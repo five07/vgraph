@@ -58,6 +58,16 @@ pub:
 	required bool
 	// immutable: only a create sets the edge; updates can't change it.
 	immutable bool
+	// graphql_skip leaves the edge out of the GraphQL schema: its field, its
+	// predicates and its inputs.
+	graphql_skip bool
+	// order_field: on a many_to_one or one_to_one edge, a column of the target
+	// that the GraphQL OrderField enum orders by, as `<EDGE>_<FIELD>`, such as
+	// `OWNER_NAME`
+	order_field string
+	// directives are printed on the edge's field in the GraphQL schema as
+	// written
+	directives []string
 }
 
 // Edges is implemented by structs that declare edges. vgraph finds the method

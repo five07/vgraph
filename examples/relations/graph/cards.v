@@ -44,8 +44,8 @@ pub fn (q CardQuery) where(conds ...load.Cond) CardQuery {
 	return next
 }
 
-// limit keeps at most `count` rows. It applies to `all()` and `first()`, not to
-// the rows of an edge load.
+// limit keeps at most `count` rows. In `with_<edge>`, it keeps at most `count`
+// of each row's targets.
 pub fn (q CardQuery) limit(count int) CardQuery {
 	mut next := q
 	next.query = load.Query{
@@ -55,8 +55,8 @@ pub fn (q CardQuery) limit(count int) CardQuery {
 	return next
 }
 
-// offset skips the first `count` rows. It applies to `all()` and `first()`, not
-// to the rows of an edge load.
+// offset skips the first `count` rows. In `with_<edge>`, it skips the first
+// `count` of each row's targets.
 pub fn (q CardQuery) offset(count int) CardQuery {
 	mut next := q
 	next.query = load.Query{
@@ -204,12 +204,12 @@ pub fn card_owner_id_not_in(values []int) load.Cond {
 
 // card_has_owner returns the condition that it has a `owner`.
 pub fn card_has_owner() load.Cond {
-	return load.in_sub('owner_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} })
+	return load.and(load.is_not_null('owner_id'), load.in_sub('owner_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} }))
 }
 
 // card_has_owner_with returns the condition that it has a `owner` that matches `conds`.
 pub fn card_has_owner_with(conds ...load.Cond) load.Cond {
-	return load.in_sub('owner_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds })
+	return load.and(load.is_not_null('owner_id'), load.in_sub('owner_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds }))
 }
 
 // order_by_id orders the rows by `id`, ascending, after the orders

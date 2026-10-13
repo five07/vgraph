@@ -951,3 +951,69 @@ fn (g Graph) groups_by_keys(keys []string) ![]GroupNode {
 	}
 	return found
 }
+
+// CreateGroupInput is what a create of a `groups` row sets, as the GraphQL input
+// `CreateGroupInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct CreateGroupInput {
+pub mut:
+	name       ?string
+	user_ids   []int
+	device_ids []string
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b GroupCreate) set_input(input CreateGroupInput) GroupCreate {
+	mut next := b
+	if v := input.name {
+		next = next.set_name(v)
+	}
+	if input.user_ids.len > 0 {
+		next = next.add_users_ids(...input.user_ids)
+	}
+	if input.device_ids.len > 0 {
+		next = next.add_devices_ids(...input.device_ids)
+	}
+	return next
+}
+
+// UpdateGroupInput is what a update of a `groups` row sets, as the GraphQL input
+// `UpdateGroupInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct UpdateGroupInput {
+pub mut:
+	name              ?string
+	add_user_ids      []int
+	remove_user_ids   []int
+	clear_users       bool
+	add_device_ids    []string
+	remove_device_ids []string
+	clear_devices     bool
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b GroupUpdateOne) set_input(input UpdateGroupInput) GroupUpdateOne {
+	mut next := b
+	if input.clear_users {
+		next = next.clear_users()
+	}
+	if input.clear_devices {
+		next = next.clear_devices()
+	}
+	if v := input.name {
+		next = next.set_name(v)
+	}
+	if input.add_user_ids.len > 0 {
+		next = next.add_users_ids(...input.add_user_ids)
+	}
+	if input.remove_user_ids.len > 0 {
+		next = next.remove_users_ids(...input.remove_user_ids)
+	}
+	if input.add_device_ids.len > 0 {
+		next = next.add_devices_ids(...input.add_device_ids)
+	}
+	if input.remove_device_ids.len > 0 {
+		next = next.remove_devices_ids(...input.remove_device_ids)
+	}
+	return next
+}

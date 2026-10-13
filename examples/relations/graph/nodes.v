@@ -47,8 +47,8 @@ pub fn (q NodeQuery) where(conds ...load.Cond) NodeQuery {
 	return next
 }
 
-// limit keeps at most `count` rows. It applies to `all()` and `first()`, not to
-// the rows of an edge load.
+// limit keeps at most `count` rows. In `with_<edge>`, it keeps at most `count`
+// of each row's targets.
 pub fn (q NodeQuery) limit(count int) NodeQuery {
 	mut next := q
 	next.query = load.Query{
@@ -58,8 +58,8 @@ pub fn (q NodeQuery) limit(count int) NodeQuery {
 	return next
 }
 
-// offset skips the first `count` rows. It applies to `all()` and `first()`, not
-// to the rows of an edge load.
+// offset skips the first `count` rows. In `with_<edge>`, it skips the first
+// `count` of each row's targets.
 pub fn (q NodeQuery) offset(count int) NodeQuery {
 	mut next := q
 	next.query = load.Query{
@@ -207,12 +207,12 @@ pub fn node_next_id_is_not_null() load.Cond {
 
 // node_has_next returns the condition that it has a `next`.
 pub fn node_has_next() load.Cond {
-	return load.in_sub('next_id', load.Sub{ table: 'nodes', column: 'id', kind: .int, conds: []load.Cond{} })
+	return load.and(load.is_not_null('next_id'), load.in_sub('next_id', load.Sub{ table: 'nodes', column: 'id', kind: .int, conds: []load.Cond{} }))
 }
 
 // node_has_next_with returns the condition that it has a `next` that matches `conds`.
 pub fn node_has_next_with(conds ...load.Cond) load.Cond {
-	return load.in_sub('next_id', load.Sub{ table: 'nodes', column: 'id', kind: .int, conds: conds })
+	return load.and(load.is_not_null('next_id'), load.in_sub('next_id', load.Sub{ table: 'nodes', column: 'id', kind: .int, conds: conds }))
 }
 
 // node_has_prev returns the condition that it has a `prev`.
@@ -904,7 +904,7 @@ fn (q NodeQuery) load_prev(rows []models.Node, fns []fn (NodeQuery) NodeQuery) !
 	for configure in fns {
 		sub = configure(sub)
 	}
-	children := sub.nodes(load.select_in[models.Node](q.graph.client.conn, 'next_id',
+	children := sub.nodes(load.select_each[models.Node](q.graph.client.conn, 'next_id',
 		rows.map(it.id.str()),
 		query: q.graph.client.prepare_query('nodes', sub.query)!
 	)!)!

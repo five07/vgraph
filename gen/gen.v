@@ -45,6 +45,10 @@ pub:
 	enum_values  []string
 	embedded     string
 	json_type    string
+	// GraphQL options
+	graphql_skip_in []string
+	order_field     string
+	directives      []string
 }
 
 const int_types = ['i8', 'i16', 'int', 'i64', 'u8', 'u16', 'u32', 'u64']
@@ -148,6 +152,10 @@ pub:
 	bidi       bool
 	required   bool
 	immutable  bool
+	// GraphQL options
+	graphql_skip bool
+	order_field  string
+	directives   []string
 }
 
 // Index mirrors `vgraph.Index`, as the loader prints it.
@@ -157,6 +165,17 @@ pub:
 	columns []string
 	unique  bool
 	where   string
+}
+
+// GraphqlTable mirrors `vgraph.GraphqlTable`, as the loader prints it.
+pub struct GraphqlTable {
+pub:
+	type_name   string
+	query_field string
+	node        bool
+	relay       bool
+	mutations   []string = ['create', 'update', 'delete']
+	directives  []string
 }
 
 // Table mirrors `vgraph.Table`, as the loader prints it.
@@ -173,6 +192,7 @@ pub:
 	hooks        int
 	interceptors int
 	rules        int
+	graphql      GraphqlTable
 }
 
 fn (t Table) column(name string) !Column {

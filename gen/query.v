@@ -52,11 +52,13 @@ fn has_cond(info Info, e Edge, target Info, conds string) !string {
 			"load.in_sub('${t.key}', load.Sub{ table: '${target.table.name}', column: '${e.column}', kind: .${kind}, conds: ${sub_conds(conds, edge_extras(e, true))} })"
 		}
 		'many_to_one' {
-			has := "load.in_sub('${e.column}', load.Sub{ table: '${target.table.name}', column: '${target.table.key}', kind: .${tkind}, conds: ${sub_conds(conds, edge_extras(e, false))} })"
+			// not null too: so its negation keeps the rows whose column is null,
+			// which `NOT (column IN (…))` leaves out
+			has := "load.is_not_null('${e.column}'), load.in_sub('${e.column}', load.Sub{ table: '${target.table.name}', column: '${target.table.key}', kind: .${tkind}, conds: ${sub_conds(conds, edge_extras(e, false))} })"
 			if e.type_col != '' {
 				"load.and(load.eq('${e.type_col}', '${e.type_val}'), ${has})"
 			} else {
-				has
+				'load.and(${has})'
 			}
 		}
 		'many_to_many' {
@@ -567,7 +569,8 @@ fn (q ${q}) load_${e.name}(rows []${info.typ()}, fns []fn (${tq}) ${tq}) !map[st
 		match e.kind {
 			'one_to_many', 'one_to_one' {
 				fk := target.table.column(e.column)!
-				b.writeln("	children := sub.nodes(load.select_in[${target.typ()}](q.graph.client.conn, '${e.column}',
+				// a limit or offset applies to each row's children
+				b.writeln("	children := sub.nodes(load.select_each[${target.typ()}](q.graph.client.conn, '${e.column}',
 		rows.map(it.${key}.str()), ${filters(e, true)})!)!
 	mut by_parent := map[string][]${tn}{}
 	for child in children {")
@@ -627,6 +630,31 @@ fn (q ${q}) load_${e.name}(rows []${info.typ()}, fns []fn (${tq}) ${tq}) !map[st
 			}
 			'many_to_many' {
 				target_key := target.key_field()!
+				conds := sub_conds('prepared.conds', edge_extras(e, true))
+				// a limit or offset applies to each row's targets: the join rows
+				// come cut, in the targets' order
+				b.writeln("	if sub.query.limit > 0 || sub.query.offset > 0 {
+		prepared := q.graph.client.prepare_query('${e.to}', sub.query)!
+		cut := load.link_each(q.graph.client.conn, '${e.through}', '${e.column}', '${e.through_to}',
+			rows.map(it.${key}.str()), .${info.key_type()!}, .${target.key_type()!}, '${target.table.name}', '${target.table.key}', load.Query{
+			...prepared
+			conds: ${conds}
+		})!
+		// the targets by key: the join rows give their order
+		found := sub.nodes(load.select_in[${target.typ()}](q.graph.client.conn, '${target.table.key}',
+			load.unique(cut.map(it[1])), ${filters_unordered(e, true)})!)!
+		mut by_key := map[string]${tn}{}
+		for target in found {
+			by_key[target.${target.field()}.${target_key}.str()] = target
+		}
+		mut cut_linked := map[string][]${tn}{}
+		for pair in cut {
+			if target := by_key[pair[1]] {
+				cut_linked[pair[0]] << target
+			}
+		}
+		return cut_linked
+	}")
 				b.writeln("	pairs := load.link_pairs(q.graph.client.conn, '${e.through}', '${e.column}',
 		'${e.through_to}', rows.map(it.${key}.str()), .${info.key_type()!}, .${target.key_type()!})!
 	targets := sub.nodes(load.select_in[${target.typ()}](q.graph.client.conn, '${target.table.key}',

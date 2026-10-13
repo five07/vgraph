@@ -341,8 +341,8 @@ pub fn (q ${q}) where(conds ...load.Cond) ${q} {
 	return next
 }
 
-// limit keeps at most `count` rows. It applies to `all()` and `first()`, not to
-// the rows of an edge load.
+// limit keeps at most `count` rows. In `with_<edge>`, it keeps at most `count`
+// of each row\'s targets.
 pub fn (q ${q}) limit(count int) ${q} {
 	mut next := q
 	next.query = load.Query{
@@ -352,8 +352,8 @@ pub fn (q ${q}) limit(count int) ${q} {
 	return next
 }
 
-// offset skips the first `count` rows. It applies to `all()` and `first()`, not
-// to the rows of an edge load.
+// offset skips the first `count` rows. In `with_<edge>`, it skips the first
+// `count` of each row\'s targets.
 pub fn (q ${q}) offset(count int) ${q} {
 	mut next := q
 	next.query = load.Query{
@@ -460,6 +460,21 @@ fn filters(edge Edge, with_type bool) string {
 		parts << "soft_del: '${edge.soft_del}'"
 	}
 	parts << "query: q.graph.client.prepare_query('${edge.to}', sub.query)!"
+	return parts.join(', ')
+}
+
+// filters_unordered returns the named options that narrow an edge's rows,
+// read by key, unordered, from `prepared`, the prepared query of `sub`.
+fn filters_unordered(edge Edge, with_type bool) string {
+	mut parts := []string{}
+	if with_type && edge.type_col != '' {
+		parts << "type_col: '${edge.type_col}'"
+		parts << "type_val: '${edge.type_val}'"
+	}
+	if edge.soft_del != '' {
+		parts << "soft_del: '${edge.soft_del}'"
+	}
+	parts << "query: load.Query{ ...prepared, order: '', desc: false, orders: []load.Order{}, limit: 0, offset: 0 }"
 	return parts.join(', ')
 }
 

@@ -1052,3 +1052,61 @@ fn (g Graph) nodes_by_keys(keys []string) ![]NodeNode {
 	}
 	return found
 }
+
+// CreateNodeInput is what a create of a `nodes` row sets, as the GraphQL input
+// `CreateListNodeInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct CreateNodeInput {
+pub mut:
+	value   ?int
+	next_id ?int
+	prev_id ?int
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b NodeCreate) set_input(input CreateNodeInput) NodeCreate {
+	mut next := b
+	if v := input.value {
+		next = next.set_value(v)
+	}
+	if v := input.next_id {
+		next = next.set_next_id(v)
+	}
+	if v := input.prev_id {
+		next = next.set_prev_id(v)
+	}
+	return next
+}
+
+// UpdateNodeInput is what a update of a `nodes` row sets, as the GraphQL input
+// `UpdateListNodeInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct UpdateNodeInput {
+pub mut:
+	value         ?int
+	next_id       ?int
+	clear_next_id bool
+	prev_id       ?int
+	clear_prev    bool
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b NodeUpdateOne) set_input(input UpdateNodeInput) NodeUpdateOne {
+	mut next := b
+	if input.clear_next_id {
+		next = next.clear_next_id()
+	}
+	if input.clear_prev {
+		next = next.clear_prev()
+	}
+	if v := input.value {
+		next = next.set_value(v)
+	}
+	if v := input.next_id {
+		next = next.set_next_id(v)
+	}
+	if v := input.prev_id {
+		next = next.set_prev_id(v)
+	}
+	return next
+}

@@ -7,6 +7,9 @@ module main
 import db.pg
 import five07.vgraph.pg as vpg
 import os
+import five07.vgraph.graphql
+import graph
+import models
 
 const relation_tables = ['schema_migrations', 'vgraph_types', 'likes', 'gadgets', 'users', 'cards',
 	'pets', 'groups', 'group_users', 'follows', 'friendships', 'nodes', 'categories', 'devices',
@@ -88,4 +91,54 @@ fn test_queries() {
 
 fn test_schema() {
 	check_schema(fixture()!)!
+}
+
+fn test_relay() {
+	check_relay(fixture()!)!
+}
+
+fn test_nested_connections() {
+	check_nested_connections(fixture()!)!
+}
+
+fn test_where_input() {
+	check_where_input(fixture()!)!
+}
+
+fn test_mutations() {
+	check_mutations(fixture()!)!
+}
+
+// A GraphQL request's mutations on a pool: they run on the connection of the
+// request's transaction, so a failure rolls back every one of them (Q103).
+fn test_graphql_transaction_on_a_pool() {
+	fixture()!
+	mut db := pg.connect(pg.Config{
+		host:     os.getenv_opt('PGHOST') or { 'localhost' }
+		port:     (os.getenv_opt('PGPORT') or { '5432' }).int()
+		user:     os.getenv_opt('PGUSER') or { 'postgres' }
+		password: os.getenv_opt('PGPASSWORD') or { '12345678' }
+		dbname:   os.getenv_opt('PGDATABASE') or { 'postgres' }
+	})!
+	defer {
+		db.close() or {}
+	}
+	g := graph.Graph.new(vpg.pool(db))!
+	s := g.graphql(graph.Resolvers{})!
+	// the second mutation is denied (only an admin deletes a group): the first
+	// one's group is gone with it
+	denied := s.execute(graphql.Request{
+		query: 'mutation { a: createGroup(input: {name: "ops"}) { id } b: createUser(input: {name: "gil", groupIDs: ["1"]}) { id } c: deleteGroup(id: "2") }'
+	}, unsafe { nil })
+	assert denied.errors.map(it.message) == ['privacy: delete_one of `groups` denied']
+	assert g.groups().where_name('ops').count()! == 0
+	assert g.users().where_name('gil').count()! == 0
+	assert g.groups().count()! == 2
+	// as an admin, all three, committed together
+	allowed := s.execute(graphql.Request{
+		query: 'mutation { a: createGroup(input: {name: "ops"}) { id } b: createUser(input: {name: "gil", groupIDs: ["1"]}) { groups { name } } c: deleteGroup(id: "2") }'
+	}, models.Admin{})
+	assert allowed.errors.len == 0
+	assert g.groups().order_by_id().all()!.map(it.group.name) == ['admins', 'ops']
+	assert g.users().where_name('gil').with_groups().only()!.groups.map(it.group.name) == ['admins']
 }

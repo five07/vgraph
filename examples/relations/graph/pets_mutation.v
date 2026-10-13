@@ -1146,3 +1146,61 @@ fn (g Graph) pets_by_keys(keys []string) ![]PetNode {
 	}
 	return found
 }
+
+// CreatePetInput is what a create of a `pets` row sets, as the GraphQL input
+// `CreatePetInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct CreatePetInput {
+pub mut:
+	name       ?string
+	owner_id   ?int
+	deleted_at ?time.Time
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b PetCreate) set_input(input CreatePetInput) PetCreate {
+	mut next := b
+	if v := input.name {
+		next = next.set_name(v)
+	}
+	if v := input.owner_id {
+		next = next.set_owner_id(v)
+	}
+	if v := input.deleted_at {
+		next = next.set_deleted_at(v)
+	}
+	return next
+}
+
+// UpdatePetInput is what a update of a `pets` row sets, as the GraphQL input
+// `UpdatePetInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct UpdatePetInput {
+pub mut:
+	name             ?string
+	owner_id         ?int
+	clear_owner_id   bool
+	deleted_at       ?time.Time
+	clear_deleted_at bool
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b PetUpdateOne) set_input(input UpdatePetInput) PetUpdateOne {
+	mut next := b
+	if input.clear_owner_id {
+		next = next.clear_owner_id()
+	}
+	if input.clear_deleted_at {
+		next = next.clear_deleted_at()
+	}
+	if v := input.name {
+		next = next.set_name(v)
+	}
+	if v := input.owner_id {
+		next = next.set_owner_id(v)
+	}
+	if v := input.deleted_at {
+		next = next.set_deleted_at(v)
+	}
+	return next
+}

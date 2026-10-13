@@ -2212,3 +2212,125 @@ fn (g Graph) comments_by_keys(keys []string) ![]CommentNode {
 	}
 	return found
 }
+
+// CreateCommentInput is what a create of a `comments` row sets, as the GraphQL input
+// `CreateCommentInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct CreateCommentInput {
+pub mut:
+	slug       ?string
+	user_id    ?int
+	owner_type ?string
+	owner_id   ?int
+	parent_id  ?int
+	body       ?string
+	created_at ?time.Time
+	updated_at ?time.Time
+	deleted_at ?time.Time
+	reply_ids  []int
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b CommentCreate) set_input(input CreateCommentInput) CommentCreate {
+	mut next := b
+	if v := input.slug {
+		next = next.set_slug(v)
+	}
+	if v := input.user_id {
+		next = next.set_user_id(v)
+	}
+	if v := input.owner_type {
+		next = next.set_owner_type(v)
+	}
+	if v := input.owner_id {
+		next = next.set_owner_id(v)
+	}
+	if v := input.parent_id {
+		next = next.set_parent_id(v)
+	}
+	if v := input.body {
+		next = next.set_body(v)
+	}
+	if v := input.created_at {
+		next = next.set_created_at(v)
+	}
+	if v := input.updated_at {
+		next = next.set_updated_at(v)
+	}
+	if v := input.deleted_at {
+		next = next.set_deleted_at(v)
+	}
+	if input.reply_ids.len > 0 {
+		next = next.add_replies_ids(...input.reply_ids)
+	}
+	return next
+}
+
+// UpdateCommentInput is what a update of a `comments` row sets, as the GraphQL input
+// `UpdateCommentInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct UpdateCommentInput {
+pub mut:
+	slug             ?string
+	user_id          ?int
+	owner_type       ?string
+	owner_id         ?int
+	parent_id        ?int
+	clear_parent_id  bool
+	body             ?string
+	created_at       ?time.Time
+	updated_at       ?time.Time
+	deleted_at       ?time.Time
+	clear_deleted_at bool
+	add_reply_ids    []int
+	remove_reply_ids []int
+	clear_replies    bool
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b CommentUpdateOne) set_input(input UpdateCommentInput) CommentUpdateOne {
+	mut next := b
+	if input.clear_parent_id {
+		next = next.clear_parent_id()
+	}
+	if input.clear_deleted_at {
+		next = next.clear_deleted_at()
+	}
+	if input.clear_replies {
+		next = next.clear_replies()
+	}
+	if v := input.slug {
+		next = next.set_slug(v)
+	}
+	if v := input.user_id {
+		next = next.set_user_id(v)
+	}
+	if v := input.owner_type {
+		next = next.set_owner_type(v)
+	}
+	if v := input.owner_id {
+		next = next.set_owner_id(v)
+	}
+	if v := input.parent_id {
+		next = next.set_parent_id(v)
+	}
+	if v := input.body {
+		next = next.set_body(v)
+	}
+	if v := input.created_at {
+		next = next.set_created_at(v)
+	}
+	if v := input.updated_at {
+		next = next.set_updated_at(v)
+	}
+	if v := input.deleted_at {
+		next = next.set_deleted_at(v)
+	}
+	if input.add_reply_ids.len > 0 {
+		next = next.add_replies_ids(...input.add_reply_ids)
+	}
+	if input.remove_reply_ids.len > 0 {
+		next = next.remove_replies_ids(...input.remove_reply_ids)
+	}
+	return next
+}

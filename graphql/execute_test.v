@@ -172,16 +172,27 @@ mut:
 	calls &Calls
 }
 
-fn (mut t MemoryTx) begin() ! {
-	t.calls.log << 'begin'
+// InTx is the context of a request's mutations in a `MemoryTx`.
+struct InTx {
+	n int
 }
 
-fn (mut t MemoryTx) commit() ! {
-	t.calls.log << 'commit'
+fn (t MemoryTx) begin(_ Context) !Context {
+	mut calls := t.calls
+	calls.log << 'begin'
+	return InTx{
+		n: calls.log.len
+	}
 }
 
-fn (mut t MemoryTx) rollback() ! {
-	t.calls.log << 'rollback'
+fn (t MemoryTx) commit(ctx Context) ! {
+	mut calls := t.calls
+	calls.log << if ctx is InTx { 'commit ${ctx.n}' } else { 'commit' }
+}
+
+fn (t MemoryTx) rollback(ctx Context) ! {
+	mut calls := t.calls
+	calls.log << if ctx is InTx { 'rollback ${ctx.n}' } else { 'rollback' }
 }
 
 fn zoo(mut calls Calls) !&Server {
@@ -224,7 +235,11 @@ fn zoo(mut calls Calls) !&Server {
 			return parents.map(Resolved((it as map[string]Value)['name'] or { null }))
 		})
 	}
-	s.resolve('Mutation', 'add', fn [mut calls] (_ Context, info FieldInfo, parents []Source) ![]Resolved {
+	s.resolve('Mutation', 'add', fn [mut calls] (ctx Context, info FieldInfo, parents []Source) ![]Resolved {
+		// the resolvers of a mutation get the transaction's context
+		if ctx !is InTx {
+			return error('not in the transaction')
+		}
 		calls.names << info.arg('name').as_string()
 		return parents.map(Resolved(Value(calls.names.len)))
 	})
@@ -297,12 +312,12 @@ fn test_mutations_run_in_order_in_a_transaction() {
 	}, unsafe { nil })
 	assert r.json() == '{"data":{"a":1,"b":2}}'
 	assert calls.names == ['x', 'y']
-	assert calls.log == ['begin', 'commit']
+	assert calls.log == ['begin', 'commit 1']
 	failed := s.execute(Request{
 		query: 'mutation { a: add(name: "z") fail }'
 	}, unsafe { nil })
 	assert failed.errors.map(it.message) == ['no']
-	assert calls.log == ['begin', 'commit', 'begin', 'rollback']
+	assert calls.log == ['begin', 'commit 1', 'begin', 'rollback 3']
 }
 
 fn test_http() {
@@ -345,4 +360,63 @@ fn test_http() {
 		content_type: 'application/json'
 		body:         '{"query": 1}'
 	}, unsafe { nil }).body == '{"errors":[{"message":"The request must have a \\"query\\" string."}]}'
+}
+
+// Relay connections: `Server.connection` resolves a `Connection`; a resolver
+// sees whether `totalCount` is asked for, through named fragments too.
+fn test_connections() {
+	mut s := Server.new('type Query { items(first: Int, last: Int, after: String): ItemConnection! }
+type Item { name: String! }
+type ItemConnection { edges: [ItemEdge] pageInfo: PageInfo! totalCount: Int! }
+type ItemEdge { node: Item cursor: String! }
+type PageInfo { hasNextPage: Boolean! hasPreviousPage: Boolean! startCursor: String endCursor: String }')!
+	mut asked := []bool{}
+	log := &asked
+	s.resolve('Query', 'items', fn [log] (_ Context, info FieldInfo, parents []Source) ![]Resolved {
+		mut l := unsafe { log }
+		l << info.selected('totalCount')
+		page := page_args(info.args)!
+		names := ['a', 'b', 'c']
+		n := page.first or { 3 }
+		items := names[..n].map(Source({
+			'name': Value(it)
+		}))
+		result := obj(connection(items, names[..n].map('c-${it}'), n < 3, false, 3))
+		return parents.map(result)
+	})
+	s.connection('ItemConnection', 'ItemEdge')
+	r := s.execute(Request{
+		query: '{ items(first: 2) { ...Page edges { cursor node { name } } } } fragment Page on ItemConnection { totalCount pageInfo { hasNextPage hasPreviousPage startCursor endCursor } }'
+	}, unsafe { nil })
+	assert r.json() == '{"data":{"items":{"totalCount":3,"pageInfo":{"hasNextPage":true,"hasPreviousPage":false,"startCursor":"c-a","endCursor":"c-b"},"edges":[{"cursor":"c-a","node":{"name":"a"}},{"cursor":"c-b","node":{"name":"b"}}]}}}'
+	empty := s.execute(Request{
+		query: '{ items(first: 0) { edges { cursor } pageInfo { startCursor endCursor } } }'
+	}, unsafe { nil })
+	assert empty.json() == '{"data":{"items":{"edges":[],"pageInfo":{"startCursor":null,"endCursor":null}}}}'
+	assert asked == [true, false]
+	both := s.execute(Request{
+		query: '{ items(first: 1, last: 1) { totalCount } }'
+	}, unsafe { nil })
+	assert both.errors.map(it.message) == ['Passing both `first` and `last` to paginate a connection is not supported.']
+	below := s.execute(Request{
+		query: '{ items(last: -2) { totalCount } }'
+	}, unsafe { nil })
+	assert below.errors.map(it.message) == ['`last` on a connection cannot be less than zero.']
+}
+
+// Applied directives print only when asked for, as Apollo's subgraph schemas
+// print them; graphql-js's printSchema leaves them out.
+fn test_print_applied_directives() {
+	schema := build_schema('directive @tag(name: String!) repeatable on OBJECT | FIELD_DEFINITION | ENUM_VALUE | INPUT_FIELD_DEFINITION
+type Query @tag(name: "q") { a(x: Int): Int @tag(name: "a") @deprecated(reason: "no") }
+enum E { X @tag(name: "x") }
+input I { f: Int @tag(name: "f") }')!
+	plain := print_schema(schema)
+	assert !plain.contains('@tag(name: "')
+	with := print_schema_with(schema, applied_directives: true)
+	assert with.contains('type Query @tag(name: "q") {\n  a(x: Int): Int @deprecated(reason: "no") @tag(name: "a")\n}')
+	assert with.contains('enum E {\n  X @tag(name: "x")\n}')
+	assert with.contains('input I {\n  f: Int @tag(name: "f")\n}')
+	// and it reads back the same
+	assert print_schema_with(build_schema(with)!, applied_directives: true) == with
 }

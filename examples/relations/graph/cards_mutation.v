@@ -886,3 +886,45 @@ fn (g Graph) cards_by_keys(keys []string) ![]CardNode {
 	}
 	return found
 }
+
+// CreateCardInput is what a create of a `cards` row sets, as the GraphQL input
+// `CreateCardInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct CreateCardInput {
+pub mut:
+	number   ?string
+	owner_id ?int
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b CardCreate) set_input(input CreateCardInput) CardCreate {
+	mut next := b
+	if v := input.number {
+		next = next.set_number(v)
+	}
+	if v := input.owner_id {
+		next = next.set_owner_id(v)
+	}
+	return next
+}
+
+// UpdateCardInput is what a update of a `cards` row sets, as the GraphQL input
+// `UpdateCardInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct UpdateCardInput {
+pub mut:
+	number   ?string
+	owner_id ?int
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b CardUpdateOne) set_input(input UpdateCardInput) CardUpdateOne {
+	mut next := b
+	if v := input.number {
+		next = next.set_number(v)
+	}
+	if v := input.owner_id {
+		next = next.set_owner_id(v)
+	}
+	return next
+}

@@ -72,6 +72,7 @@ pub:
 	operation    OperationType
 	variables    map[string]Value
 	schema       &Schema
+	fragments    map[string]FragmentDefinition // the request's, by name
 }
 
 // arg returns the argument `name`, or null.
@@ -105,20 +106,27 @@ fn selection_has(set SelectionSet, name string, i &FieldInfo) bool {
 					return true
 				}
 			}
-			FragmentSpread {}
+			FragmentSpread {
+				if def := i.fragments[sel.name.value] {
+					if selection_has(def.selection_set, name, i) {
+						return true
+					}
+				}
+			}
 		}
 	}
 	return false
 }
 
 // Transaction runs a request's mutations together: `begin` before the first,
-// then `commit`, or `rollback` when any of them failed. A connection that
+// then `commit`, or `rollback` when any of them failed. `begin` returns the
+// context the mutations' resolvers get, which can carry the transaction, such
+// as its connection; `commit` and `rollback` get it back. A connection that
 // implements `orm.TransactionalConnection` fits through a small adapter.
 pub interface Transaction {
-mut:
-	begin() !
-	commit() !
-	rollback() !
+	begin(ctx Context) !Context
+	commit(ctx Context) !
+	rollback(ctx Context) !
 }
 
 // Request is a GraphQL request.
@@ -308,33 +316,30 @@ pub fn (s &Server) execute_document(doc &Document, operation_name string, inputs
 		kind:   .object
 		parent: -1
 	}
-	mut tx := s.transaction
-	in_tx := op.operation == .mutation && tx != none
-	if in_tx {
-		mut t := tx or { panic('unreachable') }
-		t.begin() or {
+	// a request's mutations run in one transaction, when the server has one
+	tx := if op.operation == .mutation { s.transaction } else { ?Transaction(none) }
+	if t := tx {
+		ex.ctx = t.begin(ctx) or {
 			return Response{
 				errors: [GraphQLError{
 					message: 'Could not start a transaction: ${err.msg()}'
 				}]
 			}
 		}
-		tx = t
 	}
 	ex.execute_selection(root_type, [op.selection_set], [Item{
 		source: s.root
 		slot:   0
 	}])
-	if in_tx {
-		mut t := tx or { panic('unreachable') }
+	if t := tx {
 		if ex.errors.len > 0 {
-			t.rollback() or {
+			t.rollback(ex.ctx) or {
 				ex.errors << GraphQLError{
 					message: 'Could not roll back the transaction: ${err.msg()}'
 				}
 			}
 		} else {
-			t.commit() or {
+			t.commit(ex.ctx) or {
 				ex.errors << GraphQLError{
 					message: 'Could not commit the transaction: ${err.msg()}'
 				}
@@ -561,11 +566,11 @@ pub fn (s &Schema) coerce_input_value(value Value, t TypeNode, path []PathItem, 
 struct Execution {
 	server    &Server
 	doc       &Document
-	ctx       Context
 	operation OperationDefinition
 	variables map[string]Value
 	fragments map[string]FragmentDefinition
 mut:
+	ctx    Context // the transaction's, for a mutation in one
 	slots  []Slot
 	errors []GraphQLError
 }
@@ -727,6 +732,7 @@ fn (mut ex Execution) execute_field(object_type Type, group FieldGroup, items []
 		operation:    ex.operation.operation
 		variables:    ex.variables
 		schema:       s
+		fragments:    ex.fragments
 	}
 	results := ex.resolve(info, items) or {
 		for slot in slots {

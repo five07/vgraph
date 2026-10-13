@@ -1549,3 +1549,97 @@ fn (g Graph) posts_by_keys(keys []string) ![]PostNode {
 	}
 	return found
 }
+
+// CreatePostInput is what a create of a `posts` row sets, as the GraphQL input
+// `CreatePostInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct CreatePostInput {
+pub mut:
+	slug        ?string
+	user_id     ?int
+	body        ?string
+	created_at  ?time.Time
+	updated_at  ?time.Time
+	deleted_at  ?time.Time
+	comment_ids []int
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b PostCreate) set_input(input CreatePostInput) PostCreate {
+	mut next := b
+	if v := input.slug {
+		next = next.set_slug(v)
+	}
+	if v := input.user_id {
+		next = next.set_user_id(v)
+	}
+	if v := input.body {
+		next = next.set_body(v)
+	}
+	if v := input.created_at {
+		next = next.set_created_at(v)
+	}
+	if v := input.updated_at {
+		next = next.set_updated_at(v)
+	}
+	if v := input.deleted_at {
+		next = next.set_deleted_at(v)
+	}
+	if input.comment_ids.len > 0 {
+		next = next.add_comments_ids(...input.comment_ids)
+	}
+	return next
+}
+
+// UpdatePostInput is what a update of a `posts` row sets, as the GraphQL input
+// `UpdatePostInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct UpdatePostInput {
+pub mut:
+	slug               ?string
+	user_id            ?int
+	body               ?string
+	created_at         ?time.Time
+	updated_at         ?time.Time
+	deleted_at         ?time.Time
+	clear_deleted_at   bool
+	add_comment_ids    []int
+	remove_comment_ids []int
+	clear_comments     bool
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b PostUpdateOne) set_input(input UpdatePostInput) PostUpdateOne {
+	mut next := b
+	if input.clear_deleted_at {
+		next = next.clear_deleted_at()
+	}
+	if input.clear_comments {
+		next = next.clear_comments()
+	}
+	if v := input.slug {
+		next = next.set_slug(v)
+	}
+	if v := input.user_id {
+		next = next.set_user_id(v)
+	}
+	if v := input.body {
+		next = next.set_body(v)
+	}
+	if v := input.created_at {
+		next = next.set_created_at(v)
+	}
+	if v := input.updated_at {
+		next = next.set_updated_at(v)
+	}
+	if v := input.deleted_at {
+		next = next.set_deleted_at(v)
+	}
+	if input.add_comment_ids.len > 0 {
+		next = next.add_comments_ids(...input.add_comment_ids)
+	}
+	if input.remove_comment_ids.len > 0 {
+		next = next.remove_comments_ids(...input.remove_comment_ids)
+	}
+	return next
+}

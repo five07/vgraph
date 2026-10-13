@@ -6,6 +6,22 @@ module graphql
 // built in, then every type that isn't a specified scalar or an introspection
 // type, in schema order.
 pub fn print_schema(s &Schema) string {
+	return print_schema_with(s, PrintOptions{})
+}
+
+// PrintOptions changes how `print_schema_with` prints a schema.
+@[params]
+pub struct PrintOptions {
+pub:
+	// applied_directives prints the directives the schema applies to its
+	// types, fields, arguments and enum values, as Apollo's
+	// `printSubgraphSchema` does; graphql-js's `printSchema` leaves them out
+	applied_directives bool
+}
+
+// print_schema_with returns the schema as SDL, as `print_schema` does, with
+// what `opts` adds.
+pub fn print_schema_with(s &Schema, opts PrintOptions) string {
 	mut parts := []string{}
 	if def := print_schema_root(s) {
 		parts << def
@@ -19,9 +35,20 @@ pub fn print_schema(s &Schema) string {
 		if name in specified_scalars || name in introspection_types {
 			continue
 		}
-		parts << s.print_named_type(s.types[name] or { continue })
+		parts << s.print_type_with(s.types[name] or { continue }, opts.applied_directives)
 	}
 	return parts.filter(it != '').join('\n\n')
+}
+
+// applied returns the directives of `directives` that the printer prints when
+// `on`: those but `@deprecated`, `@specifiedBy` and `@oneOf`, which it prints
+// anyway.
+fn applied(directives []Directive, on bool) string {
+	if !on {
+		return ''
+	}
+	kept := directives.filter(it.name.value !in ['deprecated', 'specifiedBy', 'oneOf'])
+	return if kept.len > 0 { ' ' + print_directives(kept) } else { '' }
 }
 
 fn print_schema_root(s &Schema) ?string {
@@ -46,14 +73,21 @@ fn print_schema_root(s &Schema) ?string {
 
 // print_named_type returns one type as SDL.
 pub fn (s &Schema) print_named_type(t Type) string {
+	return s.print_type_with(t, false)
+}
+
+// print_type_with returns one type as SDL, with its applied directives when
+// `on`.
+fn (s &Schema) print_type_with(t Type, on bool) string {
 	desc := print_type_description(t.description, '', true)
+	dirs := applied(t.directives, on)
 	return match t.kind {
 		.scalar {
 			mut specified := ''
 			if url := t.specified_by_url {
 				specified = ' @specifiedBy(url: ${print_string(url)})'
 			}
-			desc + 'scalar ${t.name}' + specified
+			desc + 'scalar ${t.name}' + specified + dirs
 		}
 		.object, .@interface {
 			keyword := if t.kind == .object { 'type' } else { 'interface' }
@@ -62,7 +96,7 @@ pub fn (s &Schema) print_named_type(t Type) string {
 			} else {
 				''
 			}
-			desc + '${keyword} ${t.name}' + implements + s.print_fields(t.fields)
+			desc + '${keyword} ${t.name}' + implements + dirs + s.print_fields(t.fields, on)
 		}
 		.@union {
 			members := if t.possible_types.len > 0 {
@@ -70,34 +104,34 @@ pub fn (s &Schema) print_named_type(t Type) string {
 			} else {
 				''
 			}
-			desc + 'union ' + t.name + members
+			desc + 'union ' + t.name + dirs + members
 		}
 		.@enum {
 			mut values := []string{}
 			for i, v in t.values {
 				values << print_type_description(v.description, '  ', i == 0) + '  ' + v.name +
-					print_deprecated(v.deprecation_reason)
+					print_deprecated(v.deprecation_reason) + applied(v.directives, on)
 			}
-			desc + 'enum ${t.name}' + print_block(values)
+			desc + 'enum ${t.name}' + dirs + print_block(values)
 		}
 		.input_object {
 			mut fields := []string{}
 			for i, f in t.input_fields {
 				fields << print_type_description(f.description, '  ', i == 0) + '  ' +
-					s.print_input_value(f)
+					s.print_input_value(f) + applied(f.directives, on)
 			}
-			desc + 'input ${t.name}' + (if t.is_one_of { ' @oneOf' } else { '' }) +
+			desc + 'input ${t.name}' + (if t.is_one_of { ' @oneOf' } else { '' }) + dirs +
 				print_block(fields)
 		}
 	}
 }
 
-fn (s &Schema) print_fields(fields []FieldDef) string {
+fn (s &Schema) print_fields(fields []FieldDef, on bool) string {
 	mut out := []string{}
 	for i, f in fields {
 		out << print_type_description(f.description, '  ', i == 0) + '  ' + f.name +
 			s.print_args(f.args, '  ') + ': ' + print_type(f.typ) +
-			print_deprecated(f.deprecation_reason)
+			print_deprecated(f.deprecation_reason) + applied(f.directives, on)
 	}
 	return print_block(out)
 }

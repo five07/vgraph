@@ -51,8 +51,8 @@ pub fn (q GroupQuery) where(conds ...load.Cond) GroupQuery {
 	return next
 }
 
-// limit keeps at most `count` rows. It applies to `all()` and `first()`, not to
-// the rows of an edge load.
+// limit keeps at most `count` rows. In `with_<edge>`, it keeps at most `count`
+// of each row's targets.
 pub fn (q GroupQuery) limit(count int) GroupQuery {
 	mut next := q
 	next.query = load.Query{
@@ -62,8 +62,8 @@ pub fn (q GroupQuery) limit(count int) GroupQuery {
 	return next
 }
 
-// offset skips the first `count` rows. It applies to `all()` and `first()`, not
-// to the rows of an edge load.
+// offset skips the first `count` rows. In `with_<edge>`, it skips the first
+// `count` of each row's targets.
 pub fn (q GroupQuery) offset(count int) GroupQuery {
 	mut next := q
 	next.query = load.Query{
@@ -694,6 +694,30 @@ fn (q GroupQuery) load_users(rows []models.Group, fns []fn (UserQuery) UserQuery
 	for configure in fns {
 		sub = configure(sub)
 	}
+	if sub.query.limit > 0 || sub.query.offset > 0 {
+		prepared := q.graph.client.prepare_query('users', sub.query)!
+		cut := load.link_each(q.graph.client.conn, 'group_users', 'group_id', 'user_id',
+			rows.map(it.id.str()), .int, .int, 'users', 'id', load.Query{
+				...prepared
+				conds: prepared.conds
+			})!
+		// the targets by key: the join rows give their order
+		found := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
+			load.unique(cut.map(it[1])),
+			query: load.Query{ ...prepared, order: '', desc: false, orders: []load.Order{}, limit: 0, offset: 0 }
+		)!)!
+		mut by_key := map[string]UserNode{}
+		for target in found {
+			by_key[target.user.id.str()] = target
+		}
+		mut cut_linked := map[string][]UserNode{}
+		for pair in cut {
+			if target := by_key[pair[1]] {
+				cut_linked[pair[0]] << target
+			}
+		}
+		return cut_linked
+	}
 	pairs := load.link_pairs(q.graph.client.conn, 'group_users', 'group_id',
 		'user_id', rows.map(it.id.str()), .int, .int)!
 	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
@@ -730,6 +754,30 @@ fn (q GroupQuery) load_devices(rows []models.Group, fns []fn (DeviceQuery) Devic
 	mut sub := q.graph.devices()
 	for configure in fns {
 		sub = configure(sub)
+	}
+	if sub.query.limit > 0 || sub.query.offset > 0 {
+		prepared := q.graph.client.prepare_query('devices', sub.query)!
+		cut := load.link_each(q.graph.client.conn, 'device_groups', 'group_id', 'device_id',
+			rows.map(it.id.str()), .int, .string, 'devices', 'id', load.Query{
+				...prepared
+				conds: prepared.conds
+			})!
+		// the targets by key: the join rows give their order
+		found := sub.nodes(load.select_in[models.Device](q.graph.client.conn, 'id',
+			load.unique(cut.map(it[1])),
+			query: load.Query{ ...prepared, order: '', desc: false, orders: []load.Order{}, limit: 0, offset: 0 }
+		)!)!
+		mut by_key := map[string]DeviceNode{}
+		for target in found {
+			by_key[target.device.id.str()] = target
+		}
+		mut cut_linked := map[string][]DeviceNode{}
+		for pair in cut {
+			if target := by_key[pair[1]] {
+				cut_linked[pair[0]] << target
+			}
+		}
+		return cut_linked
 	}
 	pairs := load.link_pairs(q.graph.client.conn, 'device_groups', 'group_id',
 		'device_id', rows.map(it.id.str()), .int, .string)!

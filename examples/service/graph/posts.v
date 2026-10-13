@@ -52,8 +52,8 @@ pub fn (q PostQuery) where(conds ...load.Cond) PostQuery {
 	return next
 }
 
-// limit keeps at most `count` rows. It applies to `all()` and `first()`, not to
-// the rows of an edge load.
+// limit keeps at most `count` rows. In `with_<edge>`, it keeps at most `count`
+// of each row's targets.
 pub fn (q PostQuery) limit(count int) PostQuery {
 	mut next := q
 	next.query = load.Query{
@@ -63,8 +63,8 @@ pub fn (q PostQuery) limit(count int) PostQuery {
 	return next
 }
 
-// offset skips the first `count` rows. It applies to `all()` and `first()`, not
-// to the rows of an edge load.
+// offset skips the first `count` rows. In `with_<edge>`, it skips the first
+// `count` of each row's targets.
 pub fn (q PostQuery) offset(count int) PostQuery {
 	mut next := q
 	next.query = load.Query{
@@ -362,12 +362,12 @@ pub fn post_deleted_at_is_not_null() load.Cond {
 
 // post_has_author returns the condition that it has a `author`.
 pub fn post_has_author() load.Cond {
-	return load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} })
+	return load.and(load.is_not_null('user_id'), load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} }))
 }
 
 // post_has_author_with returns the condition that it has a `author` that matches `conds`.
 pub fn post_has_author_with(conds ...load.Cond) load.Cond {
-	return load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds })
+	return load.and(load.is_not_null('user_id'), load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds }))
 }
 
 // post_has_comments returns the condition that it has a `comments`.
@@ -1277,8 +1277,8 @@ fn (q PostQuery) load_comments(rows []posts_models.Post, fns []fn (CommentQuery)
 	for configure in fns {
 		sub = configure(sub)
 	}
-	children := sub.nodes(load.select_in[comments_models.Comment](q.graph.client.conn, 'owner_id',
-		rows.map(it.id.str()),
+	children := sub.nodes(load.select_each[comments_models.Comment](q.graph.client.conn,
+		'owner_id', rows.map(it.id.str()),
 		type_col: 'owner_type'
 		type_val: 'Post'
 		soft_del: 'deleted_at'

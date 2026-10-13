@@ -1014,3 +1014,53 @@ fn (g Graph) likes_by_keys(keys []string) ![]LikeNode {
 	}
 	return found
 }
+
+// CreateLikeInput is what a create of a `likes` row sets, as the GraphQL input
+// `CreateLikeInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct CreateLikeInput {
+pub mut:
+	user_id   ?int
+	gadget_id ?i64
+	liked_at  ?time.Time
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b LikeCreate) set_input(input CreateLikeInput) LikeCreate {
+	mut next := b
+	if v := input.user_id {
+		next = next.set_user_id(v)
+	}
+	if v := input.gadget_id {
+		next = next.set_gadget_id(v)
+	}
+	if v := input.liked_at {
+		next = next.set_liked_at(v)
+	}
+	return next
+}
+
+// UpdateLikeInput is what a update of a `likes` row sets, as the GraphQL input
+// `UpdateLikeInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct UpdateLikeInput {
+pub mut:
+	user_id   ?int
+	gadget_id ?i64
+	liked_at  ?time.Time
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b LikeUpdateOne) set_input(input UpdateLikeInput) LikeUpdateOne {
+	mut next := b
+	if v := input.user_id {
+		next = next.set_user_id(v)
+	}
+	if v := input.gadget_id {
+		next = next.set_gadget_id(v)
+	}
+	if v := input.liked_at {
+		next = next.set_liked_at(v)
+	}
+	return next
+}

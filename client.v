@@ -53,7 +53,21 @@ pub fn Client.new(conn orm.Connection, schema Schema) !Client {
 // `graphql.Context`, so the GraphQL server passes each request's context on:
 // V can't convert one interface into another, so vgraph and its GraphQL module
 // share the one type.
+//
+// A `TxContext` (a GraphQL request's mutations) gives the client its
+// transaction too: the client then runs in it, and carries the request's own
+// context.
 pub fn (c Client) with_ctx(ctx graphql.Context) Client {
+	if ctx is TxContext {
+		return Client{
+			...c
+			conn:    ctx.client.conn
+			ctx:     ctx.ctx
+			in_tx:   true
+			owns_tx: false
+			txstate: ctx.client.txstate
+		}
+	}
 	return Client{
 		...c
 		ctx: ctx
@@ -241,4 +255,30 @@ fn (c Client) edge_between(from string, name string, to string) !Edge {
 		return error('`${from}.${name}` leads to `${e.to}`, not `${to}`')
 	}
 	return e
+}
+
+// global_types returns the tables with global ids (`global_ids`), by their
+// index, in one query.
+pub fn (c Client) global_types() !map[int]string {
+	config := orm.SelectConfig{
+		table:        orm.Table{
+			name: 'vgraph_types'
+		}
+		primary:      'id'
+		fields:       ['id', 'name']
+		select_exprs: ['id', 'name']
+		types:        [orm.type_idx['int'], orm.type_string]
+	}
+	mut conn := c.conn
+	rows := conn.select(config, orm.QueryData{}, orm.QueryData{})!
+	mut types := map[int]string{}
+	for row in rows {
+		index := match row[0] {
+			int { row[0] as int }
+			i64 { int(row[0] as i64) }
+			else { 0 }
+		}
+		types[index] = row[1] as string
+	}
+	return types
 }

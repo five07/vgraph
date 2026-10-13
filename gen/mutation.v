@@ -703,7 +703,85 @@ fn (g Graph) ${t.name}_by_keys(keys []string) ![]${n} {
 	}
 	return found
 }')
+	if !t.graphql_skip {
+		write_inputs(mut b, info, infos)!
+	}
 	return b.str()
+}
+
+// write_inputs writes `Create<T>Input` and `Update<T>Input`, the values of the
+// GraphQL inputs, and `set_input` on the create and update_one builders, as
+// entgql's `SetInput`.
+fn write_inputs(mut b strings.Builder, info Info, infos map[string]Info) ! {
+	t := info.table
+	s := info.entity.struct_name
+	for create in [true, false] {
+		kind := if create { 'Create' } else { 'Update' }
+		vt := '${kind}${s}Input'
+		builder := if create { info.create() } else { info.update_one() }
+		fields := input_fields(info, infos, create)
+		b.writeln('
+// ${vt} is what a ${kind.to_lower()} of a `${t.name}` row sets, as the GraphQL input
+// `${kind}${info.gql_type()}Input` gives it: `none` and empty lists leave things as
+// they are.
+pub struct ${vt} {
+pub mut:')
+		for f in fields {
+			b.writeln('	${f.v} ${f.v_type}')
+		}
+		b.writeln('}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b ${builder}) set_input(input ${vt}) ${builder} {
+	mut next := b')
+		for f in fields {
+			match f.kind {
+				.clear_column {
+					b.writeln('	if input.${f.v} {
+		next = next.clear_${f.column.field}()
+	}')
+				}
+				.clear_edge {
+					b.writeln('	if input.${f.v} {
+		next = next.clear_${f.edge.name}()
+	}')
+				}
+				else {}
+			}
+		}
+		for f in fields {
+			match f.kind {
+				.column {
+					b.writeln('	if v := input.${f.v} {
+		next = next.set_${f.column.field}(v)
+	}')
+				}
+				.set_edge {
+					b.writeln('	if v := input.${f.v} {
+		next = next.set_${f.edge.name}_id(v)
+	}')
+				}
+				else {}
+			}
+		}
+		for f in fields {
+			match f.kind {
+				.add_ids {
+					b.writeln('	if input.${f.v}.len > 0 {
+		next = next.add_${f.edge.name}_ids(...input.${f.v})
+	}')
+				}
+				.remove_ids {
+					b.writeln('	if input.${f.v}.len > 0 {
+		next = next.remove_${f.edge.name}_ids(...input.${f.v})
+	}')
+				}
+				else {}
+			}
+		}
+		b.writeln('	return next
+}')
+	}
 }
 
 // write_conflict writes the upsert methods of a create builder, or of a bulk

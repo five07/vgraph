@@ -1,5 +1,10 @@
 # TODO
 
+Let's rewrite PLAN.md - add a small context preamble section for future agents. Then remove all old goals including Phase 8. Next, create new goals and tasks for the items in the TODO.md (which will be deleted). Future items post-v0.1.0 will come from issues in GH.
+
+- verify no N+1 queries
+- verify coverage
+- Add a Contributing and Credits section to README
 - polymorphic FKs on related tables
 - optional pagination with GraphQl standard (by config): 
   - first, after, offest
@@ -9,8 +14,10 @@
 - hooks example
   - passing JWT bearer token
   - hook handler to evaluate access/deny to resources
+- Copy gh/vlang/v issue templates for GitHub
+  - update them where appropriate
 - schema discovery and validation
-- federation
+- federation v2 subgraphs
 - OTel integration
 - docs section
 - upstream fix in `vlib/orm` (PLAN.md Q51 (d), future state): an optional

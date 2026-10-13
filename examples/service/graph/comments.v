@@ -62,8 +62,8 @@ pub fn (q CommentQuery) where(conds ...load.Cond) CommentQuery {
 	return next
 }
 
-// limit keeps at most `count` rows. It applies to `all()` and `first()`, not to
-// the rows of an edge load.
+// limit keeps at most `count` rows. In `with_<edge>`, it keeps at most `count`
+// of each row's targets.
 pub fn (q CommentQuery) limit(count int) CommentQuery {
 	mut next := q
 	next.query = load.Query{
@@ -73,8 +73,8 @@ pub fn (q CommentQuery) limit(count int) CommentQuery {
 	return next
 }
 
-// offset skips the first `count` rows. It applies to `all()` and `first()`, not
-// to the rows of an edge load.
+// offset skips the first `count` rows. In `with_<edge>`, it skips the first
+// `count` of each row's targets.
 pub fn (q CommentQuery) offset(count int) CommentQuery {
 	mut next := q
 	next.query = load.Query{
@@ -512,42 +512,42 @@ pub fn comment_deleted_at_is_not_null() load.Cond {
 
 // comment_has_author returns the condition that it has a `author`.
 pub fn comment_has_author() load.Cond {
-	return load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} })
+	return load.and(load.is_not_null('user_id'), load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} }))
 }
 
 // comment_has_author_with returns the condition that it has a `author` that matches `conds`.
 pub fn comment_has_author_with(conds ...load.Cond) load.Cond {
-	return load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds })
+	return load.and(load.is_not_null('user_id'), load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds }))
 }
 
 // comment_has_parent returns the condition that it has a `parent`.
 pub fn comment_has_parent() load.Cond {
-	return load.in_sub('parent_id', load.Sub{ table: 'comments', column: 'id', kind: .int, conds: []load.Cond{} })
+	return load.and(load.is_not_null('parent_id'), load.in_sub('parent_id', load.Sub{ table: 'comments', column: 'id', kind: .int, conds: []load.Cond{} }))
 }
 
 // comment_has_parent_with returns the condition that it has a `parent` that matches `conds`.
 pub fn comment_has_parent_with(conds ...load.Cond) load.Cond {
-	return load.in_sub('parent_id', load.Sub{ table: 'comments', column: 'id', kind: .int, conds: conds })
+	return load.and(load.is_not_null('parent_id'), load.in_sub('parent_id', load.Sub{ table: 'comments', column: 'id', kind: .int, conds: conds }))
 }
 
 // comment_has_article returns the condition that it has a `article`.
 pub fn comment_has_article() load.Cond {
-	return load.and(load.eq('owner_type', 'Article'), load.in_sub('owner_id', load.Sub{ table: 'articles', column: 'id', kind: .int, conds: []load.Cond{} }))
+	return load.and(load.eq('owner_type', 'Article'), load.is_not_null('owner_id'), load.in_sub('owner_id', load.Sub{ table: 'articles', column: 'id', kind: .int, conds: []load.Cond{} }))
 }
 
 // comment_has_article_with returns the condition that it has a `article` that matches `conds`.
 pub fn comment_has_article_with(conds ...load.Cond) load.Cond {
-	return load.and(load.eq('owner_type', 'Article'), load.in_sub('owner_id', load.Sub{ table: 'articles', column: 'id', kind: .int, conds: conds }))
+	return load.and(load.eq('owner_type', 'Article'), load.is_not_null('owner_id'), load.in_sub('owner_id', load.Sub{ table: 'articles', column: 'id', kind: .int, conds: conds }))
 }
 
 // comment_has_post returns the condition that it has a `post`.
 pub fn comment_has_post() load.Cond {
-	return load.and(load.eq('owner_type', 'Post'), load.in_sub('owner_id', load.Sub{ table: 'posts', column: 'id', kind: .int, conds: []load.Cond{} }))
+	return load.and(load.eq('owner_type', 'Post'), load.is_not_null('owner_id'), load.in_sub('owner_id', load.Sub{ table: 'posts', column: 'id', kind: .int, conds: []load.Cond{} }))
 }
 
 // comment_has_post_with returns the condition that it has a `post` that matches `conds`.
 pub fn comment_has_post_with(conds ...load.Cond) load.Cond {
-	return load.and(load.eq('owner_type', 'Post'), load.in_sub('owner_id', load.Sub{ table: 'posts', column: 'id', kind: .int, conds: conds }))
+	return load.and(load.eq('owner_type', 'Post'), load.is_not_null('owner_id'), load.in_sub('owner_id', load.Sub{ table: 'posts', column: 'id', kind: .int, conds: conds }))
 }
 
 // comment_has_replies returns the condition that it has a `replies`.
@@ -2326,8 +2326,8 @@ fn (q CommentQuery) load_replies(rows []comments_models.Comment, fns []fn (Comme
 	for configure in fns {
 		sub = configure(sub)
 	}
-	children := sub.nodes(load.select_in[comments_models.Comment](q.graph.client.conn, 'parent_id',
-		rows.map(it.id.str()),
+	children := sub.nodes(load.select_each[comments_models.Comment](q.graph.client.conn,
+		'parent_id', rows.map(it.id.str()),
 		soft_del: 'deleted_at'
 		query:    q.graph.client.prepare_query('comments', sub.query)!
 	)!)!

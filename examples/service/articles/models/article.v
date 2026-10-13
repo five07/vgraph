@@ -141,3 +141,11 @@ fn (fields ArticleUpdate) validate() ! {
 		return error('the body is longer than ${max_body_len} bytes')
 	}
 }
+
+// graphql leaves out the generated GraphQL mutations: `api.graphql` declares
+// this API's own, keyed by slug, until Phase 7 (PLAN.md, Q107).
+pub fn (a Article) graphql() vgraph.GraphqlTable {
+	return vgraph.GraphqlTable{
+		mutations: []
+	}
+}

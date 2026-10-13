@@ -48,8 +48,8 @@ pub fn (q LikeQuery) where(conds ...load.Cond) LikeQuery {
 	return next
 }
 
-// limit keeps at most `count` rows. It applies to `all()` and `first()`, not to
-// the rows of an edge load.
+// limit keeps at most `count` rows. In `with_<edge>`, it keeps at most `count`
+// of each row's targets.
 pub fn (q LikeQuery) limit(count int) LikeQuery {
 	mut next := q
 	next.query = load.Query{
@@ -59,8 +59,8 @@ pub fn (q LikeQuery) limit(count int) LikeQuery {
 	return next
 }
 
-// offset skips the first `count` rows. It applies to `all()` and `first()`, not
-// to the rows of an edge load.
+// offset skips the first `count` rows. In `with_<edge>`, it skips the first
+// `count` of each row's targets.
 pub fn (q LikeQuery) offset(count int) LikeQuery {
 	mut next := q
 	next.query = load.Query{
@@ -228,22 +228,22 @@ pub fn like_liked_at_ge(value time.Time) load.Cond {
 
 // like_has_user returns the condition that it has a `user`.
 pub fn like_has_user() load.Cond {
-	return load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} })
+	return load.and(load.is_not_null('user_id'), load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} }))
 }
 
 // like_has_user_with returns the condition that it has a `user` that matches `conds`.
 pub fn like_has_user_with(conds ...load.Cond) load.Cond {
-	return load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds })
+	return load.and(load.is_not_null('user_id'), load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds }))
 }
 
 // like_has_gadget returns the condition that it has a `gadget`.
 pub fn like_has_gadget() load.Cond {
-	return load.in_sub('gadget_id', load.Sub{ table: 'gadgets', column: 'id', kind: .i64, conds: []load.Cond{} })
+	return load.and(load.is_not_null('gadget_id'), load.in_sub('gadget_id', load.Sub{ table: 'gadgets', column: 'id', kind: .i64, conds: []load.Cond{} }))
 }
 
 // like_has_gadget_with returns the condition that it has a `gadget` that matches `conds`.
 pub fn like_has_gadget_with(conds ...load.Cond) load.Cond {
-	return load.in_sub('gadget_id', load.Sub{ table: 'gadgets', column: 'id', kind: .i64, conds: conds })
+	return load.and(load.is_not_null('gadget_id'), load.in_sub('gadget_id', load.Sub{ table: 'gadgets', column: 'id', kind: .i64, conds: conds }))
 }
 
 // order_by_id orders the rows by `id`, ascending, after the orders

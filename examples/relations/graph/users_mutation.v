@@ -1984,3 +1984,189 @@ fn (g Graph) users_by_keys(keys []string) ![]UserNode {
 	}
 	return found
 }
+
+// CreateUserInput is what a create of a `users` row sets, as the GraphQL input
+// `CreateUserInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct CreateUserInput {
+pub mut:
+	name             ?string
+	spouse_id        ?int
+	card_id          ?int
+	pet_ids          []int
+	group_ids        []int
+	following_ids    []int
+	follower_ids     []int
+	friend_ids       []int
+	device_ids       []string
+	gadget_ids       []i64
+	liked_gadget_ids []i64
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b UserCreate) set_input(input CreateUserInput) UserCreate {
+	mut next := b
+	if v := input.name {
+		next = next.set_name(v)
+	}
+	if v := input.spouse_id {
+		next = next.set_spouse_id(v)
+	}
+	if v := input.card_id {
+		next = next.set_card_id(v)
+	}
+	if input.pet_ids.len > 0 {
+		next = next.add_pets_ids(...input.pet_ids)
+	}
+	if input.group_ids.len > 0 {
+		next = next.add_groups_ids(...input.group_ids)
+	}
+	if input.following_ids.len > 0 {
+		next = next.add_following_ids(...input.following_ids)
+	}
+	if input.follower_ids.len > 0 {
+		next = next.add_followers_ids(...input.follower_ids)
+	}
+	if input.friend_ids.len > 0 {
+		next = next.add_friends_ids(...input.friend_ids)
+	}
+	if input.device_ids.len > 0 {
+		next = next.add_devices_ids(...input.device_ids)
+	}
+	if input.gadget_ids.len > 0 {
+		next = next.add_gadgets_ids(...input.gadget_ids)
+	}
+	if input.liked_gadget_ids.len > 0 {
+		next = next.add_liked_gadgets_ids(...input.liked_gadget_ids)
+	}
+	return next
+}
+
+// UpdateUserInput is what a update of a `users` row sets, as the GraphQL input
+// `UpdateUserInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct UpdateUserInput {
+pub mut:
+	name                    ?string
+	spouse_id               ?int
+	clear_spouse_id         bool
+	card_id                 ?int
+	clear_card              bool
+	add_pet_ids             []int
+	remove_pet_ids          []int
+	clear_pets              bool
+	add_group_ids           []int
+	remove_group_ids        []int
+	clear_groups            bool
+	add_following_ids       []int
+	remove_following_ids    []int
+	clear_following         bool
+	add_follower_ids        []int
+	remove_follower_ids     []int
+	clear_followers         bool
+	add_friend_ids          []int
+	remove_friend_ids       []int
+	clear_friends           bool
+	add_device_ids          []string
+	remove_device_ids       []string
+	clear_devices           bool
+	add_gadget_ids          []i64
+	remove_gadget_ids       []i64
+	clear_gadgets           bool
+	add_liked_gadget_ids    []i64
+	remove_liked_gadget_ids []i64
+	clear_liked_gadgets     bool
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b UserUpdateOne) set_input(input UpdateUserInput) UserUpdateOne {
+	mut next := b
+	if input.clear_spouse_id {
+		next = next.clear_spouse_id()
+	}
+	if input.clear_card {
+		next = next.clear_card()
+	}
+	if input.clear_pets {
+		next = next.clear_pets()
+	}
+	if input.clear_groups {
+		next = next.clear_groups()
+	}
+	if input.clear_following {
+		next = next.clear_following()
+	}
+	if input.clear_followers {
+		next = next.clear_followers()
+	}
+	if input.clear_friends {
+		next = next.clear_friends()
+	}
+	if input.clear_devices {
+		next = next.clear_devices()
+	}
+	if input.clear_gadgets {
+		next = next.clear_gadgets()
+	}
+	if input.clear_liked_gadgets {
+		next = next.clear_liked_gadgets()
+	}
+	if v := input.name {
+		next = next.set_name(v)
+	}
+	if v := input.spouse_id {
+		next = next.set_spouse_id(v)
+	}
+	if v := input.card_id {
+		next = next.set_card_id(v)
+	}
+	if input.add_pet_ids.len > 0 {
+		next = next.add_pets_ids(...input.add_pet_ids)
+	}
+	if input.remove_pet_ids.len > 0 {
+		next = next.remove_pets_ids(...input.remove_pet_ids)
+	}
+	if input.add_group_ids.len > 0 {
+		next = next.add_groups_ids(...input.add_group_ids)
+	}
+	if input.remove_group_ids.len > 0 {
+		next = next.remove_groups_ids(...input.remove_group_ids)
+	}
+	if input.add_following_ids.len > 0 {
+		next = next.add_following_ids(...input.add_following_ids)
+	}
+	if input.remove_following_ids.len > 0 {
+		next = next.remove_following_ids(...input.remove_following_ids)
+	}
+	if input.add_follower_ids.len > 0 {
+		next = next.add_followers_ids(...input.add_follower_ids)
+	}
+	if input.remove_follower_ids.len > 0 {
+		next = next.remove_followers_ids(...input.remove_follower_ids)
+	}
+	if input.add_friend_ids.len > 0 {
+		next = next.add_friends_ids(...input.add_friend_ids)
+	}
+	if input.remove_friend_ids.len > 0 {
+		next = next.remove_friends_ids(...input.remove_friend_ids)
+	}
+	if input.add_device_ids.len > 0 {
+		next = next.add_devices_ids(...input.add_device_ids)
+	}
+	if input.remove_device_ids.len > 0 {
+		next = next.remove_devices_ids(...input.remove_device_ids)
+	}
+	if input.add_gadget_ids.len > 0 {
+		next = next.add_gadgets_ids(...input.add_gadget_ids)
+	}
+	if input.remove_gadget_ids.len > 0 {
+		next = next.remove_gadgets_ids(...input.remove_gadget_ids)
+	}
+	if input.add_liked_gadget_ids.len > 0 {
+		next = next.add_liked_gadgets_ids(...input.add_liked_gadget_ids)
+	}
+	if input.remove_liked_gadget_ids.len > 0 {
+		next = next.remove_liked_gadgets_ids(...input.remove_liked_gadget_ids)
+	}
+	return next
+}

@@ -69,3 +69,19 @@ fn test_queries() {
 fn test_schema() {
 	check_schema(fixture()!)!
 }
+
+fn test_relay() {
+	check_relay(fixture()!)!
+}
+
+fn test_nested_connections() {
+	check_nested_connections(fixture()!)!
+}
+
+fn test_where_input() {
+	check_where_input(fixture()!)!
+}
+
+fn test_mutations() {
+	check_mutations(fixture()!)!
+}

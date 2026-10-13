@@ -151,8 +151,11 @@ pub mut:
 	desc  bool
 	// orders: the order columns after `order`
 	orders []Order
-	limit  int // at most this many rows; no limit when 0. Edge loads ignore it.
-	offset int // skip this many rows first. Edge loads ignore it.
+	// limit: at most this many rows, no limit when 0; offset: skip this many
+	// rows first. `select_in` ignores both; `select_each` and `link_each` apply
+	// them to each parent's rows.
+	limit  int
+	offset int
 	lock   Lock
 	// distinct: `scan` reads each distinct row once
 	distinct bool
@@ -175,6 +178,8 @@ pub:
 	desc   bool
 	nulls  Nulls
 	expr   string
+	// typ: the V type of `expr`'s value, such as `int`, for a cursor
+	typ string
 }
 
 // asc returns the ascending order of `column`.

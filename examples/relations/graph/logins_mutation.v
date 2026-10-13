@@ -902,3 +902,45 @@ fn (g Graph) logins_by_keys(keys []string) ![]LoginNode {
 	}
 	return found
 }
+
+// CreateLoginInput is what a create of a `logins` row sets, as the GraphQL input
+// `CreateLoginInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct CreateLoginInput {
+pub mut:
+	device_id ?string
+	at        ?int
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b LoginCreate) set_input(input CreateLoginInput) LoginCreate {
+	mut next := b
+	if v := input.device_id {
+		next = next.set_device_id(v)
+	}
+	if v := input.at {
+		next = next.set_at(v)
+	}
+	return next
+}
+
+// UpdateLoginInput is what a update of a `logins` row sets, as the GraphQL input
+// `UpdateLoginInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct UpdateLoginInput {
+pub mut:
+	device_id ?string
+	at        ?int
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b LoginUpdateOne) set_input(input UpdateLoginInput) LoginUpdateOne {
+	mut next := b
+	if v := input.device_id {
+		next = next.set_device_id(v)
+	}
+	if v := input.at {
+		next = next.set_at(v)
+	}
+	return next
+}

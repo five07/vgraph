@@ -87,8 +87,8 @@ pub fn (q UserQuery) where(conds ...load.Cond) UserQuery {
 	return next
 }
 
-// limit keeps at most `count` rows. It applies to `all()` and `first()`, not to
-// the rows of an edge load.
+// limit keeps at most `count` rows. In `with_<edge>`, it keeps at most `count`
+// of each row's targets.
 pub fn (q UserQuery) limit(count int) UserQuery {
 	mut next := q
 	next.query = load.Query{
@@ -98,8 +98,8 @@ pub fn (q UserQuery) limit(count int) UserQuery {
 	return next
 }
 
-// offset skips the first `count` rows. It applies to `all()` and `first()`, not
-// to the rows of an edge load.
+// offset skips the first `count` rows. In `with_<edge>`, it skips the first
+// `count` of each row's targets.
 pub fn (q UserQuery) offset(count int) UserQuery {
 	mut next := q
 	next.query = load.Query{
@@ -267,12 +267,12 @@ pub fn user_has_card_with(conds ...load.Cond) load.Cond {
 
 // user_has_spouse returns the condition that it has a `spouse`.
 pub fn user_has_spouse() load.Cond {
-	return load.in_sub('spouse_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} })
+	return load.and(load.is_not_null('spouse_id'), load.in_sub('spouse_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} }))
 }
 
 // user_has_spouse_with returns the condition that it has a `spouse` that matches `conds`.
 pub fn user_has_spouse_with(conds ...load.Cond) load.Cond {
-	return load.in_sub('spouse_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds })
+	return load.and(load.is_not_null('spouse_id'), load.in_sub('spouse_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds }))
 }
 
 // user_has_pets returns the condition that it has a `pets`.
@@ -1487,7 +1487,7 @@ fn (q UserQuery) load_card(rows []models.User, fns []fn (CardQuery) CardQuery) !
 	for configure in fns {
 		sub = configure(sub)
 	}
-	children := sub.nodes(load.select_in[models.Card](q.graph.client.conn, 'owner_id',
+	children := sub.nodes(load.select_each[models.Card](q.graph.client.conn, 'owner_id',
 		rows.map(it.id.str()),
 		query: q.graph.client.prepare_query('cards', sub.query)!
 	)!)!
@@ -1565,7 +1565,7 @@ fn (q UserQuery) load_pets(rows []models.User, fns []fn (PetQuery) PetQuery) !ma
 	for configure in fns {
 		sub = configure(sub)
 	}
-	children := sub.nodes(load.select_in[models.Pet](q.graph.client.conn, 'owner_id',
+	children := sub.nodes(load.select_each[models.Pet](q.graph.client.conn, 'owner_id',
 		rows.map(it.id.str()),
 		query: q.graph.client.prepare_query('pets', sub.query)!
 	)!)!
@@ -1594,6 +1594,30 @@ fn (q UserQuery) load_groups(rows []models.User, fns []fn (GroupQuery) GroupQuer
 	mut sub := q.graph.groups()
 	for configure in fns {
 		sub = configure(sub)
+	}
+	if sub.query.limit > 0 || sub.query.offset > 0 {
+		prepared := q.graph.client.prepare_query('groups', sub.query)!
+		cut := load.link_each(q.graph.client.conn, 'group_users', 'user_id', 'group_id',
+			rows.map(it.id.str()), .int, .int, 'groups', 'id', load.Query{
+				...prepared
+				conds: prepared.conds
+			})!
+		// the targets by key: the join rows give their order
+		found := sub.nodes(load.select_in[models.Group](q.graph.client.conn, 'id',
+			load.unique(cut.map(it[1])),
+			query: load.Query{ ...prepared, order: '', desc: false, orders: []load.Order{}, limit: 0, offset: 0 }
+		)!)!
+		mut by_key := map[string]GroupNode{}
+		for target in found {
+			by_key[target.group.id.str()] = target
+		}
+		mut cut_linked := map[string][]GroupNode{}
+		for pair in cut {
+			if target := by_key[pair[1]] {
+				cut_linked[pair[0]] << target
+			}
+		}
+		return cut_linked
 	}
 	pairs := load.link_pairs(q.graph.client.conn, 'group_users', 'user_id',
 		'group_id', rows.map(it.id.str()), .int, .int)!
@@ -1632,6 +1656,30 @@ fn (q UserQuery) load_following(rows []models.User, fns []fn (UserQuery) UserQue
 	for configure in fns {
 		sub = configure(sub)
 	}
+	if sub.query.limit > 0 || sub.query.offset > 0 {
+		prepared := q.graph.client.prepare_query('users', sub.query)!
+		cut := load.link_each(q.graph.client.conn, 'follows', 'follower_id', 'followee_id',
+			rows.map(it.id.str()), .int, .int, 'users', 'id', load.Query{
+				...prepared
+				conds: prepared.conds
+			})!
+		// the targets by key: the join rows give their order
+		found := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
+			load.unique(cut.map(it[1])),
+			query: load.Query{ ...prepared, order: '', desc: false, orders: []load.Order{}, limit: 0, offset: 0 }
+		)!)!
+		mut by_key := map[string]UserNode{}
+		for target in found {
+			by_key[target.user.id.str()] = target
+		}
+		mut cut_linked := map[string][]UserNode{}
+		for pair in cut {
+			if target := by_key[pair[1]] {
+				cut_linked[pair[0]] << target
+			}
+		}
+		return cut_linked
+	}
 	pairs := load.link_pairs(q.graph.client.conn, 'follows', 'follower_id',
 		'followee_id', rows.map(it.id.str()), .int, .int)!
 	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
@@ -1668,6 +1716,30 @@ fn (q UserQuery) load_followers(rows []models.User, fns []fn (UserQuery) UserQue
 	mut sub := q.graph.users()
 	for configure in fns {
 		sub = configure(sub)
+	}
+	if sub.query.limit > 0 || sub.query.offset > 0 {
+		prepared := q.graph.client.prepare_query('users', sub.query)!
+		cut := load.link_each(q.graph.client.conn, 'follows', 'followee_id', 'follower_id',
+			rows.map(it.id.str()), .int, .int, 'users', 'id', load.Query{
+				...prepared
+				conds: prepared.conds
+			})!
+		// the targets by key: the join rows give their order
+		found := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
+			load.unique(cut.map(it[1])),
+			query: load.Query{ ...prepared, order: '', desc: false, orders: []load.Order{}, limit: 0, offset: 0 }
+		)!)!
+		mut by_key := map[string]UserNode{}
+		for target in found {
+			by_key[target.user.id.str()] = target
+		}
+		mut cut_linked := map[string][]UserNode{}
+		for pair in cut {
+			if target := by_key[pair[1]] {
+				cut_linked[pair[0]] << target
+			}
+		}
+		return cut_linked
 	}
 	pairs := load.link_pairs(q.graph.client.conn, 'follows', 'followee_id',
 		'follower_id', rows.map(it.id.str()), .int, .int)!
@@ -1706,6 +1778,30 @@ fn (q UserQuery) load_friends(rows []models.User, fns []fn (UserQuery) UserQuery
 	for configure in fns {
 		sub = configure(sub)
 	}
+	if sub.query.limit > 0 || sub.query.offset > 0 {
+		prepared := q.graph.client.prepare_query('users', sub.query)!
+		cut := load.link_each(q.graph.client.conn, 'friendships', 'user_id', 'friend_id',
+			rows.map(it.id.str()), .int, .int, 'users', 'id', load.Query{
+				...prepared
+				conds: prepared.conds
+			})!
+		// the targets by key: the join rows give their order
+		found := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
+			load.unique(cut.map(it[1])),
+			query: load.Query{ ...prepared, order: '', desc: false, orders: []load.Order{}, limit: 0, offset: 0 }
+		)!)!
+		mut by_key := map[string]UserNode{}
+		for target in found {
+			by_key[target.user.id.str()] = target
+		}
+		mut cut_linked := map[string][]UserNode{}
+		for pair in cut {
+			if target := by_key[pair[1]] {
+				cut_linked[pair[0]] << target
+			}
+		}
+		return cut_linked
+	}
 	pairs := load.link_pairs(q.graph.client.conn, 'friendships', 'user_id',
 		'friend_id', rows.map(it.id.str()), .int, .int)!
 	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
@@ -1743,7 +1839,7 @@ fn (q UserQuery) load_devices(rows []models.User, fns []fn (DeviceQuery) DeviceQ
 	for configure in fns {
 		sub = configure(sub)
 	}
-	children := sub.nodes(load.select_in[models.Device](q.graph.client.conn, 'owner_id',
+	children := sub.nodes(load.select_each[models.Device](q.graph.client.conn, 'owner_id',
 		rows.map(it.id.str()),
 		query: q.graph.client.prepare_query('devices', sub.query)!
 	)!)!
@@ -1771,7 +1867,7 @@ fn (q UserQuery) load_gadgets(rows []models.User, fns []fn (GadgetQuery) GadgetQ
 	for configure in fns {
 		sub = configure(sub)
 	}
-	children := sub.nodes(load.select_in[models.Gadget](q.graph.client.conn, 'owner_id',
+	children := sub.nodes(load.select_each[models.Gadget](q.graph.client.conn, 'owner_id',
 		rows.map(it.id.str()),
 		query: q.graph.client.prepare_query('gadgets', sub.query)!
 	)!)!
@@ -1798,6 +1894,30 @@ fn (q UserQuery) load_liked_gadgets(rows []models.User, fns []fn (GadgetQuery) G
 	mut sub := q.graph.gadgets()
 	for configure in fns {
 		sub = configure(sub)
+	}
+	if sub.query.limit > 0 || sub.query.offset > 0 {
+		prepared := q.graph.client.prepare_query('gadgets', sub.query)!
+		cut := load.link_each(q.graph.client.conn, 'likes', 'user_id', 'gadget_id',
+			rows.map(it.id.str()), .int, .i64, 'gadgets', 'id', load.Query{
+				...prepared
+				conds: prepared.conds
+			})!
+		// the targets by key: the join rows give their order
+		found := sub.nodes(load.select_in[models.Gadget](q.graph.client.conn, 'id',
+			load.unique(cut.map(it[1])),
+			query: load.Query{ ...prepared, order: '', desc: false, orders: []load.Order{}, limit: 0, offset: 0 }
+		)!)!
+		mut by_key := map[string]GadgetNode{}
+		for target in found {
+			by_key[target.gadget.id.str()] = target
+		}
+		mut cut_linked := map[string][]GadgetNode{}
+		for pair in cut {
+			if target := by_key[pair[1]] {
+				cut_linked[pair[0]] << target
+			}
+		}
+		return cut_linked
 	}
 	pairs := load.link_pairs(q.graph.client.conn, 'likes', 'user_id',
 		'gadget_id', rows.map(it.id.str()), .int, .i64)!

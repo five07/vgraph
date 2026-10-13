@@ -5,7 +5,7 @@ module main
 // installed as `five07.vgraph` (`~/.vmodules/five07/vgraph`), as CI does.
 import os
 
-const models = "module models
+const models = 'module models
 
 import time
 import five07.vgraph
@@ -18,16 +18,16 @@ pub:
 	banned bool
 }
 
-@[table: 'users']
+@[table: \'users\']
 pub struct User {
 pub:
 	id            int @[primary; sql: serial]
 	name          string
-	password_hash string @[graphql: '-']
+	password_hash string @[graphql: \'-\']
 }
 
 // Audit is left out of GraphQL, and so is every edge to it.
-@[graphql: '-'; table: 'audits']
+@[graphql: \'-\'; table: \'audits\']
 pub struct Audit {
 pub:
 	id      int @[primary; sql: serial]
@@ -37,15 +37,15 @@ pub:
 pub fn (a Audit) edges() []vgraph.Edge {
 	return [
 		vgraph.Edge{
-			name:   'user'
+			name:   \'user\'
 			kind:   .many_to_one
-			to:     'users'
-			column: 'user_id'
+			to:     \'users\'
+			column: \'user_id\'
 		},
 	]
 }
 
-@[table: 'articles']
+@[table: \'articles\']
 pub struct Article {
 pub:
 	id         int @[primary; sql: serial]
@@ -60,14 +60,27 @@ pub fn (a Article) hooks() []vgraph.Hook {
 		vgraph.on(vgraph.Hook{
 			run: fn (next vgraph.Mutate) vgraph.Mutate {
 				return fn [next] (ctx graphql.Context, mut m vgraph.Mutation) ! {
-					if _ := m.field_value('title') {
+					if _ := m.field_value(\'title\') {
 					} else {
-						m.set_field_value('title', 'Untitled')
+						m.set_field_value(\'title\', \'Untitled\')
 					}
 					next(ctx, mut m)!
 				}
 			}
 		}, .create),
+	]
+}
+
+// fields: GraphQL\'s description of `title`, which an update can\'t set, and a
+// directive on it.
+pub fn (a Article) fields() []vgraph.Field {
+	return [
+		vgraph.Field{
+			name:            \'title\'
+			comment:         \'The title, Untitled when it is missing.\'
+			graphql_skip_in: [.update_input]
+			directives:      [\'@tag(name: "title")\']
+		},
 	]
 }
 
@@ -90,27 +103,37 @@ pub fn (a Article) policy() vgraph.Policy {
 pub fn (a Article) edges() []vgraph.Edge {
 	return [
 		vgraph.Edge{
-			name:   'author'
+			name:   \'author\'
 			kind:   .many_to_one
-			to:     'users'
-			column: 'user_id'
+			to:     \'users\'
+			column: \'user_id\'
 		},
 		vgraph.Edge{
-			name:     'comments'
+			name:     \'comments\'
 			kind:     .one_to_many
-			to:       'comments'
-			column:   'owner_id'
-			type_col: 'owner_type'
-			type_val: 'Article'
-			soft_del: 'deleted_at'
+			to:       \'comments\'
+			column:   \'owner_id\'
+			type_col: \'owner_type\'
+			type_val: \'Article\'
+			soft_del: \'deleted_at\'
 		},
 		vgraph.Edge{
-			name:       'tags'
+			name:       \'tags\'
 			kind:       .many_to_many
-			to:         'tags'
-			column:     'article_id'
-			through:    'article_tags'
-			through_to: 'tag_id'
+			to:         \'tags\'
+			column:     \'article_id\'
+			through:    \'article_tags\'
+			through_to: \'tag_id\'
+		},
+	]
+}
+
+// fields: GraphQL marks `name` deprecated.
+pub fn (u User) fields() []vgraph.Field {
+	return [
+		vgraph.Field{
+			name:       \'name\'
+			deprecated: \'Use the handle.\'
 		},
 	]
 }
@@ -118,22 +141,22 @@ pub fn (a Article) edges() []vgraph.Edge {
 pub fn (u User) edges() []vgraph.Edge {
 	return [
 		vgraph.Edge{
-			name:     'articles'
+			name:     \'articles\'
 			kind:     .one_to_many
-			to:       'articles'
-			column:   'user_id'
-			soft_del: 'deleted_at'
+			to:       \'articles\'
+			column:   \'user_id\'
+			soft_del: \'deleted_at\'
 		},
 		vgraph.Edge{
-			name:   'audits'
+			name:   \'audits\'
 			kind:   .one_to_many
-			to:     'audits'
-			column: 'user_id'
+			to:     \'audits\'
+			column: \'user_id\'
 		},
 	]
 }
 
-@[table: 'tags']
+@[table: \'tags\']
 pub struct Tag {
 pub:
 	id   int @[primary; sql: serial]
@@ -144,7 +167,16 @@ pub fn (t Tag) edges() []vgraph.Edge {
 	return []
 }
 
-@[table: 'article_tags']
+// graphql renames tags in GraphQL, with a directive of api.graphql.
+pub fn (t Tag) graphql() vgraph.GraphqlTable {
+	return vgraph.GraphqlTable{
+		type_name:   \'Label\'
+		query_field: \'labels\'
+		directives:  [\'@tag(name: "public")\']
+	}
+}
+
+@[table: \'article_tags\']
 pub struct ArticleTag {
 pub:
 	id         int @[primary; sql: serial]
@@ -152,7 +184,7 @@ pub:
 	tag_id     int
 }
 
-@[table: 'comments']
+@[table: \'comments\']
 pub struct Comment {
 pub:
 	id         int @[primary; sql: serial]
@@ -163,32 +195,39 @@ pub:
 	deleted_at ?time.Time
 }
 
+// graphql: comments are only created through GraphQL.
+pub fn (c Comment) graphql() vgraph.GraphqlTable {
+	return vgraph.GraphqlTable{
+		mutations: [.create]
+	}
+}
+
 pub fn (c Comment) edges() []vgraph.Edge {
 	return [
 		vgraph.Edge{
-			name:     'article'
+			name:     \'article\'
 			kind:     .many_to_one
-			to:       'articles'
-			column:   'owner_id'
-			type_col: 'owner_type'
-			type_val: 'Article'
+			to:       \'articles\'
+			column:   \'owner_id\'
+			type_col: \'owner_type\'
+			type_val: \'Article\'
 		},
 		vgraph.Edge{
-			name:   'parent'
+			name:   \'parent\'
 			kind:   .many_to_one
-			to:     'comments'
-			column: 'parent_id'
+			to:     \'comments\'
+			column: \'parent_id\'
 		},
 		vgraph.Edge{
-			name:     'replies'
+			name:     \'replies\'
 			kind:     .one_to_many
-			to:       'comments'
-			column:   'parent_id'
-			soft_del: 'deleted_at'
+			to:       \'comments\'
+			column:   \'parent_id\'
+			soft_del: \'deleted_at\'
 		},
 	]
 }
-"
+'
 
 const project_test = 'module main
 
@@ -420,6 +459,43 @@ fn test_polymorphic_writes() {
 	assert false
 }
 
+// The GraphQL options of the models: a renamed type and root field, a field
+// left out of one input, directives, descriptions and deprecations, and
+// mutations turned off; and a polymorphic edge\'s type, checked.
+fn test_graphql_options() {
+	g, _ := setup()!
+	sdl := graph.schema_sdl
+	assert sdl.contains("type Label @tag(name: \\"public\\") {")
+	assert sdl.contains("labels(where: LabelWhereInput")
+	assert sdl.contains("\\"\\"\\"The title, Untitled when it is missing.\\"\\"\\"\\n  title: String! @tag(name: \\"title\\")")
+	assert sdl.contains("name: String! @deprecated(reason: \\"Use the handle.\\")")
+	assert sdl.contains("createComment(") && !sdl.contains("updateComment(") && !sdl.contains("deleteComment(")
+	s := g.graphql(graph.Resolvers{})!
+	labels := s.execute(graphql.Request{
+		query: "{ labels(orderBy: {field: NAME}) { __typename name } }"
+	}, unsafe { nil })
+	assert labels.json() == "{\\"data\\":{\\"labels\\":[{\\"__typename\\":\\"Label\\",\\"name\\":\\"db\\"},{\\"__typename\\":\\"Label\\",\\"name\\":\\"v\\"}]}}"
+	no_title := s.execute(graphql.Request{
+		query: "mutation { updateArticle(id: \\"1\\", input: {title: \\"x\\"}) { id } }"
+	}, unsafe { nil })
+	assert no_title.errors.map(it.message) == ["Field \\"title\\" is not defined by type \\"UpdateArticleInput\\"."]
+	bad := s.execute(graphql.Request{
+		query: "mutation { createComment(input: {ownerType: \\"Nope\\", ownerID: \\"1\\", body: \\"x\\"}) { id } }"
+	}, unsafe { nil })
+	assert bad.errors.map(it.message) == ["`ownerType` is one of Article"]
+	made := s.execute(graphql.Request{
+		query: "mutation { createComment(input: {ownerType: \\"Article\\", ownerID: \\"2\\", body: \\"x\\", parentID: \\"1\\"}) { body article { title } parent { body } } }"
+	}, unsafe { nil })
+	assert made.json() == "{\\"data\\":{\\"createComment\\":{\\"body\\":\\"x\\",\\"article\\":{\\"title\\":\\"SQL\\"},\\"parent\\":{\\"body\\":\\"a\\"}}}}"
+	// the client\'s input, as the resolvers use it
+	art := g.articles().create().set_input(graph.CreateArticleInput{
+		user_id:  2
+		title:    \'From an input\'
+		tag_ids:  [1]
+	}).save()!
+	assert art.query_tags()!.all()!.map(it.tag.name) == [\'v\']
+}
+
 // Typed hooks and interceptors on the graph, the model\'s hook and policy, and
 // privacy through GraphQL.
 fn test_hooks_and_privacy() {
@@ -498,11 +574,11 @@ fn test_gen_writes_a_working_client() {
 	run(root, 'graph', true)!
 	assert os.read_file(os.join_path(root, 'graph', 'resolvers.v'))! == resolvers
 	// a new field gets a new stub, after what is there
-	os.write_file(os.join_path(root, 'api.graphql'), api_sdl + 'extend type Tag { slug: String! }\n')!
+	os.write_file(os.join_path(root, 'api.graphql'), api_sdl + 'extend type Label { slug: String! }\n')!
 	run(root, 'graph', true)!
 	with_stub := os.read_file(os.join_path(root, 'graph', 'resolvers.v'))!
 	assert with_stub.starts_with(resolvers.trim_right('\n'))
-	assert with_stub.contains(') tag_slug(')
+	assert with_stub.contains(') label_slug(')
 	os.write_file(os.join_path(root, 'api.graphql'), api_sdl)!
 	os.write_file(os.join_path(root, 'graph', 'resolvers.v'), resolvers)!
 	run(root, 'graph', true)!
@@ -514,11 +590,18 @@ fn test_gen_writes_a_working_client() {
 	assert !os.exists(os.join_path(root, 'graph', 'old.v'))
 	assert os.exists(os.join_path(root, 'graph', 'mine.v'))
 
+	// an operations folder holds operations, checked against the schema
+	os.mkdir_all(os.join_path(root, 'web', 'operations'))!
+	os.write_file(os.join_path(root, 'web', 'operations', 'titles.graphql'), 'query Titles { articles(orderBy: {field: ID}) { title ...Who } }\nfragment Who on Article { author { name } }\n')!
+	run(root, 'graph', true)!
+
 	res := os.exec([@VEXE, '-stats', 'test', root])
 	assert res.exit_code == 0, res.output
 }
 
-const api_sdl = 'extend type Query {
+const api_sdl = 'directive @tag(name: String!) on OBJECT | FIELD_DEFINITION
+
+extend type Query {
   hello(name: String = \"world\"): String!
 }
 
@@ -526,7 +609,7 @@ extend type Article {
   url: String!
 }
 
-type Mutation {
+extend type Mutation {
   touch(id: ID!): Article
 }
 '
@@ -604,10 +687,37 @@ fn test_gen_reports_graphql_problems_where_they_are() {
 	os.write_file(os.join_path(root, 'shop', 'models', 'models.v'), models)!
 	os.mkdir_all(os.join_path(root, 'schema'))!
 	os.write_file(os.join_path(root, 'schema', 'bad.graphql'), '# a mistake\nextend type Query {\n  x: Nope\n}\n')!
+	os.write_file(os.join_path(root, 'schema', 'directives.graphql'), 'directive @tag(name: String!) on OBJECT | FIELD_DEFINITION\n')!
 	run(root, 'graph', true) or {
 		// the file and line of the mistake, not of the merged schema
 		assert err.msg().starts_with('schema/bad.graphql:3:6: Unknown type "Nope".'), err.msg()
 		return
+	}
+	assert false, 'gen should fail'
+}
+
+// An operation in a schema file would be dropped: vgraph gen reports it; and
+// one in an operations folder that no longer fits the schema.
+fn test_gen_checks_operations() {
+	root := os.join_path(os.vtmp_dir(), 'vgraph_gen_ops_${os.getpid()}')
+	os.rmdir_all(root) or {}
+	defer {
+		os.rmdir_all(root) or {}
+	}
+	os.mkdir_all(os.join_path(root, 'shop', 'models'))!
+	os.write_file(os.join_path(root, 'v.mod'), "Module {\n\tname: 'shop'\n\tversion: '0.0.0'\n}\n")!
+	os.write_file(os.join_path(root, 'shop', 'models', 'models.v'), models)!
+	os.write_file(os.join_path(root, 'api.graphql'), api_sdl + '\nquery GetUser { users { name } }\n')!
+	run(root, 'graph', true) or {
+		assert err.msg() == 'api.graphql:15:1: the operation `GetUser` is not schema: put operations in an `operations` folder, which vgraph gen checks against the schema', err.msg()
+		os.write_file(os.join_path(root, 'api.graphql'), api_sdl)!
+		os.mkdir_all(os.join_path(root, 'operations'))!
+		os.write_file(os.join_path(root, 'operations', 'users.graphql'), '# users\nquery Users {\n  users { name nickname }\n}\n')!
+		run(root, 'graph', true) or {
+			assert err.msg() == 'operations/users.graphql:3:16: Cannot query field "nickname" on type "User". Did you mean "name"?', err.msg()
+			return
+		}
+		assert false, 'gen should fail on the operation'
 	}
 	assert false, 'gen should fail'
 }

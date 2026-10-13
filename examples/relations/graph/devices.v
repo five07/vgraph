@@ -54,8 +54,8 @@ pub fn (q DeviceQuery) where(conds ...load.Cond) DeviceQuery {
 	return next
 }
 
-// limit keeps at most `count` rows. It applies to `all()` and `first()`, not to
-// the rows of an edge load.
+// limit keeps at most `count` rows. In `with_<edge>`, it keeps at most `count`
+// of each row's targets.
 pub fn (q DeviceQuery) limit(count int) DeviceQuery {
 	mut next := q
 	next.query = load.Query{
@@ -65,8 +65,8 @@ pub fn (q DeviceQuery) limit(count int) DeviceQuery {
 	return next
 }
 
-// offset skips the first `count` rows. It applies to `all()` and `first()`, not
-// to the rows of an edge load.
+// offset skips the first `count` rows. In `with_<edge>`, it skips the first
+// `count` of each row's targets.
 pub fn (q DeviceQuery) offset(count int) DeviceQuery {
 	mut next := q
 	next.query = load.Query{
@@ -224,12 +224,12 @@ pub fn device_owner_id_not_in(values []int) load.Cond {
 
 // device_has_owner returns the condition that it has a `owner`.
 pub fn device_has_owner() load.Cond {
-	return load.in_sub('owner_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} })
+	return load.and(load.is_not_null('owner_id'), load.in_sub('owner_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} }))
 }
 
 // device_has_owner_with returns the condition that it has a `owner` that matches `conds`.
 pub fn device_has_owner_with(conds ...load.Cond) load.Cond {
-	return load.in_sub('owner_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds })
+	return load.and(load.is_not_null('owner_id'), load.in_sub('owner_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds }))
 }
 
 // device_has_logins returns the condition that it has a `logins`.
@@ -932,7 +932,7 @@ fn (q DeviceQuery) load_logins(rows []models.Device, fns []fn (LoginQuery) Login
 	for configure in fns {
 		sub = configure(sub)
 	}
-	children := sub.nodes(load.select_in[models.Login](q.graph.client.conn, 'device_id',
+	children := sub.nodes(load.select_each[models.Login](q.graph.client.conn, 'device_id',
 		rows.map(it.id.str()),
 		query: q.graph.client.prepare_query('logins', sub.query)!
 	)!)!
@@ -959,6 +959,30 @@ fn (q DeviceQuery) load_groups(rows []models.Device, fns []fn (GroupQuery) Group
 	mut sub := q.graph.groups()
 	for configure in fns {
 		sub = configure(sub)
+	}
+	if sub.query.limit > 0 || sub.query.offset > 0 {
+		prepared := q.graph.client.prepare_query('groups', sub.query)!
+		cut := load.link_each(q.graph.client.conn, 'device_groups', 'device_id', 'group_id',
+			rows.map(it.id.str()), .string, .int, 'groups', 'id', load.Query{
+				...prepared
+				conds: prepared.conds
+			})!
+		// the targets by key: the join rows give their order
+		found := sub.nodes(load.select_in[models.Group](q.graph.client.conn, 'id',
+			load.unique(cut.map(it[1])),
+			query: load.Query{ ...prepared, order: '', desc: false, orders: []load.Order{}, limit: 0, offset: 0 }
+		)!)!
+		mut by_key := map[string]GroupNode{}
+		for target in found {
+			by_key[target.group.id.str()] = target
+		}
+		mut cut_linked := map[string][]GroupNode{}
+		for pair in cut {
+			if target := by_key[pair[1]] {
+				cut_linked[pair[0]] << target
+			}
+		}
+		return cut_linked
 	}
 	pairs := load.link_pairs(q.graph.client.conn, 'device_groups', 'device_id',
 		'group_id', rows.map(it.id.str()), .string, .int)!

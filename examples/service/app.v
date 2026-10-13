@@ -122,22 +122,25 @@ pub fn (a &App) serve_graphql(mut ctx app.Context) veb.Result {
 }
 
 // SqliteTransaction runs a GraphQL request's mutations in one SQLite
-// transaction.
+// transaction, on the connection the stores share.
 struct SqliteTransaction {
-mut:
 	db sqlite.DB
 }
 
-fn (mut t SqliteTransaction) begin() ! {
-	t.db.orm_begin()!
+fn (t SqliteTransaction) begin(ctx graphql.Context) !graphql.Context {
+	mut db := t.db
+	db.orm_begin()!
+	return ctx
 }
 
-fn (mut t SqliteTransaction) commit() ! {
-	t.db.orm_commit()!
+fn (t SqliteTransaction) commit(_ graphql.Context) ! {
+	mut db := t.db
+	db.orm_commit()!
 }
 
-fn (mut t SqliteTransaction) rollback() ! {
-	t.db.orm_rollback()!
+fn (t SqliteTransaction) rollback(_ graphql.Context) ! {
+	mut db := t.db
+	db.orm_rollback()!
 }
 
 // HealthResponse is the body of `GET /health`.

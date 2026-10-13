@@ -18,13 +18,18 @@ mut:
 	tables []string
 }
 
-// Fixture is a seeded database, its client, and the log of its selects, and a
-// client on a vgraph driver for writes.
+// Fixture is a seeded database, its client, and the log of its selects, a
+// client on a vgraph driver for writes, and one on the driver whose selects
+// and SQL go to the log too (`sql` for the driver's own), with their GraphQL
+// servers.
 struct Fixture {
-	g   graph.Graph
-	w   graph.Graph
-	db  orm.Connection
-	log &Log
+	g       graph.Graph
+	w       graph.Graph
+	t       graph.Graph
+	db      orm.Connection
+	log     &Log
+	server  &graphql.Server
+	tserver &graphql.Server
 }
 
 // queries returns the tables of the selects run since the last call.
@@ -222,17 +227,24 @@ fn seed(db orm.Connection, driver orm.Connection) !Fixture {
 		}!
 	}
 	log := &Log{}
-	g := graph.Graph.new(vgraph.trace(db, fn [log] (e vgraph.TraceEvent) {
+	tracer := fn [log] (e vgraph.TraceEvent) {
+		mut l := unsafe { log }
 		if e.kind == .select {
-			mut l := unsafe { log }
 			l.tables << e.table
+		} else if e.kind == .raw {
+			l.tables << 'sql'
 		}
-	}))!
+	}
+	g := graph.Graph.new(vgraph.trace(db, tracer))!
+	t := graph.Graph.new(vgraph.trace(driver, tracer))!
 	return Fixture{
-		g:   g
-		w:   graph.Graph.new(driver)!
-		db:  db
-		log: log
+		g:       g
+		w:       graph.Graph.new(driver)!
+		t:       t
+		db:      db
+		log:     log
+		server:  g.graphql(graph.Resolvers{})!
+		tserver: t.graphql(graph.Resolvers{})!
 	}
 }
 
@@ -448,8 +460,14 @@ fn check_uuid_keys(f Fixture) ! {
 // gql runs a GraphQL query on the client's server, and returns the response
 // as JSON.
 fn gql(f Fixture, query string) !string {
-	mut s := f.g.graphql(graph.Resolvers{})!
-	return s.execute(graphql.Request{
+	return f.server.execute(graphql.Request{
+		query: query
+	}, unsafe { nil }).json()
+}
+
+// gqlt runs a GraphQL query on the server of the traced driver.
+fn gqlt(f Fixture, query string) !string {
+	return f.tserver.execute(graphql.Request{
 		query: query
 	}, unsafe { nil }).json()
 }
@@ -471,7 +489,7 @@ fn check_graphql(f Fixture) ! {
 	assert gql(f, '{ usersCount petsCount(where: {ownerIDIsNil: false, nameHasPrefix: "r"}) users(orderBy: {field: ID}, limit: 2) { name pets(orderBy: {field: NAME}, limit: 1) { name } } strays: pets(where: {ownerIDIsNil: true}) { name owner { name } } page: users(orderBy: {field: NAME, direction: DESC}, limit: 2, offset: 1) { id name } }')! == '{"data":{"usersCount":4,"petsCount":1,"users":[{"name":"ada","pets":[{"name":"rex"}]},{"name":"bob","pets":[]}],"strays":[{"name":"stray","owner":null}],"page":[{"id":"3","name":"cy"},{"id":"2","name":"bob"}]}}'
 	assert f.queries() == ['users', 'pets', 'users', 'pets', 'pets', 'users']
 	// O2O same type and bidirectional, M2M same type and bidirectional
-	assert gql(f, '{ nodes(where: {idIn: ["1", "2"]}, orderBy: {field: ID}) { value next { value } prev { value } } users(where: {idNotIn: ["3", "4"]}, orderBy: {field: ID}) { spouse { name } following(orderBy: {field: ID}) { name } followers { name } friends { name } } }')! == '{"data":{"nodes":[{"value":1,"next":{"value":2},"prev":null},{"value":2,"next":{"value":3},"prev":{"value":1}}],"users":[{"spouse":{"name":"bob"},"following":[{"name":"bob"},{"name":"cy"}],"followers":[],"friends":[{"name":"bob"}]},{"spouse":{"name":"ada"},"following":[{"name":"cy"}],"followers":[{"name":"ada"}],"friends":[{"name":"ada"}]}]}}'
+	assert gql(f, '{ listNodes(where: {idIn: ["1", "2"]}, orderBy: {field: ID}) { value next { value } prev { value } } users(where: {idNotIn: ["3", "4"]}, orderBy: {field: ID}) { spouse { name } following(orderBy: {field: ID}) { name } followers { name } friends { name } } }')! == '{"data":{"listNodes":[{"value":1,"next":{"value":2},"prev":null},{"value":2,"next":{"value":3},"prev":{"value":1}}],"users":[{"spouse":{"name":"bob"},"following":[{"name":"bob"},{"name":"cy"}],"followers":[],"friends":[{"name":"bob"}]},{"spouse":{"name":"ada"},"following":[{"name":"cy"}],"followers":[{"name":"ada"}],"friends":[{"name":"ada"}]}]}}'
 	// UUID keys
 	assert gql(f, '{ devices(orderBy: {field: NAME}) { id name owner { name } logins(orderBy: {field: AT, direction: DESC}) { at } groups { name } } }')! == '{"data":{"devices":[{"id":"${laptop}","name":"laptop","owner":{"name":"ada"},"logins":[],"groups":[]},{"id":"${phone}","name":"phone","owner":{"name":"ada"},"logins":[{"at":2},{"at":1}],"groups":[{"name":"admins"},{"name":"devs"}]},{"id":"${tablet}","name":"tablet","owner":{"name":"bob"},"logins":[{"at":3}],"groups":[{"name":"devs"}]}]}}'
 	assert gql(f, '{ devices(where: {id: "${tablet}"}) { name } }')! == '{"data":{"devices":[{"name":"tablet"}]}}'
@@ -955,5 +973,301 @@ fn check_schema(f Fixture) ! {
 	]
 	assert owners.map(if o := it.owner { o.user.id } else { 0 }) == [1, 1]
 	assert gql(f, '{ petOwners(orderBy: {field: ID}) { petName owner { name } } }')! == '{"data":{"petOwners":[{"petName":"rex","owner":{"name":"ada"}},{"petName":"tom","owner":{"name":"ada"}}]}}'
-	assert gql(f, '{ gadgets(where: {color: RED}) { serialNo color tags level big } }')! == '{"data":{"gadgets":[{"serialNo":"S-2","color":"RED","tags":[],"level":2,"big":1}]}}'
+	assert gql(f, '{ gadgets(where: {color: RED}) { edges { node { serialNo color tags level big } } } }')! == '{"data":{"gadgets":{"edges":[{"node":{"serialNo":"S-2","color":"RED","tags":[],"level":2,"big":1}}]}}}'
+}
+
+// run executes a GraphQL request on `s` with the context `ctx`, and returns its
+// data, or its errors as one error.
+fn run(s &graphql.Server, query string) !graphql.Value {
+	r := s.execute(graphql.Request{
+		query: query
+	}, unsafe { nil })
+	if r.errors.len > 0 {
+		return error(r.errors.map(it.message).join('\n'))
+	}
+	return r.data or { graphql.null }
+}
+
+// at returns the value at `keys` in the objects of `v`.
+fn at(v graphql.Value, keys ...string) graphql.Value {
+	mut cur := v
+	for k in keys {
+		cur = cur.as_map()[k] or { graphql.null }
+	}
+	return cur
+}
+
+// serials returns the serial numbers of a gadget connection's nodes.
+fn serials(conn graphql.Value) []string {
+	return at(conn, 'edges').as_list().map(at(it, 'node', 'serialNo').as_string())
+}
+
+// walk pages through `gadgets` on `s`, with `args`, `n` at a time, forwards
+// with `first` and `after`, or backwards with `last` and `before`, and
+// returns the serial numbers in the connection's order.
+fn walk(s &graphql.Server, args string, n int, forward bool) ![]string {
+	mut out := []string{}
+	mut cursor := ''
+	for _ in 0 .. 10 {
+		mut page := if forward { 'first: ${n}' } else { 'last: ${n}' }
+		if cursor != '' {
+			page += if forward { ', after: "${cursor}"' } else { ', before: "${cursor}"' }
+		}
+		conn := at(run(s, '{ gadgets(${page}${args}) { edges { node { serialNo } } pageInfo { hasNextPage hasPreviousPage startCursor endCursor } } }')!,
+			'gadgets')
+		info := at(conn, 'pageInfo')
+		if forward {
+			out << serials(conn)
+			if !at(info, 'hasNextPage').as_bool() {
+				return out
+			}
+			cursor = at(info, 'endCursor').as_string()
+		} else {
+			mut before := serials(conn)
+			before << out
+			out = before.clone()
+			if !at(info, 'hasPreviousPage').as_bool() {
+				return out
+			}
+			cursor = at(info, 'startCursor').as_string()
+		}
+	}
+	return error('more than 10 pages')
+}
+
+// gadgets creates the gadgets the connection checks page through: ada (1) has
+// S-1 to S-3, bob (2) S-4 and S-5. Ada likes S-4 and S-5, bob S-1, and cy S-1
+// to S-3. It returns their keys by serial number.
+fn gadgets(w graph.Graph) !map[string]i64 {
+	mut ids := map[string]i64{}
+	for spec in [['1', 'S-1', 'red', '3', '4.5'], ['1', 'S-2', 'green', '1', ''],
+		['1', 'S-3', 'blue', '2', '2'], ['2', 'S-4', 'red', '1', '3'], ['2', 'S-5', 'green', '5',
+			'']] {
+		mut b := w.gadgets().create().set_owner_id(spec[0].int()).set_serial_no(spec[1]).set_color(match spec[2] {
+			'red' { models.Color.red }
+			'green' { models.Color.green }
+			else { models.Color.blue }
+		}).set_level(i8(spec[3].int())).set_weight(1).set_parts(1).set_big(1).set_ratio(1).set_tags('[]')
+		if spec[4] != '' {
+			b = b.set_rating(spec[4].f64())
+		}
+		ids[spec[1]] = b.save()!.gadget.id
+	}
+	w.users().update_one_id(1).add_liked_gadgets_ids(ids['S-4'], ids['S-5']).exec()!
+	w.users().update_one_id(2).add_liked_gadgets_ids(ids['S-1']).exec()!
+	w.users().update_one_id(3).add_liked_gadgets_ids(ids['S-1'], ids['S-2'], ids['S-3']).exec()!
+	return ids
+}
+
+// Node and Relay connections (6e): gadgets have global ids and connections.
+fn check_relay(f Fixture) ! {
+	ids := gadgets(f.w)!
+	s1, s2 := ids['S-1'], ids['S-2']
+	on_pg := (f.w.client.conn as vgraph.Driver).dialect() == .pg
+	// node and nodes, by global id, in one select per table
+	f.queries()
+	assert gql(f, '{ node(id: "${s1}") { __typename id ... on Gadget { serialNo } } }')! == '{"data":{"node":{"__typename":"Gadget","id":"${s1}","serialNo":"S-1"}}}'
+	assert f.queries() == ['gadgets']
+	assert gql(f, '{ nodes(ids: ["${s2}", "7", "x", "${s1}"]) { id } }')! == '{"errors":[{"message":"Could not resolve to a node with the global ID of \\"7\\".","locations":[{"line":1,"column":3}],"path":["nodes",1]},{"message":"Could not resolve to a node with the global ID of \\"x\\".","locations":[{"line":1,"column":3}],"path":["nodes",2]}],"data":{"nodes":[{"id":"${s2}"},null,null,{"id":"${s1}"}]}}'
+	assert f.queries() == ['gadgets']
+	// pages by the key, without a driver: forwards and backwards
+	all := ['S-1', 'S-2', 'S-3', 'S-4', 'S-5']
+	assert walk(f.server, '', 2, true)! == all
+	assert walk(f.server, '', 2, false)! == all
+	assert walk(f.server, ', where: {colorNEQ: BLUE}', 3, true)! == ['S-1', 'S-2', 'S-4', 'S-5']
+	// the selects: totalCount only when it is asked for
+	f.queries()
+	conn := at(run(f.server, '{ gadgets(first: 2) { edges { cursor node { serialNo } } pageInfo { hasNextPage hasPreviousPage startCursor endCursor } } }')!,
+		'gadgets')
+	assert f.queries() == ['gadgets']
+	assert serials(conn) == ['S-1', 'S-2']
+	assert at(conn, 'pageInfo', 'hasNextPage').as_bool()
+	assert !at(conn, 'pageInfo', 'hasPreviousPage').as_bool()
+	assert at(conn, 'pageInfo', 'startCursor') == at(conn, 'edges').as_list()[0].as_map()['cursor'] or {
+		graphql.null
+	}
+	assert gql(f, '{ gadgets(first: 1, where: {color: RED}) { totalCount edges { node { serialNo } } } }')! == '{"data":{"gadgets":{"totalCount":2,"edges":[{"node":{"serialNo":"S-1"}}]}}}'
+	assert f.queries() == ['gadgets', 'gadgets']
+	assert gql(f, '{ gadgets(first: 0) { totalCount edges { node { serialNo } } pageInfo { hasNextPage endCursor } } }')! == '{"data":{"gadgets":{"totalCount":5,"edges":[],"pageInfo":{"hasNextPage":true,"endCursor":null}}}}'
+	assert gql(f, '{ gadgets { edges { node { serialNo } } } }')! == '{"data":{"gadgets":{"edges":[{"node":{"serialNo":"S-1"}},{"node":{"serialNo":"S-2"}},{"node":{"serialNo":"S-3"}},{"node":{"serialNo":"S-4"}},{"node":{"serialNo":"S-5"}}]}}}'
+	// an order by another column needs the key after it: two order columns,
+	// which the ORM can't run
+	assert run(f.server, '{ gadgets(first: 2, orderBy: {field: LEVEL}) { totalCount } }') or {
+		err.msg()
+	}.str() == "this query needs SQL the ORM can't run: pass a vgraph driver (five07.vgraph.sqlite or five07.vgraph.pg)"
+	// with a driver: by level, then the key, both ways
+	by_level := ['S-2', 'S-4', 'S-3', 'S-1', 'S-5']
+	for n in [1, 2, 3] {
+		assert walk(f.tserver, ', orderBy: {field: LEVEL}', n, true)! == by_level
+		assert walk(f.tserver, ', orderBy: {field: LEVEL}', n, false)! == by_level
+	}
+	desc := ['S-5', 'S-1', 'S-3', 'S-4', 'S-2']
+	assert walk(f.tserver, ', orderBy: {field: LEVEL, direction: DESC}', 2, true)! == desc
+	assert walk(f.tserver, ', orderBy: {field: LEVEL, direction: DESC}', 2, false)! == desc
+	// several columns, one nullable: a null is the largest rating on
+	// PostgreSQL, the smallest on SQLite, as each database orders it
+	by_rating := if on_pg {
+		['S-2', 'S-5', 'S-1', 'S-4', 'S-3']
+	} else {
+		['S-1', 'S-4', 'S-3', 'S-2', 'S-5']
+	}
+	rating := ', orderBy: [{field: RATING, direction: DESC}, {field: SERIAL}]'
+	assert serials(at(run(f.tserver, '{ gadgets(first: 10${rating}) { edges { node { serialNo } } } }')!,
+		'gadgets')) == by_rating
+	for n in [1, 2, 4] {
+		assert walk(f.tserver, rating, n, true)! == by_rating
+		assert walk(f.tserver, rating, n, false)! == by_rating
+	}
+	// by an edge's count: S-1 has two likers, the others one
+	by_likers := ['S-1', 'S-5', 'S-4', 'S-3', 'S-2']
+	assert walk(f.tserver, ', orderBy: {field: LIKERS_COUNT, direction: DESC}', 2, true)! == by_likers
+	assert walk(f.tserver, ', orderBy: {field: LIKERS_COUNT, direction: DESC}', 2, false)! == by_likers
+	// the arguments' errors
+	assert gql(f, '{ gadgets(first: 1, last: 1) { totalCount } }')!.contains('"message":"Passing both `first` and `last` to paginate a connection is not supported."')
+	assert gql(f, '{ gadgets(first: -1) { totalCount } }')!.contains('"message":"`first` on a connection cannot be less than zero."')
+	assert gql(f, '{ gadgets(after: "abc") { totalCount } }')!.contains('"message":"invalid cursor"')
+	assert gql(f, '{ gadgets(after: 1) { totalCount } }')!.contains('Cursor must be a string')
+}
+
+// Connections on edges, and limits per parent (Q98): each row's own page, in
+// one select per edge with a driver; without one, every row of the edge, cut
+// in V.
+fn check_nested_connections(f Fixture) ! {
+	gadgets(f.w)!
+	query := '{ users(where: {idIn: ["1", "2", "3"]}, orderBy: {field: ID}) { name gadgets(first: 2, orderBy: {field: SERIAL, direction: DESC}) { totalCount edges { node { serialNo } } pageInfo { hasNextPage } } likedGadgets(first: 1, orderBy: {field: SERIAL}) { totalCount edges { node { serialNo } } } } }'
+	want := '{"data":{"users":[{"name":"ada","gadgets":{"totalCount":3,"edges":[{"node":{"serialNo":"S-3"}},{"node":{"serialNo":"S-2"}}],"pageInfo":{"hasNextPage":true}},"likedGadgets":{"totalCount":2,"edges":[{"node":{"serialNo":"S-4"}}]}},{"name":"bob","gadgets":{"totalCount":2,"edges":[{"node":{"serialNo":"S-5"}},{"node":{"serialNo":"S-4"}}],"pageInfo":{"hasNextPage":false}},"likedGadgets":{"totalCount":1,"edges":[{"node":{"serialNo":"S-1"}}]}},{"name":"cy","gadgets":{"totalCount":0,"edges":[],"pageInfo":{"hasNextPage":false}},"likedGadgets":{"totalCount":3,"edges":[{"node":{"serialNo":"S-1"}}]}}]}}'
+	f.queries()
+	assert gqlt(f, query)! == want
+	// with a driver: the users; each edge's keys cut by a window, its rows,
+	// and its counts grouped
+	assert f.queries() == ['users', 'sql', 'gadgets', 'sql', 'sql', 'gadgets', 'sql']
+	// without one, the order by SERIAL alone: the ORM can run it
+	assert gql(f, query.replace('first: 2, orderBy: {field: SERIAL, direction: DESC}',
+		'last: 2').replace('likedGadgets(first: 1, orderBy: {field: SERIAL})', 'likedGadgets(first: 1)'))! == want.replace('"S-3"}},{"node":{"serialNo":"S-2"',
+		'"S-2"}},{"node":{"serialNo":"S-3"').replace('"pageInfo":{"hasNextPage":true}',
+		'"pageInfo":{"hasNextPage":false}').replace('"S-5"}},{"node":{"serialNo":"S-4"', '"S-4"}},{"node":{"serialNo":"S-5"')
+	// a list edge's limit and offset, per parent, in SQL with a driver
+	list := '{ users(orderBy: {field: ID}) { name pets(orderBy: {field: NAME}, limit: 1, offset: 1) { name } groups(orderBy: {field: NAME, direction: DESC}, limit: 1) { name } } }'
+	list_want := '{"data":{"users":[{"name":"ada","pets":[{"name":"tom"}],"groups":[{"name":"devs"}]},{"name":"bob","pets":[],"groups":[{"name":"devs"}]},{"name":"cy","pets":[],"groups":[]},{"name":"dee","pets":[],"groups":[]}]}}'
+	f.queries()
+	assert gql(f, list)! == list_want
+	assert f.queries() == ['users', 'pets', 'group_users', 'groups', 'groups']
+	assert gqlt(f, list)! == list_want
+	assert f.queries() == ['users', 'sql', 'pets', 'sql', 'groups']
+	// the client's `with_<edge>`: a limit applies to each row's
+	for g in [f.g, f.t] {
+		users := g.users().with_pets(fn (q graph.PetQuery) graph.PetQuery {
+			return q.order_by_name_desc().limit(1)
+		}).with_groups(fn (q graph.GroupQuery) graph.GroupQuery {
+			return q.order_by_name().limit(1)
+		}).order_by_id().all()!
+		assert users.map(it.pets.map(it.pet.name)) == [['tom'], []string{}, []string{}, []string{}]
+		assert users.map(it.groups.map(it.group.name)) == [['admins'], ['devs'], []string{},
+			[]string{}]
+	}
+}
+
+// The full WhereInput (6e): and, or, not, edge predicates and the folded and
+// list forms, on both servers.
+fn check_where_input(f Fixture) ! {
+	ids := gadgets(f.w)!
+	for s in [f.server, f.tserver] {
+		pets := fn [s] (where string) ![]string {
+			data := run(s, '{ pets(where: ${where}, orderBy: {field: NAME}) { name } }') or {
+				return error('${where}: ${err.msg()}')
+			}
+			return at(data, 'pets').as_list().map(at(it, 'name').as_string())
+		}
+		assert pets('{or: [{name: "rex"}, {name: "stray"}]}')! == ['rex', 'stray']
+		assert pets('{not: {name: "rex"}}')! == ['stray', 'tom']
+		assert pets('{and: [{nameNEQ: "rex"}, {nameNEQ: "tom"}]}')! == ['stray']
+		assert pets('{or: []}')! == []string{}
+		assert pets('{hasOwner: false}')! == ['stray']
+		assert pets('{hasOwnerWith: [{name: "ada"}]}')! == ['rex', 'tom']
+		assert pets('{not: {hasOwnerWith: [{nameIn: ["ada", "bob"]}]}}')! == ['stray']
+		users := at(run(s, '{ users(where: {hasPetsWith: [{nameHasPrefix: "t"}], hasGroups: true}) { name } }') or {
+			return error('users: ${err.msg()}')
+		}, 'users').as_list().map(at(it, 'name').as_string())
+		assert users == ['ada']
+		// lists of floats and times: an OR of equals
+		assert at(run(s, '{ gadgets(where: {ratingIn: [4.5, 3]}) { totalCount } }') or {
+			return error('rating: ${err.msg()}')
+		}, 'gadgets',
+			'totalCount') == graphql.Value(2)
+		created := f.w.gadgets().where_id(ids['S-1']).first()!.gadget.created_at.format_rfc3339_micro()
+		inside := at(run(s, '{ gadgets(where: {createdAtIn: ["${created}"]}) { totalCount } }')!,
+			'gadgets', 'totalCount').as_int()
+		outside := at(run(s, '{ gadgets(where: {createdAtNotIn: ["${created}"]}) { totalCount } }')!,
+			'gadgets', 'totalCount').as_int()
+		assert inside >= 1 && inside + outside == 5
+	}
+	// folded matches: through a driver, or ILIKE on PostgreSQL
+	assert gqlt(f, '{ pets(where: {nameEqualFold: "REX"}) { name } }')! == '{"data":{"pets":[{"name":"rex"}]}}'
+	assert gqlt(f, '{ pets(where: {nameContainsFold: "O"}) { name } }')! == '{"data":{"pets":[{"name":"tom"}]}}'
+	on_pg := (f.w.client.conn as vgraph.Driver).dialect() == .pg
+	if !on_pg {
+		assert gql(f, '{ pets(where: {nameEqualFold: "REX"}) { name } }')!.contains('a case-insensitive match needs a vgraph driver on SQLite')
+	}
+}
+
+// Generated mutations (6e): every kind of edge through the inputs, hooks and
+// privacy, and a request's mutations in one transaction.
+fn check_mutations(f Fixture) ! {
+	for i, s in [f.server, f.tserver] {
+		name := ['eve', 'fay'][i]
+		// a create with a one_to_one, a one_to_many and a many_to_many edge
+		created := run(s, 'mutation { createUser(input: {name: "${name}", spouseID: "4", petIDs: ["3"], groupIDs: ["1"]}) { id name spouse { name } pets { name } groups { name } } }')!
+		user := at(created, 'createUser')
+		id := at(user, 'id').as_string()
+		assert user.json() == '{"id":"${id}","name":"${name}","spouse":{"name":"dee"},"pets":[{"name":"stray"}],"groups":[{"name":"admins"}]}'
+		// an update: a value, clears, adds and removes
+		updated := run(s, 'mutation { updateUser(id: "${id}", input: {name: "${name}2", clearSpouse: true, removeGroupIDs: ["1"], addGroupIDs: ["2"], clearPets: true, addFollowingIDs: ["1", "2"]}) { name spouse { name } pets { name } groups { name } following(orderBy: {field: ID}) { name } } }')!
+		assert at(updated, 'updateUser').json() == '{"name":"${name}2","spouse":null,"pets":[],"groups":[{"name":"devs"}],"following":[{"name":"ada"},{"name":"bob"}]}'
+		// the stray is ownerless again
+		assert at(run(s, '{ pets(where: {name: "stray"}) { owner { name } } }')!, 'pets').json() == '[{"owner":null}]'
+		if i == 0 {
+			// a new i64 key is read back through a driver: gadgets are the
+			// driver's server's
+			continue
+		}
+		// every field type, an enum and JSON; an immutable edge has no update field
+		gadget := at(run(s, 'mutation { createGadget(input: {ownerID: "${id}", serialNo: "M-${i}", color: BLUE, level: -2, weight: 3, parts: 4, big: 5, ratio: 0.25, rating: 1.5, tags: ["a", "b"]}) { id serialNo color level ratio rating tags owner { name } } }')!,
+			'createGadget')
+		gid := at(gadget, 'id').as_string()
+		assert gadget.json() == '{"id":"${gid}","serialNo":"M-${i}","color":"BLUE","level":-2,"ratio":0.25,"rating":1.5,"tags":["a","b"],"owner":{"name":"${name}2"}}'
+		assert at(run(s, 'mutation { updateGadget(id: "${gid}", input: {clearRating: true, tags: {k: 1}}) { rating tags } }')!,
+			'updateGadget').json() == '{"rating":null,"tags":{"k":1}}'
+		assert gql(f, 'mutation { updateGadget(id: "${gid}", input: {ownerID: "1"}) { id } }')!.contains('Field \\"ownerID\\" is not defined by type \\"UpdateGadgetInput\\".')
+		// the unique index, and a missing row
+		if _ := run(s, 'mutation { createGadget(input: {ownerID: "1", serialNo: "M-${i}", color: RED, level: 1, weight: 1, parts: 1, big: 1, ratio: 1, tags: []}) { id } }') {
+			assert false
+		}
+		assert run(s, 'mutation { updateGadget(id: "9", input: {level: 1}) { id } }') or { err.msg() }.str() == 'no `gadgets` row matches'
+		// a delete returns the id; a soft-deleted pet stays in the table
+		assert at(run(s, 'mutation { deleteGadget(id: "${gid}") }')!, 'deleteGadget').as_string() == gid
+		assert run(s, '{ node(id: "${gid}") { id } }') or { err.msg() }.str() == 'Could not resolve to a node with the global ID of "${gid}".'
+		// privacy: only an admin deletes a group; the rule sees the request's
+		// context, inside the transaction too
+		denied := s.execute(graphql.Request{
+			query: 'mutation { a: createGroup(input: {name: "ops-${i}"}) { id } b: deleteGroup(id: "2") }'
+		}, unsafe { nil })
+		assert denied.errors.len == 1 && denied.errors[0].path == [graphql.PathItem('b')]
+		// so the request rolled back, the group it created with it
+		assert at(run(s, '{ groupsCount(where: {name: "ops-${i}"}) }')!, 'groupsCount') == graphql.Value(0)
+		allowed := s.execute(graphql.Request{
+			query: 'mutation { a: createGroup(input: {name: "ops-${i}"}) { id } }'
+		}, models.Admin{})
+		assert allowed.errors.len == 0
+		gr := at(allowed.data or { graphql.null }, 'a', 'id').as_string()
+		admin := s.execute(graphql.Request{
+			query: 'mutation { deleteGroup(id: "${gr}") }'
+		}, models.Admin{})
+		assert admin.errors.len == 0
+		// a soft delete: the pet's row stays, hidden
+		pet := at(run(s, 'mutation { createPet(input: {name: "kit-${i}"}) { id } }')!, 'createPet',
+			'id').as_string()
+		run(s, 'mutation { deletePet(id: "${pet}") }')!
+		assert at(run(s, '{ petsCount(where: {name: "kit-${i}"}) }')!, 'petsCount') == graphql.Value(0)
+		assert f.w.skip('soft_delete').pets().where_name('kit-${i}').count()! == 1
+	}
 }

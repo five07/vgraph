@@ -1088,3 +1088,65 @@ fn (g Graph) categories_by_keys(keys []string) ![]CategoryNode {
 	}
 	return found
 }
+
+// CreateCategoryInput is what a create of a `categories` row sets, as the GraphQL input
+// `CreateCategoryInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct CreateCategoryInput {
+pub mut:
+	name      ?string
+	parent_id ?int
+	child_ids []int
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b CategoryCreate) set_input(input CreateCategoryInput) CategoryCreate {
+	mut next := b
+	if v := input.name {
+		next = next.set_name(v)
+	}
+	if v := input.parent_id {
+		next = next.set_parent_id(v)
+	}
+	if input.child_ids.len > 0 {
+		next = next.add_children_ids(...input.child_ids)
+	}
+	return next
+}
+
+// UpdateCategoryInput is what a update of a `categories` row sets, as the GraphQL input
+// `UpdateCategoryInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct UpdateCategoryInput {
+pub mut:
+	name             ?string
+	parent_id        ?int
+	clear_parent_id  bool
+	add_child_ids    []int
+	remove_child_ids []int
+	clear_children   bool
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b CategoryUpdateOne) set_input(input UpdateCategoryInput) CategoryUpdateOne {
+	mut next := b
+	if input.clear_parent_id {
+		next = next.clear_parent_id()
+	}
+	if input.clear_children {
+		next = next.clear_children()
+	}
+	if v := input.name {
+		next = next.set_name(v)
+	}
+	if v := input.parent_id {
+		next = next.set_parent_id(v)
+	}
+	if input.add_child_ids.len > 0 {
+		next = next.add_children_ids(...input.add_child_ids)
+	}
+	if input.remove_child_ids.len > 0 {
+		next = next.remove_children_ids(...input.remove_child_ids)
+	}
+	return next
+}

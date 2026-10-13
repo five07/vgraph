@@ -648,7 +648,7 @@ that Ent doesn't.
 | | `Optional`, `Nillable` | `Field.optional`; option types are nullable; `set_nillable_<field>` | 6a (done) |
 | | `Default`, `DefaultFunc`, `UpdateDefault` | `default`, `default_now`, `update_default`, `update_now` | 6a (done) |
 | | `Immutable`, `Sensitive` | `immutable` (no update setter); `sensitive` leaves GraphQL only, as V's `str()` can't be changed | 6a (done) |
-| | `Unique`, `StorageKey`, `SchemaType`, `Comment`, `Deprecated` | `@[unique]` / `Field.unique`, `@[sql: 'col']`, `sql_type`, `Field.comment` / `deprecated` | 6a, 6d (done); in GraphQL 6e |
+| | `Unique`, `StorageKey`, `SchemaType`, `Comment`, `Deprecated` | `@[unique]` / `Field.unique`, `@[sql: 'col']`, `sql_type`, `Field.comment` / `deprecated` (descriptions and `@deprecated` in GraphQL) | 6a, 6d, 6e (done) |
 | | validators: `Validate`, `MinLen`, `MaxLen`, `NotEmpty`, `Match`, `Range`, `Positive` | `validate`, `min_len`, `max_len`, `not_empty`, `pattern`, `min` / `max`, `positive` | 6a (done) |
 | | custom types: `GoType`, `ValueScanner` | type aliases; no `ValueScanner` (Q84) | 6d (done) |
 | | id types: `i64`, string (UUID) | `int` only (Q6) | 3.2 (Q43) |
@@ -660,7 +660,7 @@ that Ent doesn't.
 | | — | polymorphic edges, per-edge soft delete (extra) | done |
 | **Schema** | declared indexes (fields, edges, unique, partial) | `indexes()`, unique and partial | 5, 6d (done) |
 | | mixins (shared fields, edges, hooks) | embedded structs | 6d (done) |
-| | annotations (`entsql`, `entgql`) | `@[table]`; `@[graphql]` in Phase 4 (Q29) | 4 / 6d |
+| | annotations (`entsql`, `entgql`) | `@[table]`; `@[graphql: '-']`; `graphql()` options | 4, 6d, 6e (done) |
 | | views, multiple database schemas | views (`@[vgraph: 'view']`); schemas §8 (Q91) | 6d (done) |
 | **Queries** | predicates `EQ`, `NEQ`, `In`, `NotIn`, `GT`/`GTE`/`LT`/`LTE`, `IsNil`, `NotNil` | all, as methods and functions | 6b (done) |
 | | `Contains`, `HasPrefix`, `HasSuffix`, `EqualFold`, `ContainsFold` | all, escaped; GraphQL's escaped too | 6b (done) |
@@ -696,15 +696,15 @@ that Ent doesn't.
 | | `ent describe` | `vgraph describe` | 6d (done) |
 | | schema visualization (entviz) | none | §8 |
 | **Migrations** | automatic and versioned migrations, diffing through Atlas | versioned through `v.migrations`, written by hand, with vgraph's helpers (Q10) | 5 (done); no diffing |
-| **entgql** | schema generation | none | 4 |
-| | `Node` interface, global ids, `node` / `nodes` | global ids (`global_ids`, `table_of`); `Node` in 6e | 6d (done), 6e |
+| **entgql** | schema generation | `vgraph gen` | 4 (done) |
+| | `Node` interface, global ids, `node` / `nodes` | `node: true` on tables with global ids | 6d, 6e (done) |
 | | `CollectFields`: eager loads from the selection set | none | 4 (Q32) |
-| | `WhereInput`: every predicate, `and`/`or`/`not`, `has<Edge>` | the predicates `load` can run, ANDed (Phase 4) | rest 6e |
-| | `OrderBy` inputs, multi-field ordering | none | 4 (one field); 6e |
-| | Relay connections, cursors, `totalCount`, per-parent pagination | none | 6e (Q22) |
-| | mutation inputs (`CreateXInput`, `UpdateXInput`, `SetInput`), generated mutations | none | 6e (needs 6a) |
-| | annotations: `Skip`, `Type`, `QueryField`, `RelayConnection`, `Mutations`, `OrderField`, `Directives` | none | 4 (`Skip`, Q29); rest 6e |
-| | `Transactioner` (a transaction per request) | none | 4 (Q34) |
+| | `WhereInput`: every predicate, `and`/`or`/`not`, `has<Edge>` | all, with `EqualFold` / `ContainsFold` and `In` on floats and times | 6e (done) |
+| | `OrderBy` inputs, multi-field ordering | `orderBy: [TOrder!]`; edge counts; `order_field` | 4, 6e (done) |
+| | Relay connections, cursors, `totalCount`, per-parent pagination | `relay: true`; keyset cursors; windows per parent | 6e (done) |
+| | mutation inputs (`CreateXInput`, `UpdateXInput`, `SetInput`), generated mutations | `create<T>` / `update<T>` / `delete<T>`, inputs, `set_input` | 6e (done) |
+| | annotations: `Skip`, `Type`, `QueryField`, `RelayConnection`, `Mutations`, `OrderField`, `Directives` | `GraphqlTable`, `graphql_skip_in`, `order_field`, `directives` | 4, 6e (done) |
+| | `Transactioner` (a transaction per request) | `graphql.Transaction`; `vgraph.GraphqlTransaction` | 4, 6e (done) |
 | **Other** | Gremlin driver; entproto, entoas/ogent | none | §8 (Q37) |
 
 *Readiness review (2026-10-13), after Phase 5.* What Phase 6 builds on, and what
@@ -819,6 +819,97 @@ Decisions before 6d (Q82–Q94, 2026-10-13): the defaults.
 
 Decisions before 6b (Q70–Q81, 2026-10-13): the defaults; reads that need SQL the
 ORM can't express run keys first (Q70 (a)).
+
+Decisions before 6e (Q95–Q108, 2026-10-13): the defaults. `Node` is opt-in, with
+`node: true` in a table's `graphql()` options (Q95). `examples/service`'s rewrite
+is Phase 7 (Q107).
+
+*6e result (2026-10-13, done):*
+- **Schema** (`gen/graphql.v`, Q99–Q105): per table, from its `graphql()` options
+  (`vgraph.GraphqlTable`, Q104): `node` adds `implements Node` and the root `node` /
+  `nodes`; `relay` makes its root list and every list edge to it a connection
+  (`<T>Connection`, `<T>Edge`, `PageInfo`, `Cursor`; no `<root>Count`); `mutations`
+  (all three by default, none for views); `type_name`, `query_field` (`-` for
+  none), `directives`. `WhereInput` gains `not` / `and` / `or`, `has<Edge>` /
+  `has<Edge>With`, `EqualFold` / `ContainsFold` and `In` / `NotIn` on floats and
+  times (an OR of equals). `orderBy` is `[<T>Order!]`, with `<EDGE>_COUNT` for list
+  edges and `<EDGE>_<FIELD>` for an edge's `order_field`. `Field.comment` and
+  `deprecated` become descriptions and `@deprecated` (not on a required input
+  field, which graphql-js refuses). Clashing names (a table typed `Node`, two root
+  fields) are an error naming the options that rename them; `examples/relations`
+  renames `Node` to `ListNode`.
+- **Field and edge options** (Q104): `Field.graphql_skip_in []GraphqlSkip` (`.object`,
+  `.where`, `.order`, `.create_input`, `.update_input`) beside `graphql_skip`, which
+  stays the bool for all; Q104's `.type` is `.object`, `type` being a V keyword.
+  `Field.order_field` (`-` for none) and `directives`; `Edge.graphql_skip`,
+  `order_field` (validated: a many_to_one or one_to_one edge, a target column) and
+  `directives`. `sensitive` no longer sets `graphql_skip`: it leaves the field out of
+  the type, filters and orders, and keeps it in the inputs (Q102).
+- **Mutations** (Q101, Q102): `create<T>(input)`, `update<T>(id, input)` and
+  `delete<T>(id): ID!`, resolved through the builders, so checks, defaults, hooks and
+  privacy apply. Inputs as entgql's: create fields required when the create needs
+  them, `<edge>IDs` (singular, as entgql's inflection), `<edge>ID`; update fields
+  nullable, `clear<Field>` (`clear<Edge>` for a foreign key), `add` / `remove` /
+  `clear` per list edge; immutable fields and edges left out. A polymorphic type
+  column is checked against its edges' types. The client gains
+  `Create<T>Input` / `Update<T>Input` and `set_input` on the create and update_one
+  builders (clears, then values, then edges).
+- **Transactions** (Q103): `graphql.Transaction` is `begin(ctx) !Context`,
+  `commit(ctx)`, `rollback(ctx)`: commit and rollback get the context too, so a
+  server shared by concurrent requests keeps no state. `vgraph.GraphqlTransaction`
+  returns a `TxContext`; `Client.with_ctx` takes it apart into the transaction's
+  connection and the request's own context. The generated server sets it when
+  `can_begin()`. Tested on a PostgreSQL pool: a request whose last mutation is
+  denied leaves nothing behind.
+- **Connections** (Q97): keyset cursors, base64 of a JSON list of the order values,
+  the key last; `after` / `before` are conditions (`load.keyset`), with nulls where
+  each database orders them (largest on PostgreSQL, smallest on SQLite).
+  `first` / `last` read one row more; `totalCount` counts only when selected
+  (`FieldInfo.selected`, which now follows named fragments). The key breaks ties in
+  the direction of the last order, as entgql's. Two order columns need a driver, so
+  a connection ordered by anything but its key needs one (Q97 had said one column
+  ran without; the key makes two). An order by an edge reads its cursor values in
+  one more select (`load.expr_values`).
+- **Per parent** (Q98, `load/each.v`): `select_each`, `link_each`, `count_each`,
+  `count_through`. With a driver: `ROW_NUMBER() OVER (PARTITION BY …)` for the keys,
+  then the rows by key; counts by `GROUP BY`. Without one: every row, cut in V. The
+  client's `with_<edge>` limit and offset now apply per row (`load_<edge>`), and
+  GraphQL's nested `limit` / `offset` and connections use them; `page()` is gone.
+- **Node** (Q95): the server reads `vgraph_types` once at startup
+  (`Client.global_types`), fails naming a `node` table without a range, and `nodes`
+  reads each table's ids in one select, with an error at each unknown id.
+- **Operations** (Q106): an operation or fragment in a schema file is an error at its
+  file and line; files in `operations/` folders are validated against the schema
+  and not served. Directives print as Apollo's subgraph schemas print them
+  (`graphql.print_schema_with(applied_directives: true)`); graphql-js's
+  `printSchema` drops them, so `check_schema.js` compares only schemas without
+  custom directives, as both examples' are.
+- **Fixed on the way** (6b): `not(has_<edge>())` on a many_to_one edge left out
+  rows whose column is null (`NOT (NULL IN (…))`): the predicate is now
+  `column IS NOT NULL AND column IN (…)`. Without a driver, a subquery's conditions
+  now get the outer query's downgrade, so `has_pets_with(…has_prefix…)` runs.
+- **`examples/service`** (Q107): its four models give `mutations: []`, since
+  `api.graphql` declares its own; a clash is reported at the project file's line with
+  that hint. Its `SqliteTransaction` follows the new interface. The introspection
+  snapshot is regenerated: graphql-js 16.11.0 (npm) for the schema's types, with the
+  16.x branch's introspection types taken from the old snapshot, a merge that
+  reproduces the old snapshot exactly from the old schema. Its tests and query
+  counts are otherwise unchanged.
+- **Tests:** `examples/relations` (gadgets are `node` and `relay`): `check_relay`
+  (node / nodes, paging both ways by key, level, a nullable rating with a second
+  column, and likers' count; the selects; `totalCount`; argument errors),
+  `check_nested_connections` (per-parent connections and lists, with the selects,
+  with and without a driver, and `with_<edge>` limits), `check_where_input`,
+  `check_mutations` (every edge kind, hooks, soft delete, privacy, a rolled-back
+  request), on SQLite and PostgreSQL, plus `test_graphql_transaction_on_a_pool`. The
+  generator test's project: a renamed type and root field, a field out of one input,
+  directives, a description, a deprecation, create-only mutations, the polymorphic
+  type check, `set_input`, and the `operations` checks. `load_test.v`: keysets,
+  cursors, the no-driver per-parent paths. `execute_test.v`: connections, `selected`
+  through fragments, printed directives, the transaction's context.
+  `schema_test.v` / `write_test.v`: the new validation and `GraphqlTransaction`. All
+  22 test files pass, both PostgreSQL tests against PostgreSQL 18, and graphql-js
+  16.11.0 reads both generated schemas unchanged. CI's vet now includes `gql.v`.
 
 *6d result (2026-10-13, done):*
 - **Reflection** (`load/fields.v`, `schema.v`): every type of V's ORM but bytes, type
@@ -2063,13 +2154,243 @@ case.
 - `vgraph describe` tested on `examples/relations`.
 >  A: agreed
 
-## 8. Future state
+### Phase 6e (entgql): answer before 6e starts
 
-Out of scope for v1, kept for later (Q30, Q37):
-- **entproto** (protobuf and gRPC services generated from the schema): first in line.
-- entoas and ogent (an OpenAPI spec and server generated from the schema).
-- entviz (schema diagrams).
-- Ent's Gremlin driver (graph databases).
-- Apollo's runtime extras: a `GET /graphql` page for Sandbox or GraphiQL, Apollo
-  Server's error codes in `extensions.code`, automatic persisted queries, and
-  Federation v2 subgraph support (`_service`, `_entities`, `@key`).
+Background (checked 2026-10-13):
+- **What the generator writes today** (`gen/graphql.v`): per table an object type, a
+  root list `articles(where, orderBy, limit, offset): [Article!]!` and
+  `articlesCount(where)`, list edges `[T!]` with the same arguments, unique edges
+  nullable; `ArticleWhereInput` with the Phase 4 predicates, ANDed;
+  `ArticleOrder { direction, field }` with one field; enums, `Time` and `JSON`
+  scalars. Nested `limit` / `offset` is cut per parent in V (`page`). Mutations exist
+  only as the project's own `.graphql` fields, resolved by `Resolvers` methods.
+- **What 6a–6d left for it:** the write builders and `<T>Mutation` (6a), hooks and
+  privacy, which a generated mutation then runs (6c), `load.and` / `or` / `not`,
+  `has_<edge>_with`, the `Fold` predicates, several order columns and order by edge
+  (6b), `global_ids` and `Client.table_of` (6d), and `Field.comment` / `deprecated`
+  (6a), not yet in the schema.
+- **Window functions:** nothing in `load` writes `ROW_NUMBER() OVER (PARTITION BY …)`
+  yet; 6b's keys-first plan (Q70 (a)) is where it fits, through a driver.
+- **The GraphQL transaction** (moved from 6a): `graphql.Server.transaction` is a
+  `Transaction` with `begin` / `commit` / `rollback` and no way to hand the
+  resolvers a different graph. The generated resolvers capture the `Graph` they were
+  built with (`fn [g] (ctx, …)`), so on a pool a request's mutations would run on
+  other connections than its transaction. `examples/service` works today only
+  because its `SqliteTransaction` runs `BEGIN` on the single connection the stores
+  share.
+- **Selections are visible to resolvers:** `FieldInfo.nodes` holds the field's
+  merged selections, so a connection can count `totalCount` only when it's asked for.
+- **entgql's own split:** entgql generates `CreateTodoInput` / `UpdateTodoInput` and a
+  Go `SetInput` on the builders, but the app writes the `createTodo` field and its
+  resolver in gqlgen. Q29 / Q27 already chose to generate the mutation fields too.
+
+**Q95. `Node`, `node` and `nodes`** (Q42, Q85). **Default** (revised in chat,
+2026-10-13: opt-in rather than inferred from the key):
+- a table implements `Node` only when it asks to, with `node: true` in Q104's table
+  options (`fn (Article) graphql() vgraph.GraphqlTable`). `validate` refuses it on a
+  table without an `i64` serial key, the only kind `global_ids` gives a range to;
+  when no table asks, there is no `Node` interface, `node` or `nodes` at all;
+- `Graph.graphql()` checks once, at startup, that each `Node` table has a row in
+  `vgraph_types`, and fails naming the table if not, so a missing `global_ids`
+  migration is an error at boot rather than a `node` that answers wrongly;
+- `node(id: ID!): Node` and `nodes(ids: [ID!]!): [Node]!` as entgql's; each id goes
+  through `Client.table_of`, and `nodes` reads each table's ids in one query, keeping
+  the order asked for, with `null` and an error at its index for an unknown id;
+- the table's privacy rules and interceptors apply, as to every other read.
+
+Inferring `Node` from the key was the other choice. A request would cost the same
+either way (one `table_of` lookup, then one query per table), but inference can't
+tell whether `global_ids` ever ran. A table whose ids start at 1 would then get a
+`node` that finds the wrong table, or nothing.
+> A: opt-in, as a table option
+
+**Q96. Relay connections: when.** entgql adds a connection only where the
+`RelayConnection` annotation asks for one; the rest stay lists. `TODO.md` asked for
+"offset or Relay, by config" (held, Q60). **Default:** per table, opt-in (Q104):
+- a table with connections gets `articles(after: Cursor, first: Int, before: Cursor,
+  last: Int, orderBy, where): ArticleConnection!` as its root field, and every list
+  edge pointing at it becomes a connection too, as entgql does;
+- a table without stays as it is: lists with `limit` / `offset`, and `<root>Count`;
+- the `<root>Count` field goes for a table with connections, since `totalCount`
+  replaces it.
+
+The other choices: connections for every table (one style everywhere, but
+`examples/service`'s and the tests' lists all change), or both side by side
+(`articles` a list, `articlesConnection` a connection), which entgql doesn't do.
+> A: agree
+
+**Q97. Relay connections: shape and cursors.** **Default:** entgql's names and types:
+`ArticleConnection { edges: [ArticleEdge], pageInfo: PageInfo!, totalCount: Int! }`,
+`ArticleEdge { node: Article, cursor: Cursor! }`, `PageInfo { hasNextPage,
+hasPreviousPage, startCursor, endCursor }`, and a `Cursor` scalar.
+- A cursor is opaque: base64 of JSON holding the row's key and the values of the
+  order columns (entgql uses msgpack; the bytes differ, the contract doesn't).
+- Paging is keyset, not offset: `after` turns into `(order columns, key) > (values)`,
+  written as ORs of ANDs so the ORM can run a single order column without a driver;
+  several order columns, or a mix of directions, need a driver (6b).
+- `last` / `before` reverse the order, read, and reverse the page back;
+  `first` and `last` together are refused, as entgql refuses them.
+- `totalCount` runs a count only when it's selected (`FieldInfo.nodes`).
+- `hasNextPage` / `hasPreviousPage` read one row past the page, as entgql does.
+- No upper limit on `first` / `last` by default; `Server`'s `max_depth` and
+  `max_selections` stay the only limits. A `max_page` on the generated server is an
+  option to add here if you want one.
+> A: agree
+
+**Q98. Per-parent pagination in SQL** (Q32). Nested `limit` / `offset`, and nested
+connections' `first` / `after`, are per parent. **Default:**
+- with a driver: the keys-first plan (Q70 (a)) gains a window:
+  `SELECT key, parent FROM (SELECT …, ROW_NUMBER() OVER (PARTITION BY parent ORDER BY
+  …) AS n FROM … WHERE …) WHERE n BETWEEN …`, then the rows by key, as 6b does; through
+  a join table for many_to_many, partitioned by the join column. SQLite (3.25+) and
+  PostgreSQL both have it;
+- without a driver: the Phase 4 way, every row of the edge and the cut in V;
+- a nested `totalCount`: one `GROUP BY parent` count for every parent at once (a
+  driver), or counted in V without one;
+- this lives in `load` (a `Query.per_parent` window), so the generated client gains
+  it too: `with_<edge>(fn (q) { return q.limit(3) })` then limits per parent, as
+  Ent's `WithComments(func(q) { q.Limit(3) })` does not (Ent limits the whole load).
+  So the client's `limit` inside `with_<edge>` changes meaning; the other choice keeps
+  it as is and gives the per-parent form its own name (`limit_each(3)`).
+> A: agree
+
+**Q99. The full `WhereInput`.** **Default:** entgql's, on 6b:
+- `not: ArticleWhereInput`, `and: [ArticleWhereInput!]`, `or: [ArticleWhereInput!]`;
+- per edge `hasTags: Boolean` and `hasTagsWith: [TagWhereInput!]` (ANDed, as
+  entgql's), polymorphic edges and join tables included; the target's privacy and
+  interceptors apply in the subquery (Q73);
+- strings gain `EqualFold` and `ContainsFold`; `In` / `NotIn` on floats and times
+  (the Phase 4 gaps); `ID` keys gain `In` / `NotIn` on foreign keys already, and keep
+  `GT`… on keys only;
+- a predicate a plain `orm.Connection` can't run (a `Fold` on SQLite, an escaped
+  `Contains` with `%`) is an error at the field, with 6b's message.
+> A: agree
+
+**Q100. Ordering in GraphQL.** **Default:**
+- `orderBy: [ArticleOrder!]`: a list. GraphQL coerces a single value to a list of one,
+  so today's queries keep working; entgql makes it a list only with `MultiOrder`,
+  but here it costs nothing;
+- the order fields stay every scalar field but JSON, as today; list edges add
+  `<EDGE>_COUNT` (`TAGS_COUNT`) and unique edges add nothing unless Q104's field
+  option names an edge field to order by (`OWNER_NAME`), as entgql's `OrderField` on
+  an edge does;
+- a connection's cursor holds every order column (Q97).
+> A: agree
+
+**Q101. Generated mutations: which fields.** entgql leaves the fields to the app
+(see the background); Q27 / Q38 / Q40 asked for them generated. **Default:** per table,
+unless Q104 turns some off:
+- `createArticle(input: CreateArticleInput!): Article!`;
+- `updateArticle(id: ID!, input: UpdateArticleInput!): Article!`;
+- `deleteArticle(id: ID!): ID!`, which returns the id deleted;
+- none for views (no write builders), for tables hidden with `@[graphql: '-']`, and
+  for edge-schema join structs unless they're visible;
+- no bulk (`createArticles`), update-many or delete-many fields; entgql has none.
+  The app adds them in its `.graphql` files, resolved with the builders, as today.
+
+Each runs the builder, so `fields()` checks, defaults, hooks and privacy all apply,
+and a check's or hook's error is an error at the field (Q68). The request's
+transaction (Q103) holds the writes.
+> A: agree
+
+**Q102. Mutation inputs.** **Default:** entgql's `Mutations()` inputs:
+- `CreateArticleInput`: each writable field, non-null when it's required on create,
+  nullable when it's optional or has a default (`default`, `default_now`); the serial
+  key and fields with only an `update_default` left out. Edges: `ownerID: ID` for a
+  many_to_one (non-null when `required`), `tagIDs: [ID!]` for list edges;
+- `UpdateArticleInput`: every mutable field nullable (immutable fields and edges left
+  out), `clearSummary: Boolean` for each optional field, `ownerID` / `clearOwner`,
+  `addTagIDs` / `removeTagIDs` / `clearTags`;
+- JSON fields take the `JSON` scalar; enums their GraphQL enum; a polymorphic edge's
+  id needs its type too, so it gets `ownerID` and `ownerType`, checked against the
+  edge's tables;
+- `sensitive` fields stay in both inputs (a password is written, never read), as Ent
+  keeps them; only `@[graphql: '-']` / `graphql_skip` removes a field from inputs too.
+  Q104 can drop a field from one input only, as entgql's `Skip` modes do;
+- the generated client gains `set_input(CreateArticleInput)` and the update's, as
+  entgql's `SetInput`, so the app's own resolvers can reuse them.
+> A: agree
+
+**Q103. A request's transaction on `g.tx`** (moved from 6a). The resolvers need the
+transaction's graph, not the one they were built with. **Default:**
+- `graphql.Transaction.begin` becomes `begin(ctx Context) !Context`: it returns the
+  context the request's mutations run with. The `graphql` module still knows nothing
+  of vgraph;
+- the generated server sets its own `Transaction` when the client can begin one: it
+  wraps the request's context in a `vgraph.TxContext` holding the transaction's
+  client, and every generated resolver starts from `g.with_ctx(ctx)`, which switches
+  to that client when it finds one. `ctx()` unwraps it, so hooks and privacy rules
+  still see the app's own context;
+- the app's `Resolvers` reach it the same way (`r.graph.with_ctx(ctx)`); the
+  generated `resolvers.v` stub's comment says so;
+- an app can still set `server.transaction` itself, or turn it off.
+> A: agree
+
+**Q104. Annotations.** entgql's: `Skip` (with modes), `Type`, `QueryField`,
+`RelayConnection`, `Mutations`, `OrderField`, `MultiOrder`, `Directives`.
+**Default:** data, in the places vgraph already has:
+- per table, an optional `fn (Article) graphql() vgraph.GraphqlTable` beside
+  `fields()` / `edges()`: `type_name` (entgql's `Type`), `query_field` (the root
+  field's name, or `'-'` for none), `node` (Q95), `relay` (Q96), `mutations` (`[.create, .update,
+  .delete]` by default; `[]` for none), `directives` (SDL strings, such as
+  `'@key(fields: "id")'`, printed on the type as written);
+- per field, in `vgraph.Field`: `graphql_skip` gains modes (`.all`, `.type`,
+  `.where`, `.order`, `.create_input`, `.update_input`), `order_field` (a name, or
+  `'-'` to leave it out), `directives`;
+- per edge, in `vgraph.Edge`: `graphql_skip`, `order_field` for a unique edge's
+  field (Q100), `directives`;
+- `@[graphql: '-']` keeps working, as `.all`;
+- `comment` and `deprecated` become descriptions and `@deprecated(reason:)` on the
+  field and its inputs (moved here from 6a), and a model's doc comment isn't read:
+  V's comptime can't see it.
+
+The other choice, struct attributes (`@[graphql: 'relay']`), can't hold lists or
+names cleanly, and `fields()` already took the field options off attributes.
+> A: agree
+
+**Q105. Polymorphic edges as unions** (Q28: "can come in 6e"). entgql has no
+polymorphic edges, so there is no convention to follow. **Default:** leave them as
+separate fields (`Comment.article`, `Comment.post`), as Phase 4 has them, and put a
+union (`owner: CommentOwner`) in §8. The other choice adds the union field beside
+the separate ones, when every target table is visible.
+> A: agreed
+
+**Q106. Named operations in the project's `.graphql` files** (the "Also for 6e"
+note). **Default:**
+- (a) in 6e: `vgraph gen` fails on an operation or fragment in a schema file, at its
+  file and line; files under an `operations/` folder (anywhere in the project) hold
+  operations only, are validated against the generated schema on every `vgraph gen`,
+  and are not served. CI then catches a query that a schema change broke;
+- (b) stored operations ("trusted documents") and (c) a typed V client per operation:
+  §8.
+> A: agree
+
+**Q107. `examples/service` after 6e** (Q58). Q58 says that once Phase 6 is complete
+its REST API goes and it runs on vgraph alone. **Default:** that is its own phase,
+**Phase 7**, with its own questions (slugs, which hooks, which mutations stay
+hand-written, the end of the REST-to-GraphQL query-count comparison), so 6e's exit
+doesn't depend on it. In 6e `examples/service` is only regenerated, and that
+collides: its `api.graphql` already declares `createUser`, `updateUser`,
+`deleteUser`, `createArticle`, `updateArticle`, `deleteArticle` and the post ones,
+keyed by slug and returning `Boolean!` on delete, which the generated fields of
+Q101 would duplicate. So its tables set Q104's `mutations: []` until Phase 7, and
+`vgraph gen` reports such a clash at the `.graphql` file's line rather than
+merging it.
+> A: agree
+
+**Q108. Exit criteria for 6e.** **Default:** Q59's, and:
+- `examples/relations`: `node` / `nodes` over the global-id table and an error for a
+  non-global id; a table with connections, root and nested, paged forward and back
+  with a multi-column order, `totalCount` only when selected, with the selects each
+  runs; nested `limit` and `first` in one query per edge with a driver, and the V cut
+  without; the full `WhereInput` per relationship kind; every generated mutation per
+  relationship kind, including a rollback of a request whose second mutation fails,
+  on a PostgreSQL pool;
+- the generator test's project: annotations (a renamed type and root field, a field
+  left out of one input, mutations turned off, directives), descriptions and
+  `@deprecated`, and an operation in `operations/` that fails when it no longer
+  validates;
+- graphql-js 16.11.0 builds and prints every generated schema unchanged, and the
+  introspection checks are regenerated;
+- the inventory's entgql rows are all done or moved with a reason.
+> A: agree

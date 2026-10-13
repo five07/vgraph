@@ -60,8 +60,8 @@ pub fn (q UserQuery) where(conds ...load.Cond) UserQuery {
 	return next
 }
 
-// limit keeps at most `count` rows. It applies to `all()` and `first()`, not to
-// the rows of an edge load.
+// limit keeps at most `count` rows. In `with_<edge>`, it keeps at most `count`
+// of each row's targets.
 pub fn (q UserQuery) limit(count int) UserQuery {
 	mut next := q
 	next.query = load.Query{
@@ -71,8 +71,8 @@ pub fn (q UserQuery) limit(count int) UserQuery {
 	return next
 }
 
-// offset skips the first `count` rows. It applies to `all()` and `first()`, not
-// to the rows of an edge load.
+// offset skips the first `count` rows. In `with_<edge>`, it skips the first
+// `count` of each row's targets.
 pub fn (q UserQuery) offset(count int) UserQuery {
 	mut next := q
 	next.query = load.Query{
@@ -1242,7 +1242,7 @@ fn (q UserQuery) load_articles(rows []users_models.User, fns []fn (ArticleQuery)
 	for configure in fns {
 		sub = configure(sub)
 	}
-	children := sub.nodes(load.select_in[articles_models.Article](q.graph.client.conn, 'user_id',
+	children := sub.nodes(load.select_each[articles_models.Article](q.graph.client.conn, 'user_id',
 		rows.map(it.id.str()),
 		soft_del: 'deleted_at'
 		query:    q.graph.client.prepare_query('articles', sub.query)!
@@ -1271,7 +1271,7 @@ fn (q UserQuery) load_posts(rows []users_models.User, fns []fn (PostQuery) PostQ
 	for configure in fns {
 		sub = configure(sub)
 	}
-	children := sub.nodes(load.select_in[posts_models.Post](q.graph.client.conn, 'user_id',
+	children := sub.nodes(load.select_each[posts_models.Post](q.graph.client.conn, 'user_id',
 		rows.map(it.id.str()),
 		soft_del: 'deleted_at'
 		query:    q.graph.client.prepare_query('posts', sub.query)!
@@ -1300,7 +1300,7 @@ fn (q UserQuery) load_comments(rows []users_models.User, fns []fn (CommentQuery)
 	for configure in fns {
 		sub = configure(sub)
 	}
-	children := sub.nodes(load.select_in[comments_models.Comment](q.graph.client.conn, 'user_id',
+	children := sub.nodes(load.select_each[comments_models.Comment](q.graph.client.conn, 'user_id',
 		rows.map(it.id.str()),
 		soft_del: 'deleted_at'
 		query:    q.graph.client.prepare_query('comments', sub.query)!

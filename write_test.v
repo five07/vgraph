@@ -578,6 +578,43 @@ fn test_transactions() {
 	}
 }
 
+// Requester is the context of a GraphQL request, in `test_graphql_transaction`.
+struct Requester {
+	name string
+}
+
+// A GraphQL request's mutations (Q103): `GraphqlTransaction` begins a
+// transaction, and a client given the context it returns runs in it, with the
+// request's own context.
+fn test_graphql_transaction() {
+	for c in clients()! {
+		assert c.can_begin()
+		t := GraphqlTransaction{
+			client: c
+		}
+		ctx := t.begin(Requester{'ada'})!
+		assert ctx is TxContext
+		inner := c.with_ctx(ctx)
+		assert inner.in_tx
+		if inner.ctx is Requester {
+			assert inner.ctx.name == 'ada'
+		} else {
+			assert false, "the request's own context"
+		}
+		create(inner, 'writers', {
+			'name': orm.Primitive('ada')
+		})!
+		t.rollback(ctx)!
+		assert writers(c)!.len == 0
+		again := t.begin(Requester{'bob'})!
+		create(c.with_ctx(again), 'writers', {
+			'name': orm.Primitive('bob')
+		})!
+		t.commit(again)!
+		assert writers(c)!.map(it.name) == ['bob']
+	}
+}
+
 fn test_create_bulk() {
 	for c in clients()! {
 		keys := c.create_bulk([

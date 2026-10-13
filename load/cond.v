@@ -513,7 +513,10 @@ fn resolve(conn orm.Connection, c Cond) !Cond {
 			s := c.sub[0]
 			mut conds := s.conds.clone()
 			conds << is_not_null(s.column)
-			values := select_column(conn, s.table, s.column, s.kind, resolve(conn, and(...conds))!)!
+			// as the outer query: an escape the values don't need is dropped, and a
+			// fold is an ILIKE on PostgreSQL
+			values := select_column(conn, s.table, s.column, s.kind, downgrade(conn, resolve(conn,
+				and(...conds))!)!)!
 			list := in_keys(c.column, values, s.kind)
 			return if c.negate { not(list) } else { list }
 		}

@@ -51,8 +51,8 @@ pub fn (q GadgetQuery) where(conds ...load.Cond) GadgetQuery {
 	return next
 }
 
-// limit keeps at most `count` rows. It applies to `all()` and `first()`, not to
-// the rows of an edge load.
+// limit keeps at most `count` rows. In `with_<edge>`, it keeps at most `count`
+// of each row's targets.
 pub fn (q GadgetQuery) limit(count int) GadgetQuery {
 	mut next := q
 	next.query = load.Query{
@@ -62,8 +62,8 @@ pub fn (q GadgetQuery) limit(count int) GadgetQuery {
 	return next
 }
 
-// offset skips the first `count` rows. It applies to `all()` and `first()`, not
-// to the rows of an edge load.
+// offset skips the first `count` rows. In `with_<edge>`, it skips the first
+// `count` of each row's targets.
 pub fn (q GadgetQuery) offset(count int) GadgetQuery {
 	mut next := q
 	next.query = load.Query{
@@ -591,12 +591,12 @@ pub fn gadget_active_is_not_null() load.Cond {
 
 // gadget_has_owner returns the condition that it has a `owner`.
 pub fn gadget_has_owner() load.Cond {
-	return load.in_sub('owner_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} })
+	return load.and(load.is_not_null('owner_id'), load.in_sub('owner_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} }))
 }
 
 // gadget_has_owner_with returns the condition that it has a `owner` that matches `conds`.
 pub fn gadget_has_owner_with(conds ...load.Cond) load.Cond {
-	return load.in_sub('owner_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds })
+	return load.and(load.is_not_null('owner_id'), load.in_sub('owner_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds }))
 }
 
 // gadget_has_likers returns the condition that it has a `likers`.
@@ -1930,6 +1930,30 @@ fn (q GadgetQuery) load_likers(rows []models.Gadget, fns []fn (UserQuery) UserQu
 	mut sub := q.graph.users()
 	for configure in fns {
 		sub = configure(sub)
+	}
+	if sub.query.limit > 0 || sub.query.offset > 0 {
+		prepared := q.graph.client.prepare_query('users', sub.query)!
+		cut := load.link_each(q.graph.client.conn, 'likes', 'gadget_id', 'user_id',
+			rows.map(it.id.str()), .i64, .int, 'users', 'id', load.Query{
+				...prepared
+				conds: prepared.conds
+			})!
+		// the targets by key: the join rows give their order
+		found := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
+			load.unique(cut.map(it[1])),
+			query: load.Query{ ...prepared, order: '', desc: false, orders: []load.Order{}, limit: 0, offset: 0 }
+		)!)!
+		mut by_key := map[string]UserNode{}
+		for target in found {
+			by_key[target.user.id.str()] = target
+		}
+		mut cut_linked := map[string][]UserNode{}
+		for pair in cut {
+			if target := by_key[pair[1]] {
+				cut_linked[pair[0]] << target
+			}
+		}
+		return cut_linked
 	}
 	pairs := load.link_pairs(q.graph.client.conn, 'likes', 'gadget_id',
 		'user_id', rows.map(it.id.str()), .i64, .int)!

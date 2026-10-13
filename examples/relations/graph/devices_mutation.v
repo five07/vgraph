@@ -1146,3 +1146,81 @@ fn (g Graph) devices_by_keys(keys []string) ![]DeviceNode {
 	}
 	return found
 }
+
+// CreateDeviceInput is what a create of a `devices` row sets, as the GraphQL input
+// `CreateDeviceInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct CreateDeviceInput {
+pub mut:
+	id        ?string
+	name      ?string
+	owner_id  ?int
+	login_ids []int
+	group_ids []int
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b DeviceCreate) set_input(input CreateDeviceInput) DeviceCreate {
+	mut next := b
+	if v := input.id {
+		next = next.set_id(v)
+	}
+	if v := input.name {
+		next = next.set_name(v)
+	}
+	if v := input.owner_id {
+		next = next.set_owner_id(v)
+	}
+	if input.login_ids.len > 0 {
+		next = next.add_logins_ids(...input.login_ids)
+	}
+	if input.group_ids.len > 0 {
+		next = next.add_groups_ids(...input.group_ids)
+	}
+	return next
+}
+
+// UpdateDeviceInput is what a update of a `devices` row sets, as the GraphQL input
+// `UpdateDeviceInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct UpdateDeviceInput {
+pub mut:
+	name             ?string
+	owner_id         ?int
+	add_login_ids    []int
+	remove_login_ids []int
+	clear_logins     bool
+	add_group_ids    []int
+	remove_group_ids []int
+	clear_groups     bool
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b DeviceUpdateOne) set_input(input UpdateDeviceInput) DeviceUpdateOne {
+	mut next := b
+	if input.clear_logins {
+		next = next.clear_logins()
+	}
+	if input.clear_groups {
+		next = next.clear_groups()
+	}
+	if v := input.name {
+		next = next.set_name(v)
+	}
+	if v := input.owner_id {
+		next = next.set_owner_id(v)
+	}
+	if input.add_login_ids.len > 0 {
+		next = next.add_logins_ids(...input.add_login_ids)
+	}
+	if input.remove_login_ids.len > 0 {
+		next = next.remove_logins_ids(...input.remove_login_ids)
+	}
+	if input.add_group_ids.len > 0 {
+		next = next.add_groups_ids(...input.add_group_ids)
+	}
+	if input.remove_group_ids.len > 0 {
+		next = next.remove_groups_ids(...input.remove_group_ids)
+	}
+	return next
+}

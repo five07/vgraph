@@ -154,15 +154,17 @@ pub fn (p Pet) interceptors() []vgraph.Interceptor {
 	return [vgraph.soft_delete_query('deleted_at')]
 }
 
-// edges declares a pet's owner, the other side of `User.pets`.
+// edges declares a pet's owner, the other side of `User.pets`. GraphQL can
+// order pets by their owner's name.
 pub fn (p Pet) edges() []vgraph.Edge {
 	return [
 		vgraph.Edge{
-			name:   'owner'
-			kind:   .many_to_one
-			to:     'users'
-			column: 'owner_id'
-			ref:    'pets'
+			name:        'owner'
+			kind:        .many_to_one
+			to:          'users'
+			column:      'owner_id'
+			ref:         'pets'
+			order_field: 'name'
 		},
 	]
 }
@@ -252,6 +254,15 @@ pub:
 	id      int @[primary; sql: serial]
 	value   int
 	next_id ?int
+}
+
+// graphql renames the type and its root field in GraphQL: `Node` and `nodes`
+// are the Node interface's, which gadgets implement.
+pub fn (n Node) graphql() vgraph.GraphqlTable {
+	return vgraph.GraphqlTable{
+		type_name:   'ListNode'
+		query_field: 'listNodes'
+	}
 }
 
 // edges declares a node's next node, and the previous node, which holds this
@@ -424,14 +435,36 @@ pub:
 	tags      string
 }
 
-// fields: `tags` holds a JSON list of strings.
+// fields: `tags` holds a JSON list of strings; and GraphQL's description of
+// `level`, deprecation of `ratio` and name for ordering by `serial_no`.
 pub fn (g Gadget) fields() []vgraph.Field {
 	return [
 		vgraph.Field{
 			name: 'tags'
 			json: '[]string'
 		},
+		vgraph.Field{
+			name:    'level'
+			comment: 'How far up the gadget is, from -128 to 127.'
+		},
+		vgraph.Field{
+			name:       'ratio'
+			deprecated: 'Use `rating`.'
+		},
+		vgraph.Field{
+			name:        'serial_no'
+			order_field: 'SERIAL'
+		},
 	]
+}
+
+// graphql: gadgets have global ids, so they are Nodes, and their lists are
+// Relay connections.
+pub fn (g Gadget) graphql() vgraph.GraphqlTable {
+	return vgraph.GraphqlTable{
+		node:  true
+		relay: true
+	}
 }
 
 // edges declares a gadget's owner, which every gadget has, and which doesn't

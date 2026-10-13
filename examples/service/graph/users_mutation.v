@@ -1733,3 +1733,129 @@ fn (g Graph) users_by_keys(keys []string) ![]UserNode {
 	}
 	return found
 }
+
+// CreateUserInput is what a create of a `users` row sets, as the GraphQL input
+// `CreateUserInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct CreateUserInput {
+pub mut:
+	slug        ?string
+	name        ?string
+	email       ?string
+	created_at  ?time.Time
+	updated_at  ?time.Time
+	deleted_at  ?time.Time
+	article_ids []int
+	post_ids    []int
+	comment_ids []int
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b UserCreate) set_input(input CreateUserInput) UserCreate {
+	mut next := b
+	if v := input.slug {
+		next = next.set_slug(v)
+	}
+	if v := input.name {
+		next = next.set_name(v)
+	}
+	if v := input.email {
+		next = next.set_email(v)
+	}
+	if v := input.created_at {
+		next = next.set_created_at(v)
+	}
+	if v := input.updated_at {
+		next = next.set_updated_at(v)
+	}
+	if v := input.deleted_at {
+		next = next.set_deleted_at(v)
+	}
+	if input.article_ids.len > 0 {
+		next = next.add_articles_ids(...input.article_ids)
+	}
+	if input.post_ids.len > 0 {
+		next = next.add_posts_ids(...input.post_ids)
+	}
+	if input.comment_ids.len > 0 {
+		next = next.add_comments_ids(...input.comment_ids)
+	}
+	return next
+}
+
+// UpdateUserInput is what a update of a `users` row sets, as the GraphQL input
+// `UpdateUserInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct UpdateUserInput {
+pub mut:
+	slug               ?string
+	name               ?string
+	email              ?string
+	created_at         ?time.Time
+	updated_at         ?time.Time
+	deleted_at         ?time.Time
+	clear_deleted_at   bool
+	add_article_ids    []int
+	remove_article_ids []int
+	clear_articles     bool
+	add_post_ids       []int
+	remove_post_ids    []int
+	clear_posts        bool
+	add_comment_ids    []int
+	remove_comment_ids []int
+	clear_comments     bool
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b UserUpdateOne) set_input(input UpdateUserInput) UserUpdateOne {
+	mut next := b
+	if input.clear_deleted_at {
+		next = next.clear_deleted_at()
+	}
+	if input.clear_articles {
+		next = next.clear_articles()
+	}
+	if input.clear_posts {
+		next = next.clear_posts()
+	}
+	if input.clear_comments {
+		next = next.clear_comments()
+	}
+	if v := input.slug {
+		next = next.set_slug(v)
+	}
+	if v := input.name {
+		next = next.set_name(v)
+	}
+	if v := input.email {
+		next = next.set_email(v)
+	}
+	if v := input.created_at {
+		next = next.set_created_at(v)
+	}
+	if v := input.updated_at {
+		next = next.set_updated_at(v)
+	}
+	if v := input.deleted_at {
+		next = next.set_deleted_at(v)
+	}
+	if input.add_article_ids.len > 0 {
+		next = next.add_articles_ids(...input.add_article_ids)
+	}
+	if input.remove_article_ids.len > 0 {
+		next = next.remove_articles_ids(...input.remove_article_ids)
+	}
+	if input.add_post_ids.len > 0 {
+		next = next.add_posts_ids(...input.add_post_ids)
+	}
+	if input.remove_post_ids.len > 0 {
+		next = next.remove_posts_ids(...input.remove_post_ids)
+	}
+	if input.add_comment_ids.len > 0 {
+		next = next.add_comments_ids(...input.add_comment_ids)
+	}
+	if input.remove_comment_ids.len > 0 {
+		next = next.remove_comments_ids(...input.remove_comment_ids)
+	}
+	return next
+}

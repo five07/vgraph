@@ -409,13 +409,13 @@ pub fn group_where(conn orm.Connection, table string, q Query, columns []GroupCo
 // `typ`, stored the way V's ORM stores it on `dialect`.
 fn parse_cell(text string, typ string, dialect orm.SQLDialect) !orm.Primitive {
 	return match typ.trim_left('?') {
-		'int' {
+		'int', 'i8', 'i16', 'u8', 'u16', 'enum' {
 			orm.Primitive(text.int())
 		}
-		'i64' {
+		'i64', 'u32', 'u64' {
 			orm.Primitive(text.i64())
 		}
-		'f64' {
+		'f64', 'f32' {
 			orm.Primitive(text.f64())
 		}
 		'bool' {

@@ -145,12 +145,13 @@ struct Peer {
 fn (p Peer) edges() []Edge {
 	return [
 		Edge{
-			name:     'peer'
-			kind:     .many_to_one
-			to:       'peers'
-			column:   'peer_id'
-			ref:      'missing'
-			required: false
+			name:        'peer'
+			kind:        .many_to_one
+			to:          'peers'
+			column:      'peer_id'
+			ref:         'missing'
+			required:    false
+			order_field: 'nope'
 		},
 		Edge{
 			name:   'rank_of'
@@ -160,13 +161,14 @@ fn (p Peer) edges() []Edge {
 			ref:    'peer'
 		},
 		Edge{
-			name:     'followers'
-			kind:     .one_to_many
-			to:       'peers'
-			column:   'peer_id'
-			bidi:     true
-			required: true
-			unique:   true
+			name:        'followers'
+			kind:        .one_to_many
+			to:          'peers'
+			column:      'peer_id'
+			bidi:        true
+			required:    true
+			unique:      true
+			order_field: 'rank'
 		},
 		Edge{
 			name:   'partner'
@@ -185,6 +187,13 @@ fn (p Peer) fields() []Field {
 	}]
 }
 
+// graphql asks for Node, which needs an i64 key.
+fn (p Peer) graphql() GraphqlTable {
+	return GraphqlTable{
+		node: true
+	}
+}
+
 fn (p Peer) indexes() []Index {
 	return [Index{
 		columns: ['nope']
@@ -197,12 +206,15 @@ fn test_new_options_are_checked() {
 	s.validate() or {
 		assert err.msg().split_into_lines() == [
 			'peers.fields: `rank`: `json` needs a string field, which holds the JSON',
+			'peers.graphql: `node` needs an i64 serial key, which `global_ids` gives a range to',
 			'peers.indexes: `nope` is not a column',
 			'peers.peer: `ref` names `peers.missing`, which does not exist',
+			'peers.peer: `order_field` names `peers.nope`, which does not exist',
 			'peers.rank_of: `ref` names `peers.peer`, which is not its other side',
 			'peers.followers: `unique` is for a many_to_one edge; a one_to_one edge is unique already',
 			'peers.followers: `bidi` is for a many_to_one or many_to_many edge to its own table',
 			'peers.followers: `required` is for a many_to_one edge',
+			'peers.followers: `order_field` is for a many_to_one or one_to_one edge',
 			'peers.partner: a `bidi` many_to_one edge pairs rows one to one: set `unique`',
 		]
 		return

@@ -472,3 +472,141 @@ fn test_load_through_keeps_the_order_of_the_query() {
 	)!
 	assert tags['1'].map(it.name) == ['red', 'old', 'blue']
 }
+
+// sql_of returns `c`, normalized, as SQL for `dialect`, and its parameters.
+fn sql_of(c Cond, dialect orm.SQLDialect) !(string, []string) {
+	mut p := Params{
+		dialect: dialect
+	}
+	text := render(normalize(c, false), mut p)!
+	return text, p.values
+}
+
+// Keyset conditions: past a cursor in an order, with nulls where each database
+// puts them.
+fn test_keyset() {
+	orders := [desc('rating'), asc('id')]
+	// after (4.5, 3), nulls the largest (PostgreSQL): descending, a smaller
+	// rating comes after, and no null does
+	after, after_values := sql_of(keyset(orders, [orm.Primitive(4.5), 3], true, true)!, .pg)!
+	assert after == '("rating" < \$1 OR ("rating" = \$2 AND "id" > \$3))'
+	assert after_values == ['4.5', '4.5', '3']
+	// nulls the smallest (SQLite): they come last, descending
+	lite, _ := sql_of(keyset(orders, [orm.Primitive(4.5), 3], true, false)!, .sqlite)!
+	assert lite == '("rating" < CAST(? AS REAL) OR "rating" IS NULL OR ("rating" = CAST(? AS REAL) AND "id" > CAST(? AS INTEGER)))'
+	// after a null rating: on PostgreSQL every non-null one, descending; on
+	// SQLite none but the nulls after it
+	pg_null, _ := sql_of(keyset(orders, [orm.Primitive(orm.Null{}), 3], true, true)!, .pg)!
+	assert pg_null == '("rating" IS NOT NULL OR ("rating" IS NULL AND "id" > \$1))'
+	lite_null, _ := sql_of(keyset(orders, [orm.Primitive(orm.Null{}), 3], true, false)!,
+		.sqlite)!
+	assert lite_null == '("rating" IS NULL AND "id" > CAST(? AS INTEGER))'
+	// before is the other way
+	before, _ := sql_of(keyset([asc('id')], [orm.Primitive(3)], false, true)!, .pg)!
+	assert before == '"id" < \$1'
+	// an order by an expression compares it as SQL
+	expr, _ := sql_of(keyset([Order{
+		expr: '(SELECT COUNT(*) FROM "t1")'
+		typ:  'int'
+	}, asc('id')], [orm.Primitive(2), 7], true, true)!, .pg)!
+	assert expr == '(((SELECT COUNT(*) FROM "t1") > \$1) OR ((SELECT COUNT(*) FROM "t1") IS NULL) OR (((SELECT COUNT(*) FROM "t1") = \$2) AND "id" > \$3))'
+	keyset(orders, [orm.Primitive(1)], true, true) or {
+		assert err.msg() == 'invalid cursor'
+		return
+	}
+	assert false
+}
+
+fn test_cursors() {
+	at := time.parse_rfc3339('2026-10-13T07:30:00.250000Z')!
+	values := [orm.Primitive(3.5), 'a,"b"', orm.Null{}, at, i64(1) << 40, 7]
+	cursor := encode_cursor(values)
+	assert !cursor.contains('"')
+	got := decode_cursor(cursor, ['f64', 'string', '?int', 'time.Time', 'i64', 'enum'])!
+	assert got.len == 6
+	assert got[0] == orm.Primitive(3.5)
+	assert got[1] == orm.Primitive('a,"b"')
+	assert got[2] is orm.Null
+	assert (got[3] as time.Time).unix_micro() == at.unix_micro()
+	assert got[4] == orm.Primitive(i64(1) << 40)
+	assert got[5] == orm.Primitive(7)
+	for bad in ['abc', encode_cursor([orm.Primitive(1)]), encode_cursor([orm.Primitive('x')])] {
+		if _ := decode_cursor(bad, ['int', 'int']) {
+			assert false, bad
+		}
+	}
+	if _ := decode_cursor(encode_cursor([orm.Primitive('x')]), ['int']) {
+		assert false
+	}
+}
+
+// Without a driver, a limit per parent reads every row and cuts each parent's.
+fn test_per_parent_without_a_driver() {
+	db := seed()!
+	conn, log := counting(db)
+	// notes 1 and 4 are by author 1, note 2 by author 2
+	newest := select_each[Note](conn, 'author_id', ['1', '2', '3'],
+		query: Query{
+			order: 'id'
+			desc:  true
+			limit: 1
+		}
+	)!
+	assert newest.map(it.id) == [4, 2]
+	assert log.tables == ['notes']
+	second := select_each[Note](conn, 'author_id', ['1', '2'],
+		query: Query{
+			order:  'id'
+			desc:   true
+			limit:  1
+			offset: 1
+		}
+	)!
+	assert second.map(it.id) == [1]
+	assert count_each(conn, 'notes', 'author_id', ['1', '2', '3'], .int, Query{})! == {
+		'1': 2
+		'2': 1
+	}
+	assert count_each(conn, 'notes', 'author_id', ['1', '2'], .int, Query{
+		conds: [eq('owner_type', 'Author')]
+	})! == {
+		'1': 1
+		'2': 1
+	}
+	// through a join table: note 1 has red, blue and the deleted old; note 2 blue
+	live := Query{
+		conds: [is_null('deleted_at')]
+		order: 'name'
+	}
+	assert link_each(conn, 'note_tags', 'note_id', 'tag_id', ['1', '2', '3'], .int, .int, 'tags',
+		'id', Query{
+			...live
+			limit: 1
+		})! == [['1', '2'], ['2', '2']]
+	assert link_each(conn, 'note_tags', 'note_id', 'tag_id', ['1'], .int, .int, 'tags', 'id',
+		Query{
+			...live
+			offset: 1
+		})! == [['1', '1']]
+	assert count_through(conn, 'note_tags', 'note_id', 'tag_id', ['1', '2', '3'], .int, .int,
+		'tags', 'id', live)! == {
+		'1': 2
+		'2': 1
+	}
+	// no keys, no query
+	log.tables.clear()
+	assert count_each(conn, 'notes', 'author_id', [], .int, Query{})!.len == 0
+	assert link_each(conn, 'note_tags', 'note_id', 'tag_id', [], .int, .int, 'tags', 'id',
+		live)!.len == 0
+	assert log.tables.len == 0
+	// the order values of an edge need a driver
+	if _ := expr_values(conn, 'notes', 'id', .int, ['1'], [Order{
+		expr: '1'
+		typ:  'int'
+	}]) {
+		assert false
+	}
+	assert expr_values(conn, 'notes', 'id', .int, ['1'], [asc('id')])!.len == 0
+	assert !has_driver(conn)
+	assert !nulls_largest(conn)
+}

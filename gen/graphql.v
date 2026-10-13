@@ -6,13 +6,20 @@ import strings
 
 // The GraphQL half of `vgraph gen`: a schema with entgql's conventions for the
 // tables, merged with the project's own `.graphql` files, and a server whose
-// resolvers load through the generated client.
+// resolvers load and write through the generated client.
 
-// GraphqlFile is a `.graphql` file of the project, merged into the schema.
+// GraphqlFile is a `.graphql` file of the project, merged into the schema, or,
+// in an `operations` folder, checked against it.
 pub struct GraphqlFile {
 pub:
 	path string // relative to the project, for messages
 	text string
+}
+
+// is_operations reports whether the file is in an `operations` folder: it
+// holds operations, not schema.
+fn (f GraphqlFile) is_operations() bool {
+	return 'operations' in f.path.split(os.path_separator)#[..-1]
 }
 
 // Go's initialisms, which entgql keeps in capitals in field names (`userID`).
@@ -40,6 +47,40 @@ pub fn camel(name string) string {
 	return b.str()
 }
 
+// upper_first returns `name` with its first letter in capitals: `ownerID` is
+// `OwnerID`.
+fn upper_first(name string) string {
+	return if name != '' { name[..1].to_upper() + name[1..] } else { name }
+}
+
+// singular returns the singular of an edge's name, as entgql's inflection
+// gives it for the inputs' `<edge>IDs`: `pets` is `pet`, `children` `child`.
+fn singular(name string) string {
+	irregular := {
+		'children': 'child'
+		'people':   'person'
+		'men':      'man'
+		'women':    'woman'
+		'mice':     'mouse'
+		'geese':    'goose'
+	}
+	for plural, one in irregular {
+		if name == plural || name.ends_with('_${plural}') {
+			return name.all_before_last(plural) + one
+		}
+	}
+	return match true {
+		name.ends_with('ies') && name.len > 3 { name#[..-3] + 'y' }
+		name.ends_with('sses') || name.ends_with('xes') || name.ends_with('ches')
+			|| name.ends_with('shes') {
+			name#[..-2]
+		}
+		name.ends_with('ss') || name.ends_with('us') || name.ends_with('is') { name }
+		name.ends_with('s') { name#[..-1] }
+		else { name }
+	}
+}
+
 // upper_snake returns `CREATED_AT` for `created_at`.
 fn upper_snake(name string) string {
 	return name.to_upper()
@@ -49,7 +90,7 @@ fn upper_snake(name string) string {
 struct GqlField {
 	name     string // the GraphQL name
 	column   Column
-	scalar   string // ID, String, Int, Float, Boolean or Time
+	scalar   string // ID, String, Int, Float, Boolean, Time, JSON or an enum type
 	nullable bool
 	key      bool // the primary key
 	foreign  bool // a column a many_to_one edge follows
@@ -86,15 +127,45 @@ fn pascal(name string) string {
 	return name.split('_').map(if it.len > 0 { it[0..1].to_upper() + it[1..] } else { it }).join('')
 }
 
+// gql_type returns the table's GraphQL type: its `graphql()` option, or the
+// struct's name.
 fn (i Info) gql_type() string {
-	return i.entity.struct_name
+	n := i.table.graphql.type_name
+	return if n != '' { n } else { i.entity.struct_name }
 }
 
+// gql_root returns the root field listing the table, or '' for none.
 fn (i Info) gql_root() string {
-	return camel(i.table.name)
+	qf := i.table.graphql.query_field
+	return match qf {
+		'-' { '' }
+		'' { camel(i.table.name) }
+		else { qf }
+	}
 }
 
-fn (i Info) gql_fields() []GqlField {
+fn (i Info) relay() bool {
+	return i.table.graphql.relay
+}
+
+fn (i Info) is_node() bool {
+	return i.table.graphql.node
+}
+
+// gql_mutations returns the mutations the schema has for the table: none for a
+// view.
+fn (i Info) gql_mutations() []string {
+	return if i.table.view { []string{} } else { i.table.graphql.mutations }
+}
+
+// prefix starts the names of the generated functions of the table.
+fn (i Info) prefix() string {
+	return snake(i.entity.struct_name)
+}
+
+// all_gql_fields returns the columns that have a GraphQL type, as fields, but
+// those `@[graphql: '-']` hides.
+fn (i Info) all_gql_fields() []GqlField {
 	mut foreign := map[string]bool{}
 	for e in i.table.edges {
 		if e.kind == 'many_to_one' {
@@ -126,44 +197,101 @@ fn (i Info) gql_fields() []GqlField {
 	return out
 }
 
+// gql_fields returns the fields of the object type: not sensitive, and not
+// left out of it.
+fn (i Info) gql_fields() []GqlField {
+	return i.all_gql_fields().filter(!it.column.sensitive && 'object' !in it.column.graphql_skip_in)
+}
+
+// where_fields returns the fields the WhereInput has predicates for.
+fn (i Info) where_fields() []GqlField {
+	return i.all_gql_fields().filter(!it.column.sensitive && 'where' !in it.column.graphql_skip_in)
+}
+
 fn is_list_edge(e Edge) bool {
 	return e.kind in ['one_to_many', 'many_to_many']
 }
 
+// gql_edges returns the edges the schema has: not hidden, to visible tables.
 fn (i Info) gql_edges(infos map[string]Info) []Edge {
-	return i.table.edges.filter(!(infos[it.to] or { Info{} }).table.graphql_skip)
+	return i.table.edges.filter(!it.graphql_skip
+		&& !(infos[it.to] or { Info{} }).table.graphql_skip)
+}
+
+// OrderField is a value of the OrderField enum: a column, or an SQL expression
+// of an edge, of the V type `typ`.
+struct OrderField {
+	name   string
+	column string
+	expr   string
+	typ    string
+}
+
+// order_fields returns the values of the table's OrderField enum: its fields,
+// the number of each list edge's targets, and the fields unique edges name.
+fn (i Info) order_fields(infos map[string]Info) []OrderField {
+	mut out := []OrderField{}
+	for f in i.all_gql_fields() {
+		c := f.column
+		if f.scalar == 'JSON' || c.sensitive || 'order' in c.graphql_skip_in || c.order_field == '-' {
+			continue
+		}
+		out << OrderField{
+			name:   if c.order_field != '' { c.order_field } else { upper_snake(c.field) }
+			column: c.name
+			typ:    c.typ
+		}
+	}
+	for e in i.gql_edges(infos) {
+		target := infos[e.to] or { continue }
+		if is_list_edge(e) {
+			out << OrderField{
+				name: '${upper_snake(e.name)}_COUNT'
+				expr: order_sql(i, e, target, '')
+				typ:  'int'
+			}
+		} else if e.order_field != '' {
+			c := target.table.column(e.order_field) or { continue }
+			out << OrderField{
+				name: '${upper_snake(e.name)}_${upper_snake(c.field)}'
+				expr: order_sql(i, e, target, c.name)
+				typ:  c.typ
+			}
+		}
+	}
+	return out
 }
 
 // predicates returns the WhereInput predicates of a field: the suffixes after
-// its name, as entgql names them.
+// its name, in entgql's order.
 fn (f GqlField) predicates() []string {
 	if f.scalar == 'JSON' {
 		return if f.nullable { ['IsNil', 'NotNil'] } else { []string{} }
 	}
 	mut out := ['', 'NEQ']
-	if f.column.base() == 'enum' {
-		out << ['In', 'NotIn']
-	}
-	match f.scalar {
-		'ID' {
+	match true {
+		f.scalar == 'ID' {
 			out << ['In', 'NotIn']
 			if f.key {
 				out << ['GT', 'GTE', 'LT', 'LTE']
 			}
 		}
-		'String' {
+		f.column.base() == 'enum' {
+			out << ['In', 'NotIn']
+		}
+		f.scalar == 'String' {
 			out << ['In', 'NotIn', 'GT', 'GTE', 'LT', 'LTE', 'Contains', 'HasPrefix', 'HasSuffix']
 		}
-		'Int' {
+		f.scalar in ['Int', 'Float', 'Time'] {
 			out << ['In', 'NotIn', 'GT', 'GTE', 'LT', 'LTE']
-		}
-		'Float', 'Time' {
-			out << ['GT', 'GTE', 'LT', 'LTE']
 		}
 		else {}
 	}
 	if f.nullable {
 		out << ['IsNil', 'NotNil']
+	}
+	if f.scalar == 'String' {
+		out << ['EqualFold', 'ContainsFold']
 	}
 	return out
 }
@@ -176,76 +304,352 @@ fn predicate_type(f GqlField, suffix string) string {
 	}
 }
 
-const list_args = 'where: WHERE, orderBy: ORDER, limit: Int, offset: Int'
-
-fn list_args_of(target Info) string {
-	return list_args.replace('WHERE', '${target.gql_type()}WhereInput').replace('ORDER',
-		'${target.gql_type()}Order')
+// list_args returns the arguments of a list of `target`: a connection's, or
+// `limit` and `offset`.
+fn list_args(target Info) string {
+	t := target.gql_type()
+	if target.relay() {
+		return 'after: Cursor, first: Int, before: Cursor, last: Int, orderBy: [${t}Order!], where: ${t}WhereInput'
+	}
+	return 'where: ${t}WhereInput, orderBy: [${t}Order!], limit: Int, offset: Int'
 }
 
-// base_sdl returns the schema generated from the tables.
-fn base_sdl(infos map[string]Info, tables []Table) string {
-	mut b := strings.new_builder(8192)
+// list_type returns the type of a list of `target`.
+fn list_type(target Info, root bool) string {
+	if target.relay() {
+		return '${target.gql_type()}Connection!'
+	}
+	return if root { '[${target.gql_type()}!]!' } else { '[${target.gql_type()}!]' }
+}
+
+// description returns a GraphQL description of `text`, indented, or '' when
+// there is none.
+fn description(text string, indent string) string {
+	if text == '' {
+		return ''
+	}
+	escaped := text.replace('"""', '\\"""')
+	if escaped.contains('\n') || escaped.ends_with('"') {
+		return '${indent}"""\n${escaped.split('\n').map(indent + it).join('\n')}\n${indent}"""\n'
+	}
+	return '${indent}"""${escaped}"""\n'
+}
+
+// field_suffix returns what follows a field's type: `@deprecated` and the
+// field's own directives.
+fn field_suffix(deprecated string, directives []string, with_directives bool) string {
+	mut out := ''
+	if deprecated != '' {
+		out += ' @deprecated(reason: "${deprecated.replace('\\', '\\\\').replace('"', '\\"')}")'
+	}
+	if with_directives && directives.len > 0 {
+		out += ' ' + directives.join(' ')
+	}
+	return out
+}
+
+// InputField is a field of a mutation's input, with its V field in the
+// table's `Create<T>Input` or `Update<T>Input`, and what it sets.
+struct InputField {
+	name     string // the GraphQL name
+	v        string // the V field
+	gql_type string // the GraphQL type
+	v_type   string // the V field's type
+	kind     InputKind
+	column   Column
+	edge     Edge
+	target   Info
+	doc      string
+}
+
+enum InputKind {
+	column       // a column's value
+	clear_column // sets a nullable column to null
+	set_edge     // a one_to_one edge's target
+	clear_edge   // removes every target of an edge
+	add_ids      // adds targets to a list edge
+	remove_ids   // removes targets from a list edge
+}
+
+// key_v_type returns the V type of the keys of `info`.
+fn key_v_type(info Info) string {
+	return info.key_type() or { 'int' }
+}
+
+// input_fields returns the fields of the create (`create`) or update input of
+// the table of `info`.
+fn input_fields(info Info, infos map[string]Info, create bool) []InputField {
+	t := info.table
+	skip := if create { 'create_input' } else { 'update_input' }
+	immutable_columns := t.edges.filter(it.immutable && it.kind == 'many_to_one').map(it.column)
+	required_columns := t.edges.filter(it.required && it.kind == 'many_to_one').map(it.column)
+	mut out := []InputField{}
+	for f in info.all_gql_fields() {
+		c := f.column
+		if !c.scalar() || skip in c.graphql_skip_in {
+			continue
+		}
+		if create && c.serial {
+			continue
+		}
+		if !create && (f.key || c.immutable || c.name in immutable_columns) {
+			continue
+		}
+		v_type := if c.json_type != '' { 'string' } else { c.v_type(info) }
+		required := (create && !c.optional && !c.nullable) || c.name in required_columns
+		out << InputField{
+			name:     f.name
+			v:        c.field
+			gql_type: if required && create { f.scalar + '!' } else { f.scalar }
+			v_type:   '?${v_type}'
+			kind:     .column
+			column:   c
+			doc:      c.comment
+		}
+		if !create && c.nullable && c.type_name == '' {
+			// the edge's name for the column of a many_to_one edge
+			mut name := f.name
+			for e in t.edges {
+				if e.kind == 'many_to_one' && e.column == c.name && e.type_col == ''
+					&& c.field == '${e.name}_id' {
+					name = camel(e.name)
+				}
+			}
+			out << InputField{
+				name:     'clear${upper_first(name)}'
+				v:        'clear_${c.field}'
+				gql_type: 'Boolean'
+				v_type:   'bool'
+				kind:     .clear_column
+				column:   c
+			}
+		}
+	}
+	for e in info.gql_edges(infos) {
+		if !create && e.immutable {
+			continue
+		}
+		target := infos[e.to] or { continue }
+		kt := key_v_type(target)
+		match e.kind {
+			'one_to_one' {
+				out << InputField{
+					name:     '${camel(e.name)}ID'
+					v:        '${e.name}_id'
+					gql_type: 'ID'
+					v_type:   '?${kt}'
+					kind:     .set_edge
+					edge:     e
+					target:   target
+				}
+				if !create {
+					out << InputField{
+						name:     'clear${upper_first(camel(e.name))}'
+						v:        'clear_${e.name}'
+						gql_type: 'Boolean'
+						v_type:   'bool'
+						kind:     .clear_edge
+						edge:     e
+						target:   target
+					}
+				}
+			}
+			'one_to_many', 'many_to_many' {
+				one := camel(singular(e.name))
+				if create {
+					out << InputField{
+						name:     '${one}IDs'
+						v:        '${singular(e.name)}_ids'
+						gql_type: '[ID!]'
+						v_type:   '[]${kt}'
+						kind:     .add_ids
+						edge:     e
+						target:   target
+					}
+				} else {
+					out << InputField{
+						name:     'add${upper_first(one)}IDs'
+						v:        'add_${singular(e.name)}_ids'
+						gql_type: '[ID!]'
+						v_type:   '[]${kt}'
+						kind:     .add_ids
+						edge:     e
+						target:   target
+					}
+					out << InputField{
+						name:     'remove${upper_first(one)}IDs'
+						v:        'remove_${singular(e.name)}_ids'
+						gql_type: '[ID!]'
+						v_type:   '[]${kt}'
+						kind:     .remove_ids
+						edge:     e
+						target:   target
+					}
+					out << InputField{
+						name:     'clear${upper_first(camel(e.name))}'
+						v:        'clear_${e.name}'
+						gql_type: 'Boolean'
+						v_type:   'bool'
+						kind:     .clear_edge
+						edge:     e
+						target:   target
+					}
+				}
+			}
+			else {}
+		}
+	}
+	return out
+}
+
+// check_inputs rejects two input fields of one name.
+fn check_inputs(info Info, fields []InputField, typ string) ! {
+	mut seen := map[string]bool{}
+	mut seen_v := map[string]bool{}
+	for f in fields {
+		if f.name in seen || f.v in seen_v {
+			return error('`${info.table.name}`: the ${typ} would have two fields named `${f.name}`; rename a field or an edge, or leave one out with `graphql_skip_in`')
+		}
+		seen[f.name] = true
+		seen_v[f.v] = true
+	}
+}
+
+// base_sdl returns the schema generated from the tables, with the tables'
+// directives when `with_directives` is set.
+fn base_sdl(infos map[string]Info, tables []Table, with_directives bool) string {
+	mut b := strings.new_builder(16384)
 	visible := tables.filter(!it.graphql_skip).map(infos[it.name])
+	nodes := visible.filter(it.is_node())
 	mut has_time := false
 	mut has_json := false
+	mut has_relay := false
 	b.writeln('type Query {')
+	if nodes.len > 0 {
+		b.writeln('  """Fetches an object given its ID."""')
+		b.writeln('  node(')
+		b.writeln('    """ID of the object."""')
+		b.writeln('    id: ID!')
+		b.writeln('  ): Node')
+		b.writeln('  """Lookup nodes by a list of IDs."""')
+		b.writeln('  nodes(')
+		b.writeln('    """The list of node IDs."""')
+		b.writeln('    ids: [ID!]!')
+		b.writeln('  ): [Node]!')
+	}
 	for info in visible {
-		b.writeln('  ${info.gql_root()}(${list_args_of(info)}): [${info.gql_type()}!]!')
-		b.writeln('  ${info.gql_root()}Count(where: ${info.gql_type()}WhereInput): Int!')
+		root := info.gql_root()
+		if root == '' {
+			continue
+		}
+		b.writeln('  ${root}(${list_args(info)}): ${list_type(info, true)}')
+		if !info.relay() {
+			b.writeln('  ${root}Count(where: ${info.gql_type()}WhereInput): Int!')
+		}
 	}
 	b.writeln('}')
-	for info in visible {
-		fields := info.gql_fields()
-		has_time = has_time || fields.any(it.scalar == 'Time')
-		has_json = has_json || fields.any(it.scalar == 'JSON')
+	with_mutations := visible.filter(it.gql_mutations().len > 0)
+	if with_mutations.len > 0 {
 		b.writeln('')
-		b.writeln('type ${info.gql_type()} {')
+		b.writeln('type Mutation {')
+		for info in with_mutations {
+			t := info.gql_type()
+			ms := info.gql_mutations()
+			if 'create' in ms {
+				b.writeln('  """Creates a ${t}."""')
+				b.writeln('  create${t}(input: Create${t}Input!): ${t}!')
+			}
+			if 'update' in ms {
+				b.writeln('  """Updates the ${t} with the id `id`."""')
+				b.writeln('  update${t}(id: ID!, input: Update${t}Input!): ${t}!')
+			}
+			if 'delete' in ms {
+				b.writeln('  """Deletes the ${t} with the id `id`, and returns the id."""')
+				b.writeln('  delete${t}(id: ID!): ID!')
+			}
+		}
+		b.writeln('}')
+	}
+	if nodes.len > 0 {
+		b.writeln('')
+		b.writeln('"""')
+		b.writeln('An object with an ID.')
+		b.writeln('Follows the [Relay Global Object Identification Specification](https://relay.dev/graphql/objectidentification.htm)')
+		b.writeln('"""')
+		b.writeln('interface Node {')
+		b.writeln('  """The id of the object."""')
+		b.writeln('  id: ID!')
+		b.writeln('}')
+	}
+	for info in visible {
+		t := info.gql_type()
+		fields := info.gql_fields()
+		all := info.all_gql_fields()
+		has_time = has_time || all.any(it.scalar == 'Time')
+		has_json = has_json || all.any(it.scalar == 'JSON')
+		has_relay = has_relay || info.relay()
+		b.writeln('')
+		implements := if info.is_node() { ' implements Node' } else { '' }
+		directives := if with_directives && info.table.graphql.directives.len > 0 {
+			' ' + info.table.graphql.directives.join(' ')
+		} else {
+			''
+		}
+		b.writeln('type ${t}${implements}${directives} {')
 		for f in fields {
-			b.writeln('  ${f.name}: ${f.typ()}')
+			b.write_string(description(f.column.comment, '  '))
+			b.writeln('  ${f.name}: ${f.typ()}${field_suffix(f.column.deprecated, f.column.directives, with_directives)}')
 		}
 		for e in info.gql_edges(infos) {
 			target := infos[e.to] or { continue }
+			suffix := field_suffix('', e.directives, with_directives)
 			if is_list_edge(e) {
-				b.writeln('  ${camel(e.name)}(${list_args_of(target)}): [${target.gql_type()}!]')
+				b.writeln('  ${camel(e.name)}(${list_args(target)}): ${list_type(target, false)}${suffix}')
 			} else {
-				b.writeln('  ${camel(e.name)}: ${target.gql_type()}')
+				b.writeln('  ${camel(e.name)}: ${target.gql_type()}${suffix}')
 			}
 		}
 		b.writeln('}')
-		b.writeln('')
-		b.writeln('"""')
-		b.writeln('${info.gql_type()}WhereInput is used for filtering ${info.gql_type()} objects.')
-		b.writeln('"""')
-		b.writeln('input ${info.gql_type()}WhereInput {')
-		for f in fields {
-			for i, suffix in f.predicates() {
-				if i == 0 {
-					b.writeln('  """${f.name} field predicates"""')
-				}
-				b.writeln('  ${f.name}${suffix}: ${predicate_type(f, suffix)}')
-			}
+		if info.relay() {
+			b.writeln('')
+			b.writeln('"""A connection to a list of items."""')
+			b.writeln('type ${t}Connection {')
+			b.writeln('  """A list of edges."""')
+			b.writeln('  edges: [${t}Edge]')
+			b.writeln('  """Information to aid in pagination."""')
+			b.writeln('  pageInfo: PageInfo!')
+			b.writeln('  """Identifies the total count of items in the connection."""')
+			b.writeln('  totalCount: Int!')
+			b.writeln('}')
+			b.writeln('')
+			b.writeln('"""An edge in a connection."""')
+			b.writeln('type ${t}Edge {')
+			b.writeln('  """The item at the end of the edge."""')
+			b.writeln('  node: ${t}')
+			b.writeln('  """A cursor for use in pagination."""')
+			b.writeln('  cursor: Cursor!')
+			b.writeln('}')
 		}
-		b.writeln('}')
+		write_where_sdl(mut b, info, infos)
 		b.writeln('')
-		b.writeln('"""Ordering options for ${info.gql_type()} lists"""')
-		b.writeln('input ${info.gql_type()}Order {')
+		b.writeln('"""Ordering options for ${t} connections"""')
+		b.writeln('input ${t}Order {')
 		b.writeln('  """The ordering direction."""')
 		b.writeln('  direction: OrderDirection! = ASC')
-		b.writeln('  """The field by which to order ${info.gql_type()}s."""')
-		b.writeln('  field: ${info.gql_type()}OrderField!')
+		b.writeln('  """The field by which to order ${t}s."""')
+		b.writeln('  field: ${t}OrderField!')
 		b.writeln('}')
 		b.writeln('')
-		b.writeln('"""Properties by which ${info.gql_type()} lists can be ordered."""')
-		b.writeln('enum ${info.gql_type()}OrderField {')
-		for f in fields {
-			if f.scalar != 'JSON' {
-				b.writeln('  ${upper_snake(f.column.field)}')
-			}
+		b.writeln('"""Properties by which ${t} connections can be ordered."""')
+		b.writeln('enum ${t}OrderField {')
+		for o in info.order_fields(infos) {
+			b.writeln('  ${o.name}')
 		}
 		b.writeln('}')
-		for f in fields {
-			if f.column.base() == 'enum' {
+		mut enums := map[string]bool{}
+		for f in all {
+			if f.column.base() == 'enum' && f.scalar !in enums {
+				enums[f.scalar] = true
 				b.writeln('')
 				b.writeln('"""${f.scalar} is enum for the field ${f.name}"""')
 				b.writeln('enum ${f.scalar} {')
@@ -254,6 +658,25 @@ fn base_sdl(infos map[string]Info, tables []Table) string {
 				}
 				b.writeln('}')
 			}
+		}
+		ms := info.gql_mutations()
+		for create in [true, false] {
+			if (create && 'create' !in ms) || (!create && 'update' !in ms) {
+				continue
+			}
+			kind := if create { 'Create' } else { 'Update' }
+			b.writeln('')
+			b.writeln('"""')
+			b.writeln('${kind}${t}Input is used for ${kind.to_lower()} ${t} object.')
+			b.writeln('"""')
+			b.writeln('input ${kind}${t}Input {')
+			for f in input_fields(info, infos, create) {
+				b.write_string(description(f.doc, '  '))
+				// a required input field can't be deprecated
+				deprecated := if f.gql_type.ends_with('!') { '' } else { f.column.deprecated }
+				b.writeln('  ${f.name}: ${f.gql_type}${field_suffix(deprecated, []string{}, false)}')
+			}
+			b.writeln('}')
 		}
 	}
 	b.writeln('')
@@ -266,6 +689,29 @@ fn base_sdl(infos map[string]Info, tables []Table) string {
 	b.writeln('  """Specifies a descending order for a given `orderBy` argument."""')
 	b.writeln('  DESC')
 	b.writeln('}')
+	if has_relay {
+		b.writeln('')
+		b.writeln('"""')
+		b.writeln('Information about pagination in a connection.')
+		b.writeln('https://relay.dev/graphql/connections.htm#sec-undefined.PageInfo')
+		b.writeln('"""')
+		b.writeln('type PageInfo {')
+		b.writeln('  """When paginating forwards, are there more items?"""')
+		b.writeln('  hasNextPage: Boolean!')
+		b.writeln('  """When paginating backwards, are there more items?"""')
+		b.writeln('  hasPreviousPage: Boolean!')
+		b.writeln('  """When paginating backwards, the cursor to continue."""')
+		b.writeln('  startCursor: Cursor')
+		b.writeln('  """When paginating forwards, the cursor to continue."""')
+		b.writeln('  endCursor: Cursor')
+		b.writeln('}')
+		b.writeln('')
+		b.writeln('"""')
+		b.writeln('Define a Relay Cursor type:')
+		b.writeln('https://relay.dev/graphql/connections.htm#sec-Cursor')
+		b.writeln('"""')
+		b.writeln('scalar Cursor')
+	}
 	if has_json {
 		b.writeln('')
 		b.writeln('"""A JSON value: an object, a list, a string, a number, a boolean or null."""')
@@ -279,13 +725,107 @@ fn base_sdl(infos map[string]Info, tables []Table) string {
 	return b.str()
 }
 
+// write_where_sdl writes the WhereInput of the table of `info`.
+fn write_where_sdl(mut b strings.Builder, info Info, infos map[string]Info) {
+	t := info.gql_type()
+	b.writeln('')
+	b.writeln('"""')
+	b.writeln('${t}WhereInput is used for filtering ${t} objects.')
+	b.writeln('Input was generated by ent.')
+	b.writeln('"""')
+	b.writeln('input ${t}WhereInput {')
+	b.writeln('  not: ${t}WhereInput')
+	b.writeln('  and: [${t}WhereInput!]')
+	b.writeln('  or: [${t}WhereInput!]')
+	for f in info.where_fields() {
+		for i, suffix in f.predicates() {
+			if i == 0 {
+				b.writeln('  """${f.name} field predicates"""')
+			}
+			b.writeln('  ${f.name}${suffix}: ${predicate_type(f, suffix)}')
+		}
+	}
+	for e in info.gql_edges(infos) {
+		target := infos[e.to] or { continue }
+		name := upper_first(camel(e.name))
+		b.writeln('  """${camel(e.name)} edge predicates"""')
+		b.writeln('  has${name}: Boolean')
+		b.writeln('  has${name}With: [${target.gql_type()}WhereInput!]')
+	}
+	b.writeln('}')
+}
+
+// check_gql_names rejects tables whose GraphQL names clash: two types of one
+// name, two root fields, or a name the generated schema needs.
+fn check_gql_names(infos map[string]Info, tables []Table) ! {
+	visible := tables.filter(!it.graphql_skip).map(infos[it.name])
+	has_node := visible.any(it.is_node())
+	has_relay := visible.any(it.relay())
+	mut types := map[string]string{}
+	mut fields := map[string]string{}
+	if has_node {
+		types['Node'] = 'the Node interface'
+		fields['node'] = 'Node'
+		fields['nodes'] = 'Node'
+	}
+	if has_relay {
+		types['PageInfo'] = 'Relay connections'
+		types['Cursor'] = 'Relay connections'
+	}
+	for name in ['Query', 'Mutation', 'OrderDirection', 'Time', 'JSON'] {
+		types[name] = 'the generated schema'
+	}
+	hint := "rename it with `type_name` or `query_field` in its `graphql()` options, or hide one with `@[graphql: '-']`"
+	for info in visible {
+		t := info.gql_type()
+		mut names := [t, '${t}WhereInput', '${t}Order', '${t}OrderField']
+		if info.relay() {
+			names << ['${t}Connection', '${t}Edge']
+		}
+		ms := info.gql_mutations()
+		if 'create' in ms {
+			names << 'Create${t}Input'
+		}
+		if 'update' in ms {
+			names << 'Update${t}Input'
+		}
+		for f in info.all_gql_fields() {
+			if f.column.base() == 'enum' {
+				names << f.scalar
+			}
+		}
+		for name in names {
+			if other := types[name] {
+				if other != info.table.name {
+					return error('table `${info.table.name}`: its GraphQL type `${name}` is taken by ${other}; ${hint}')
+				}
+			}
+			types[name] = '`${info.table.name}`'
+		}
+		root := info.gql_root()
+		if root != '' {
+			mut roots := [root]
+			if !info.relay() {
+				roots << '${root}Count'
+			}
+			for r in roots {
+				if other := fields[r] {
+					return error('table `${info.table.name}`: its root field `${r}` is taken by ${other}; ${hint}')
+				}
+				fields[r] = '`${info.table.name}`'
+			}
+		}
+	}
+}
+
 // GraphqlOutput is what the GraphQL half of `vgraph gen` writes.
 pub struct GraphqlOutput {
 pub:
-	schema    string   // schema.graphql: the whole schema, printed
-	server    string   // graphql.v: the server and its resolvers
-	resolvers string   // resolvers.v, new or with stubs appended; '' when unchanged
-	stubs     []string // the stubs added
+	schema     string   // schema.graphql: the whole schema, printed
+	server     string   // graphql.v: the server and its resolvers
+	resolvers  string   // resolvers.v, new or with stubs appended; '' when unchanged
+	stubs      []string // the stubs added
+	operations int      // the operations checked against the schema
 }
 
 // HandWritten is a field the project's `.graphql` files add, which a method of
@@ -298,27 +838,26 @@ struct HandWritten {
 }
 
 // generate_graphql builds the schema from the tables and `files`, checks it,
-// and returns the files to write. `resolvers` is the current resolvers.v, or ''
+// checks the operations of the files in `operations` folders against it, and
+// returns the files to write. `resolvers` is the current resolvers.v, or ''
 // when there is none; `defined` is the text of the module's other hand-written
 // files, to find the methods already written.
-pub fn generate_graphql(out_module string, entities []Entity, tables []Table, files []GraphqlFile, resolvers string, defined string) !GraphqlOutput {
+pub fn generate_graphql(out_module string, entities []Entity, tables []Table, all_files []GraphqlFile, resolvers string, defined string) !GraphqlOutput {
 	infos := infos_of(entities, tables)!
-	mut type_names := map[string]string{}
+	check_gql_names(infos, tables)!
 	for t in tables {
-		if t.graphql_skip {
-			continue
+		info := infos[t.name]
+		if !t.graphql_skip {
+			check_inputs(info, input_fields(info, infos, true), 'Create${info.gql_type()}Input')!
+			check_inputs(info, input_fields(info, infos, false), 'Update${info.gql_type()}Input')!
 		}
-		name := infos[t.name].gql_type()
-		if other := type_names[name] {
-			return error("tables `${other}` and `${t.name}` would both be the GraphQL type `${name}`; hide one with `@[graphql: '-']`")
-		}
-		type_names[name] = t.name
 	}
-	base := base_sdl(infos, tables)
-	base_schema := graphql.build_schema(base) or {
-		return error('the generated GraphQL schema is invalid (a vgraph bug): ${err.msg()}\n${base}')
+	base_schema := graphql.build_schema(base_sdl(infos, tables, false)) or {
+		return error('the generated GraphQL schema is invalid (a vgraph bug): ${err.msg()}\n${base_sdl(infos, tables, false)}')
 	}
-	mut merged := base
+	files := all_files.filter(!it.is_operations())
+	operations := all_files.filter(it.is_operations())
+	mut merged := base_sdl(infos, tables, true)
 	mut starts := []int{} // the line each file starts at in `merged`
 	for f in files {
 		merged += '\n\n'
@@ -326,14 +865,66 @@ pub fn generate_graphql(out_module string, entities []Entity, tables []Table, fi
 		merged += f.text
 	}
 	doc := graphql.parse(merged) or { return error(locate(err, files, starts)) }
+	// operations in a schema file would be dropped: they go in `operations/`
+	mut misplaced := []string{}
+	for def in doc.definitions {
+		match def {
+			graphql.OperationDefinition {
+				name := if n := def.name { ' `${n.value}`' } else { '' }
+				misplaced << locate(graphql.GraphQLError{
+					message:   'the operation${name} is not schema: put operations in an `operations` folder, which vgraph gen checks against the schema'
+					locations: [doc.location(def.pos)]
+				}, files, starts)
+			}
+			graphql.FragmentDefinition {
+				misplaced << locate(graphql.GraphQLError{
+					message:   'the fragment `${def.name.value}` is not schema: put fragments in an `operations` folder, which vgraph gen checks against the schema'
+					locations: [doc.location(def.pos)]
+				}, files, starts)
+			}
+			else {}
+		}
+	}
+	if misplaced.len > 0 {
+		return error(misplaced.join('\n'))
+	}
 	errors := graphql.validate_sdl(doc, none)
 	if errors.len > 0 {
-		return error(errors.map(locate(it, files, starts)).join('\n'))
+		mut lines := errors.map(locate(it, files, starts))
+		if errors.any(it.message.contains('"Mutation') || it.message.contains('named "Mutation"')) {
+			lines << "the generated mutations clash with the project's: leave a table's out with `mutations: []` in its `graphql()` options, or rename the project's"
+		}
+		return error(lines.join('\n'))
 	}
 	schema := graphql.build_ast_schema(doc)!
 	schema_errors := graphql.validate_schema(schema)
 	if schema_errors.len > 0 {
 		return error(schema_errors.map(locate(it, files, starts)).join('\n'))
+	}
+	// the operations, against the whole schema
+	mut op_errors := []string{}
+	mut op_count := 0
+	for f in operations {
+		op_doc := graphql.parse(f.text) or {
+			op_errors << locate(err, [f], [1])
+			continue
+		}
+		for def in op_doc.definitions {
+			if def is graphql.OperationDefinition {
+				op_count++
+			} else if def !is graphql.FragmentDefinition {
+				op_errors << locate(graphql.GraphQLError{
+					message:   'an `operations` folder holds operations and fragments only; schema goes elsewhere'
+					locations: [op_doc.location(def_pos(def))]
+				}, [f], [1])
+			}
+		}
+		for e in graphql.validate(&schema, &op_doc, graphql.ValidateOptions{}) {
+			op_errors << locate(e, [f], [1])
+		}
+	}
+	if op_errors.len > 0 {
+		return error(op_errors.join('\n'))
 	}
 	// the fields the files add: on the root types, and on the generated types
 	mut hand := []HandWritten{}
@@ -362,12 +953,26 @@ pub fn generate_graphql(out_module string, entities []Entity, tables []Table, fi
 			}
 		}
 	}
-	printed := graphql.print_schema(schema)
+	// graphql-js prints no applied directives: the tables' and the files' are
+	// printed as Apollo's subgraph schemas print them
+	printed := graphql.print_schema_with(schema, applied_directives: true)
 	return GraphqlOutput{
-		schema:    '# ${header.all_after('// ')}\n\n' + printed + '\n'
-		server:    server_file(out_module, infos, tables, printed, hand)
-		resolvers: resolvers_file(out_module, resolvers, defined, hand)
-		stubs:     hand.filter(!has_method(resolvers + defined, it.method)).map('${it.typ}.${it.field}')
+		schema:     '# ${header.all_after('// ')}\n\n' + printed + '\n'
+		server:     server_file(out_module, infos, tables, printed, hand)!
+		resolvers:  resolvers_file(out_module, resolvers, defined, hand)
+		stubs:      hand.filter(!has_method(resolvers + defined, it.method)).map('${it.typ}.${it.field}')
+		operations: op_count
+	}
+}
+
+// def_pos returns where a definition starts.
+fn def_pos(def graphql.Definition) int {
+	return match def {
+		graphql.DirectiveDefinition { def.pos }
+		graphql.FragmentDefinition { def.pos }
+		graphql.OperationDefinition { def.pos }
+		graphql.SchemaDefinition { def.pos }
+		graphql.TypeDefinition { 0 }
 	}
 }
 
@@ -397,7 +1002,8 @@ fn infos_of(entities []Entity, tables []Table) !map[string]Info {
 	return infos
 }
 
-// locate prefixes an error with the file and line it is in.
+// locate prefixes an error with the file and line it is in: a project file's,
+// when one of its locations is in one, else the generated schema's.
 fn locate(err IError, files []GraphqlFile, starts []int) string {
 	if err is graphql.GraphQLError {
 		for loc in err.locations {
@@ -406,6 +1012,8 @@ fn locate(err IError, files []GraphqlFile, starts []int) string {
 					return '${files[i].path}:${loc.line - starts[i] + 1}:${loc.column}: ${err.message}'
 				}
 			}
+		}
+		for loc in err.locations {
 			return 'schema.graphql (generated):${loc.line}:${loc.column}: ${err.message}'
 		}
 		return err.message
@@ -429,7 +1037,8 @@ fn resolvers_file(out_module string, current string, defined string, hand []Hand
 		b.writeln("// Resolvers resolves the fields that this project's .graphql files add to the")
 		b.writeln('// schema. `vgraph gen` wrote this file, and adds a method here for each new')
 		b.writeln('// field; it never changes what is already here. Give `Resolvers` whatever')
-		b.writeln('// its methods need, such as the stores they call.')
+		b.writeln('// its methods need, such as the graph. A method reads and writes through')
+		b.writeln("// `graph.with_ctx(ctx)`: in a mutation, that is the request's transaction.")
 		b.writeln('module ${out_module}')
 		if missing.len > 0 {
 			b.writeln('')
@@ -471,425 +1080,6 @@ fn resolvers_file(out_module string, current string, defined string, hand []Hand
 fn v_string(s string) string {
 	return "'" + s.replace('\\', '\\\\').replace("'", "\\'").replace('$', '\\$') + "'"
 }
-
-fn server_file(out_module string, infos map[string]Info, tables []Table, sdl string, hand []HandWritten) string {
-	visible := tables.filter(!it.graphql_skip).map(infos[it.name])
-	mut b := strings.new_builder(32768)
-	b.writeln(header)
-	b.writeln('module ${out_module}\n')
-	mut imports := ['five07.vgraph.graphql', 'five07.vgraph.load']
-	mut has_time := false
-	for info in visible {
-		if info.gql_fields().any(it.scalar == 'Time') {
-			has_time = true
-		}
-		line := import_line(info.entity.module_path)
-		if line !in imports {
-			imports << line
-		}
-	}
-	if has_time {
-		imports << 'time'
-	}
-	for line in imports {
-		b.writeln('import ${line}')
-	}
-	b.writeln('
-// schema_sdl is the GraphQL schema: the tables, with entgql\'s conventions, and
-// the project\'s own .graphql files. schema.graphql holds the same.
-pub const schema_sdl = ${v_string(sdl)}
-
-// graphql returns a GraphQL server for the graph. Its resolvers load through the
-// client, one query per edge per level of a request; `r` resolves the fields the
-// project\'s .graphql files add.
-pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
-	mut s := graphql.Server.new(schema_sdl)!')
-	if has_time {
-		b.writeln("	s.scalar('Time', time_scalar)")
-	}
-	for info in visible {
-		t := info.gql_type()
-		root := info.gql_root()
-		b.writeln('
-	// ${t}
-	s.resolve(\'Query\', \'${root}\', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.with_ctx(ctx).${info.table.name}().graphql_args(info.args)!.all()!
-		result := graphql.list(found.map(graphql.obj(it)))
-		return parents.map(result)
-	})
-	s.resolve(\'Query\', \'${root}Count\', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		n := g.with_ctx(ctx).${info.table.name}().graphql_args(info.args)!.count()!
-		return parents.map(graphql.Resolved(graphql.Value(n)))
-	})')
-		fields := info.gql_fields()
-		if fields.len > 0 {
-			b.writeln('	for name in [${fields.map("'" + it.name + "'").join(', ')}] {')
-			b.writeln("		s.resolve('${t}', name, resolve_${snake(t)}_field)")
-			b.writeln('	}')
-		}
-		for e in info.gql_edges(infos) {
-			target := infos[e.to] or { continue }
-			rows := 'parents.map((it as ${info.node()}).${info.field()})'
-			if is_list_edge(e) {
-				b.writeln('	s.resolve(\'${t}\', \'${camel(e.name)}\', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		cg := g.with_ctx(ctx)
-		sub := cg.${target.table.name}().graphql_args(info.args)!
-		loaded := cg.${info.table.name}().with_${e.name}(fn [sub] (_ ${target.query()}) ${target.query()} {
-			return sub
-		}).nodes(${rows})!
-		mut out := []graphql.Resolved{cap: loaded.len}
-		for n in loaded {
-			out << graphql.list(page(n.${e.name}, info.args).map(graphql.obj(it)))
-		}
-		return out
-	})')
-			} else {
-				b.writeln('	s.resolve(\'${t}\', \'${camel(e.name)}\', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		loaded := g.with_ctx(ctx).${info.table.name}().with_${e.name}().nodes(${rows})!
-		return loaded.map(fn (n ${info.node()}) graphql.Resolved {
-			if target := n.${e.name} {
-				return graphql.obj(*target)
-			}
-			return graphql.null
-		})
-	})')
-			}
-		}
-	}
-	if hand.len > 0 {
-		b.writeln("\n	// the fields the project's .graphql files add")
-	}
-	for h in hand {
-		b.writeln("	s.resolve('${h.typ}', '${h.field}', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {")
-		b.writeln('		return r.${h.method}(ctx, info, parents)')
-		b.writeln('	})')
-	}
-	b.writeln('	return s\n}')
-	// per table: field values, arguments
-	for info in visible {
-		write_gql_fields(mut b, info)
-		write_gql_args(mut b, info)
-	}
-	code := b.str()
-	return code + gql_helpers(code, has_time)
-}
-
-// field_value returns the V expression of a field's GraphQL value.
-fn field_value(f GqlField, row string) string {
-	expr := '${row}.${f.column.field}'
-	base := f.column.typ.trim_left('?')
-	conv := fn [f, base] (v string) string {
-		return match true {
-			f.scalar == 'ID' { 'graphql.Value(${v}.str())' }
-			f.scalar == 'JSON' { 'graphql.parse_json(${v}) or { graphql.null }' }
-			base == 'enum' { 'graphql.Value(${v}.str().to_upper())' }
-			base in ['i64', 'u32', 'u64', 'f32', 'f64'] { 'graphql.Value(f64(${v}))' }
-			base in int_types { 'graphql.Value(int(${v}))' }
-			base == 'time.Time' { 'graphql.Value(${v}.format_rfc3339())' }
-			base == 'string' { 'graphql.Value(string(${v}))' }
-			else { 'graphql.Value(${v})' }
-		}
-	}
-	if f.nullable {
-		return 'if v := ${expr} { ${conv('v')} } else { graphql.null }'
-	}
-	return conv(expr)
-}
-
-fn write_gql_fields(mut b strings.Builder, info Info) {
-	t := info.gql_type()
-	fields := info.gql_fields()
-	if fields.len == 0 {
-		return
-	}
-	b.writeln('
-// resolve_${snake(t)}_field resolves the columns of `${t}`.
-fn resolve_${snake(t)}_field(_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-	return parents.map(graphql.Resolved(${snake(t)}_value((it as ${info.node()}).${info.field()}, info.field_name)))
-}
-
-fn ${snake(t)}_value(row ${info.typ()}, field string) graphql.Value {
-	return match field {')
-	for f in fields {
-		b.writeln("		'${f.name}' { ${field_value(f, 'row')} }")
-	}
-	b.writeln('		else { graphql.null }
-	}
-}')
-}
-
-// cond_expr returns the load condition of a WhereInput predicate, with the
-// argument in `v`.
-fn cond_expr(f GqlField, suffix string) string {
-	col := "'${f.column.name}'"
-	base := f.column.typ.trim_left('?')
-	if base == 'enum' {
-		fn_name := '${snake(f.column.v_type_name())}_enum'
-		return match suffix {
-			'' { 'load.eq(${col}, ${fn_name}(v.as_string())!)' }
-			'NEQ' { 'load.ne(${col}, ${fn_name}(v.as_string())!)' }
-			'In' { 'load.in_ints(${col}, ${fn_name}s(v)!)' }
-			'NotIn' { 'load.not_in_ints(${col}, ${fn_name}s(v)!)' }
-			else { '' }
-		}
-	}
-	one := match true {
-		f.scalar == 'ID' && base == 'string' { 'v.as_string()' }
-		f.scalar == 'ID' && base == 'i64' { 'gql_i64_id(v)!' }
-		f.scalar == 'ID' { 'gql_int_id(v)!' }
-		base == 'time.Time' { 'gql_time(v)!' }
-		base == 'string' { 'v.as_string()' }
-		base in float_types { 'v.as_float()' }
-		base == 'bool' { 'v.as_bool()' }
-		base in ['i64', 'u64'] { 'i64(v.as_float())' }
-		else { 'v.as_int()' }
-	}
-	many := match true {
-		base == 'string' { 'gql_strings(v)' }
-		base in ['i64', 'u64'] { 'gql_i64s(v)!' }
-		f.scalar == 'ID' { 'gql_int_ids(v)!' }
-		else { 'gql_ints(v)' }
-	}
-	in_fn := match true {
-		base == 'string' { 'strings' }
-		base in ['i64', 'u64'] { 'i64s' }
-		else { 'ints' }
-	}
-	return match suffix {
-		'' { 'load.eq(${col}, ${one})' }
-		'NEQ' { 'load.ne(${col}, ${one})' }
-		'In' { 'load.in_${in_fn}(${col}, ${many})' }
-		'NotIn' { 'load.not_in_${in_fn}(${col}, ${many})' }
-		'GT' { 'load.gt(${col}, ${one})' }
-		'GTE' { 'load.ge(${col}, ${one})' }
-		'LT' { 'load.lt(${col}, ${one})' }
-		'LTE' { 'load.le(${col}, ${one})' }
-		'Contains' { 'load.contains(${col}, v.as_string())' }
-		'HasPrefix' { 'load.has_prefix(${col}, v.as_string())' }
-		'HasSuffix' { 'load.has_suffix(${col}, v.as_string())' }
-		else { '' }
-	}
-}
-
-fn write_gql_args(mut b strings.Builder, info Info) {
-	t := info.gql_type()
-	q := info.query()
-	fields := info.gql_fields()
-	b.writeln('
-// graphql_args applies the arguments of a `${t}` list: `where`, `orderBy`,
-// `limit` and `offset`.
-fn (q ${q}) graphql_args(args map[string]graphql.Value) !${q} {
-	mut next := q
-	if w := args[\'where\'] {
-		if w is map[string]graphql.Value {
-			next = next.where(...${snake(t)}_where(w)!)
-		}
-	}
-	if o := args[\'orderBy\'] {
-		if o is map[string]graphql.Value {
-			field := (o[\'field\'] or { graphql.null }).as_string()
-			column := match field {')
-	for f in fields {
-		if f.scalar != 'JSON' {
-			b.writeln("				'${upper_snake(f.column.field)}' { '${f.column.name}' }")
-		}
-	}
-	b.writeln("				else { '' }
-			}
-			next.query = load.Query{
-				...next.query
-				order: column
-				desc:  (o['direction'] or { graphql.null }).as_string() == 'DESC'
-			}
-		}
-	}
-	if limit := args['limit'] {
-		if limit is int {
-			next = next.limit(limit)
-		}
-	}
-	if offset := args['offset'] {
-		if offset is int {
-			next = next.offset(offset)
-		}
-	}
-	return next
-}")
-	b.writeln('
-// ${snake(t)}_where returns the conditions of a `${t}WhereInput`.
-fn ${snake(t)}_where(w map[string]graphql.Value) ![]load.Cond {
-	mut conds := []load.Cond{}
-	for key, v in w {
-		if v is graphql.Null {
-			continue
-		}
-		match key {')
-	for f in fields {
-		for suffix in f.predicates() {
-			name := f.name + suffix
-			if suffix == 'IsNil' {
-				b.writeln("			'${name}' { if v.as_bool() { conds << load.is_null('${f.column.name}') } }")
-			} else if suffix == 'NotNil' {
-				b.writeln("			'${name}' { if v.as_bool() { conds << load.is_not_null('${f.column.name}') } }")
-			} else {
-				b.writeln("			'${name}' { conds << ${cond_expr(f, suffix)} }")
-			}
-		}
-	}
-	b.writeln('			else {}
-		}
-	}
-	return conds
-}')
-	// each enum's GraphQL values, back to the V enum's
-	mut done := map[string]bool{}
-	for f in fields {
-		c := f.column
-		if c.base() != 'enum' || c.v_type_name() in done {
-			continue
-		}
-		done[c.v_type_name()] = true
-		name := '${snake(c.v_type_name())}_enum'
-		vt := c.v_type(info)
-		b.writeln('
-// ${name} returns the value of `${vt}` a GraphQL enum value names.
-fn ${name}(name string) !int {
-	return match name {')
-		for v in c.enum_values {
-			b.writeln("		'${v.to_upper()}' { int(${vt}.${v}) }")
-		}
-		b.writeln("		else { error('`\${name}` is not a ${c.type_name}') }
-	}
-}
-
-// ${name}s returns the values of `${vt}` that a list of GraphQL enum values
-// names.
-fn ${name}s(v graphql.Value) ![]int {
-	mut out := []int{}
-	for item in v.as_list() {
-		out << ${name}(item.as_string())!
-	}
-	return out
-}")
-	}
-}
-
-// gql_helpers returns the helper functions `code` calls, so the generated
-// module has no unused ones.
-fn gql_helpers(code string, has_time bool) string {
-	mut used := if has_time { code + gql_time_helpers } else { code }
-	mut added := map[string]bool{}
-	// helpers call helpers: add until nothing new is called
-	for {
-		mut more := false
-		for name, helper in gql_helper_fns {
-			if name !in added && (used.contains('${name}(') || used.contains('${name}[')) {
-				added[name] = true
-				used += helper
-				more = true
-			}
-		}
-		if !more {
-			break
-		}
-	}
-	mut b := strings.new_builder(4096)
-	for name, helper in gql_helper_fns {
-		if name in added {
-			b.writeln(helper)
-		}
-	}
-	if has_time {
-		b.writeln(gql_time_helpers)
-	}
-	return b.str()
-}
-
-const gql_helper_fns = {
-	'page':        "
-// page returns the part of a list that `limit` and `offset` ask for: an edge
-// loads every row in one query, and each parent's list is cut here.
-fn page[T](items []T, args map[string]graphql.Value) []T {
-	offset := (args['offset'] or { graphql.null }).as_int()
-	limit := (args['limit'] or { graphql.null }).as_int()
-	start := if offset > 0 { offset } else { 0 }
-	if start >= items.len {
-		return []T{}
-	}
-	end := if limit > 0 && start + limit < items.len { start + limit } else { items.len }
-	return items[start..end]
-}"
-	'gql_int_id':  '
-// gql_int_id reads an int key from an ID.
-fn gql_int_id(v graphql.Value) !int {
-	s := v.as_string()
-	n := s.int()
-	if n.str() != s {
-		return error(\'invalid ID "\${s}"\')
-	}
-	return n
-}'
-	'gql_int_ids': '
-fn gql_int_ids(v graphql.Value) ![]int {
-	mut out := []int{}
-	for item in v.as_list() {
-		out << gql_int_id(item)!
-	}
-	return out
-}'
-	'gql_i64_id':  '
-// gql_i64_id reads an i64 key from an ID.
-fn gql_i64_id(v graphql.Value) !i64 {
-	s := v.as_string()
-	n := s.i64()
-	if n.str() != s {
-		return error(\'invalid ID "\${s}"\')
-	}
-	return n
-}'
-	'gql_i64s':    '
-fn gql_i64s(v graphql.Value) ![]i64 {
-	mut out := []i64{}
-	for item in v.as_list() {
-		out << if item is string { gql_i64_id(item)! } else { i64(item.as_float()) }
-	}
-	return out
-}'
-	'gql_ints':    '
-fn gql_ints(v graphql.Value) []int {
-	return v.as_list().map(it.as_int())
-}'
-	'gql_strings': '
-fn gql_strings(v graphql.Value) []string {
-	return v.as_list().map(it.as_string())
-}'
-}
-
-const gql_time_helpers = '
-// gql_time reads a Time.
-fn gql_time(v graphql.Value) !time.Time {
-	return time.parse_rfc3339(v.as_string()) or {
-		return error(\'invalid Time "\${v.as_string()}": use RFC 3339, such as 2026-10-13T07:30:00Z\')
-	}
-}
-
-// time_scalar checks Time values: RFC 3339 strings.
-const time_scalar = graphql.Scalar{
-	parse_value:   fn (v graphql.Value) !graphql.Value {
-		if v !is string {
-			return error(\'Time must be an RFC 3339 string\')
-		}
-		gql_time(v)!
-		return v
-	}
-	parse_literal: fn (node graphql.ValueNode, _ map[string]graphql.Value) !graphql.Value {
-		if node is graphql.StringValue {
-			gql_time(graphql.Value(node.value))!
-			return graphql.Value(node.value)
-		}
-		return error(\'Time must be an RFC 3339 string\')
-	}
-}'
 
 // read_graphql_files returns the project's `.graphql` files, sorted, skipping
 // hidden folders, the generated module, and projects of their own.

@@ -44,8 +44,8 @@ pub fn (q LoginQuery) where(conds ...load.Cond) LoginQuery {
 	return next
 }
 
-// limit keeps at most `count` rows. It applies to `all()` and `first()`, not to
-// the rows of an edge load.
+// limit keeps at most `count` rows. In `with_<edge>`, it keeps at most `count`
+// of each row's targets.
 pub fn (q LoginQuery) limit(count int) LoginQuery {
 	mut next := q
 	next.query = load.Query{
@@ -55,8 +55,8 @@ pub fn (q LoginQuery) limit(count int) LoginQuery {
 	return next
 }
 
-// offset skips the first `count` rows. It applies to `all()` and `first()`, not
-// to the rows of an edge load.
+// offset skips the first `count` rows. In `with_<edge>`, it skips the first
+// `count` of each row's targets.
 pub fn (q LoginQuery) offset(count int) LoginQuery {
 	mut next := q
 	next.query = load.Query{
@@ -204,12 +204,12 @@ pub fn login_at_not_in(values []int) load.Cond {
 
 // login_has_device returns the condition that it has a `device`.
 pub fn login_has_device() load.Cond {
-	return load.in_sub('device_id', load.Sub{ table: 'devices', column: 'id', kind: .string, conds: []load.Cond{} })
+	return load.and(load.is_not_null('device_id'), load.in_sub('device_id', load.Sub{ table: 'devices', column: 'id', kind: .string, conds: []load.Cond{} }))
 }
 
 // login_has_device_with returns the condition that it has a `device` that matches `conds`.
 pub fn login_has_device_with(conds ...load.Cond) load.Cond {
-	return load.in_sub('device_id', load.Sub{ table: 'devices', column: 'id', kind: .string, conds: conds })
+	return load.and(load.is_not_null('device_id'), load.in_sub('device_id', load.Sub{ table: 'devices', column: 'id', kind: .string, conds: conds }))
 }
 
 // order_by_id orders the rows by `id`, ascending, after the orders

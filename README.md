@@ -5,8 +5,7 @@ between your entities once, load them in batches (one query per edge, not one pe
 traverse them through a typed API, and serve them over GraphQL. It runs on V's
 `orm.Connection`, so it works with the SQLite, PostgreSQL and MySQL adapters.
 
-**Status:** early. Nothing is published yet. See [PLAN.md](PLAN.md) in the develop
-branch for the plan.
+**Status:** early. Nothing is published yet.
 
 ## Example
 
@@ -76,6 +75,10 @@ key it holds.
 
 `five07.vgraph.load` has the same loads by column name, for code without a schema.
 
+## More Examples
+
+Check out the [examples](./examples) in this repo for various examples and use-cases
+
 ## Typed client: `vgraph gen`
 
 `vgraph gen` finds the structs with an `edges()` method in a project, checks their
@@ -113,6 +116,12 @@ variants by type, `order_by_<field>`, `limit`, `offset`, `with_<edge>`, `all`,
 `first`, `count`, `nodes`) and a node holding the row and its loaded edges, with
 `query_<edge>` to traverse. Regenerate it after changing a model; it is checked in,
 like any code.
+
+A `limit` or `offset` in `with_<edge>` applies to each row's targets:
+`with_comments(fn (q graph.CommentQuery) graph.CommentQuery { return q.order_by_id_desc().limit(3) })`
+loads each article's three newest comments. Ent's `Limit` there limits the whole
+load; vgraph's is per parent, in one query through a driver (a window function),
+or cut in V without one.
 
 ### More queries
 
@@ -373,12 +382,19 @@ Events carry no values: no parameters, and no error messages, which can quote th
 and a server for it, `Graph.graphql()`. The schema follows
 [entgql](https://entgo.io/docs/graphql)'s conventions: a type per table with
 camelCase fields (`createdAt`, `userID`), keys and foreign keys as `ID`, edges as
-fields, and per table a root list and a count:
+fields, and per table a root list, a count, a `WhereInput`, an order and three
+mutations:
 
 ```graphql
 type Query {
-  articles(where: ArticleWhereInput, orderBy: ArticleOrder, limit: Int, offset: Int): [Article!]!
+  articles(where: ArticleWhereInput, orderBy: [ArticleOrder!], limit: Int, offset: Int): [Article!]!
   articlesCount(where: ArticleWhereInput): Int!
+}
+
+type Mutation {
+  createArticle(input: CreateArticleInput!): Article!
+  updateArticle(id: ID!, input: UpdateArticleInput!): Article!
+  deleteArticle(id: ID!): ID!
 }
 
 type Article {
@@ -387,7 +403,7 @@ type Article {
   title: String!
   deletedAt: Time
   author: User
-  comments(where: CommentWhereInput, orderBy: CommentOrder, limit: Int, offset: Int): [Comment!]
+  comments(where: CommentWhereInput, orderBy: [CommentOrder!], limit: Int, offset: Int): [Comment!]
 }
 ```
 
@@ -399,24 +415,79 @@ println(res.json())
 // or over HTTP, from any web framework: server.handle(graphql.HttpRequest{...}, ctx)
 ```
 
-Resolvers load through the client: one query per edge per level of a request,
-however many rows there are. `@[graphql: '-']` on a field or struct leaves it out.
+Resolvers read through the client: one query per edge per level of a request,
+however many rows there are, with the request's context passed to hooks and
+privacy rules. A nested `limit` / `offset` (`comments(limit: 3)`) is per parent,
+cut by the database with a window function through a driver, or in V without one.
+
+- **Filters:** `where` takes entgql's `WhereInput`: `not`, `and`, `or`; per field
+  `title`, `titleNEQ`, `titleIn`, `titleNotIn`, `titleGT`/`GTE`/`LT`/`LTE`,
+  `titleContains`, `titleHasPrefix`, `titleHasSuffix`, `titleEqualFold`,
+  `titleContainsFold`, `titleIsNil`/`NotNil`, as the field's type allows; per edge
+  `hasAuthor` and `hasAuthorWith: [UserWhereInput!]`.
+- **Orders:** `orderBy` takes one order or a list, by any field, and by each list
+  edge's count (`TAGS_COUNT`). Several, or an edge's, need a driver.
+- **Mutations:** `create<T>`, `update<T>` and `delete<T>`, with entgql's inputs:
+  `CreateArticleInput` has each writable field, required when the create needs it,
+  and `tagIDs`; `UpdateArticleInput` has every mutable field, `clearDeletedAt`,
+  `addTagIDs`, `removeTagIDs`, `clearTags`. They run the generated builders, so
+  field checks, defaults, hooks and privacy apply; the client has the inputs too,
+  `graph.CreateArticleInput` and `set_input`. A request's mutations run in one
+  transaction (`vgraph.GraphqlTransaction`), on the request's connection, when the
+  client can begin one: an error in any rolls back all.
+- **Relay connections**, per table with `relay` (below): its lists, at the root and
+  on edges, take `first`/`after`/`last`/`before` and return
+  `ArticleConnection { edges { node cursor } pageInfo totalCount }`. Cursors hold
+  the row's order values and key, so pages follow from where the last one ended
+  (`after` is a condition, not an offset); `totalCount` is counted only when it is
+  asked for. A connection orders by its key last, so another order needs a driver.
+- **Node**, per table with `node`: `node(id: ID!)` and `nodes(ids: [ID!]!)` find a
+  row by its global id (`vgraph.global_ids`), for tables with an `i64` serial key.
+  The server checks at startup that each has its range.
+
+A struct gives its GraphQL options in a `graphql()` method, and its fields' and
+edges' in `fields()` and `edges()`, as entgql's annotations:
+
+```v ignore
+pub fn (g Gadget) graphql() vgraph.GraphqlTable {
+	return vgraph.GraphqlTable{
+		type_name:   'Device'          // the type's name; the struct's by default
+		query_field: 'devices'         // the root field, or '-' for none
+		node:        true              // implements Node
+		relay:       true              // connections rather than lists
+		mutations:   [.create, .update] // the default is all three; [] for none
+		directives:  ['@key(fields: "id")']
+	}
+}
+
+vgraph.Field{name: 'title', comment: 'A description.', deprecated: 'Use `name`.',
+	graphql_skip_in: [.update_input], order_field: 'TITLE', directives: ['@tag(name: "x")']}
+vgraph.Edge{..., order_field: 'name'} // orders by the target's name: OWNER_NAME
+```
+
+`@[graphql: '-']` on a field or struct, or `graphql_skip`, leaves it out; a
+`sensitive` field is left out of the type, filters and orders but stays in the
+inputs. Directives print in `schema.graphql` as Apollo's subgraph schemas print
+them; declare them in a `.graphql` file.
 
 Fields of your own, and mutations, go in `.graphql` files anywhere in the project
-(`extend type Query { me: User }`, `type Mutation { ... }`). `vgraph gen` merges them
-into the schema and adds a stub for each new field to `graph/resolvers.v`, a file it
-creates once and then never changes, apart from adding stubs: the methods of
-`Resolvers` are yours to write. `examples/service` has a mutation for every REST
-endpoint that writes.
+(`extend type Query { me: User }`, `extend type Mutation { ... }`). `vgraph gen`
+merges them into the schema and adds a stub for each new field to
+`graph/resolvers.v`, a file it creates once and then never changes, apart from
+adding stubs: the methods of `Resolvers` are yours to write. A method that writes
+should go through `graph.with_ctx(ctx)`, which is the request's transaction in a
+mutation. Operations and fragments go in `operations/` folders: `vgraph gen`
+checks them against the schema, so a schema change that breaks a client's query
+fails there, at its file and line.
 
 The GraphQL implementation is the `graphql` module (`five07.vgraph.graphql`), which
 doesn't depend on the rest of vgraph: a lexer and parser for the whole language,
 schemas built from SDL, every validation rule of the spec, an executor that hands
-each resolver all the parents at a level at once, introspection, and an HTTP
-handler following the GraphQL over HTTP spec. It is tested against cases recorded
-from graphql-js, the reference implementation Apollo builds on, and matches its
-messages, locations, printed schemas and introspection exactly
-(`graphql/testdata/README.md`).
+each resolver all the parents at a level at once, introspection, Relay
+connections, and an HTTP handler following the GraphQL over HTTP spec. It is
+tested against cases recorded from graphql-js, the reference implementation
+Apollo builds on, and matches its messages, locations, printed schemas and
+introspection exactly (`graphql/testdata/README.md`).
 
 ## Migrations
 
@@ -457,7 +528,7 @@ SQLite and PostgreSQL.
 ## Layout
 
 - `edge.v`, `schema.v`, `field.v`, `client.v`, `driver.v`, `mutation.v`, `write.v`,
-  `hooks.v`, `trace.v`, `migrate.v`: the `vgraph` module.
+  `hooks.v`, `trace.v`, `gql.v`, `migrate.v`: the `vgraph` module.
 - `sqlite/`, `pg/`: the drivers, `five07.vgraph.sqlite` and `five07.vgraph.pg`.
 - `gen/`, `cmd/vgraph/`: the generator and the `vgraph` command.
 - `load/`: `vgraph.load`, the batched loads that `Client` runs.

@@ -76,7 +76,7 @@ fn column_options(c Column) string {
 	if c.embedded != '' {
 		out << 'from ${c.embedded}'
 	}
-	if c.graphql_skip && !c.sensitive {
+	if c.graphql_skip {
 		out << 'not in GraphQL'
 	}
 	return out.join(', ')

@@ -20,15 +20,24 @@ pub:
 	// immutable: only a create sets the field; the update builders have no
 	// setter for it.
 	immutable bool
-	// sensitive: the field is left out of the GraphQL schema.
+	// sensitive: the field is left out of the GraphQL schema's object type,
+	// WhereInput and order, but not its inputs: it is written, never read, as a
+	// password.
 	sensitive bool
 	// unique: the migration helpers give the field a unique index.
 	unique bool
 	// graphql_skip leaves the field out of the GraphQL schema, as
-	// `@[graphql: '-']` does.
-	graphql_skip bool
-	comment      string
-	deprecated   string // the reason the field is deprecated
+	// `@[graphql: '-']` does; graphql_skip_in, out of some parts of it.
+	graphql_skip    bool
+	graphql_skip_in []GraphqlSkip
+	// order_field names the field's value of the GraphQL OrderField enum, such
+	// as `PUBLISHED`; its name in capitals when empty, and none when `-`
+	order_field string
+	// directives are printed on the field in the GraphQL schema as written
+	directives []string
+	// comment is the field's description in the GraphQL schema
+	comment    string
+	deprecated string // the reason the field is deprecated
 	// default gives the value of a create that leaves the field unset.
 	default ?fn () orm.Primitive
 	// default_now sets a `time.Time` field to the current time on create, when
@@ -129,16 +138,19 @@ fn check_options(mut problems []string, table Table, options []Field) {
 fn (c Column) with_options(o Field) Column {
 	return Column{
 		...c
-		optional:     c.optional || o.optional || o.default != none || o.default_now
-		immutable:    o.immutable
-		sensitive:    o.sensitive
-		unique:       c.unique || o.unique
-		graphql_skip: c.graphql_skip || o.graphql_skip || o.sensitive
-		comment:      o.comment
-		deprecated:   o.deprecated
-		has_default:  o.default != none || o.default_now
-		auto_update:  o.update_now || o.update_default != none
-		json_type:    o.json
+		optional:        c.optional || o.optional || o.default != none || o.default_now
+		immutable:       o.immutable
+		sensitive:       o.sensitive
+		unique:          c.unique || o.unique
+		graphql_skip:    c.graphql_skip || o.graphql_skip
+		graphql_skip_in: o.graphql_skip_in
+		order_field:     o.order_field
+		directives:      o.directives
+		comment:         o.comment
+		deprecated:      o.deprecated
+		has_default:     o.default != none || o.default_now
+		auto_update:     o.update_now || o.update_default != none
+		json_type:       o.json
 	}
 }
 

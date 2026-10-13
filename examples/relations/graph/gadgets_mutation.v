@@ -2551,3 +2551,161 @@ fn (g Graph) gadgets_by_keys(keys []string) ![]GadgetNode {
 	}
 	return found
 }
+
+// CreateGadgetInput is what a create of a `gadgets` row sets, as the GraphQL input
+// `CreateGadgetInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct CreateGadgetInput {
+pub mut:
+	created_at ?time.Time
+	updated_at ?time.Time
+	owner_id   ?int
+	serial_no  ?models.Serial
+	color      ?models.Color
+	level      ?i8
+	weight     ?u16
+	parts      ?u32
+	big        ?u64
+	ratio      ?f32
+	rating     ?f64
+	score      ?i64
+	active     ?bool
+	tags       ?string
+	liker_ids  []int
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b GadgetCreate) set_input(input CreateGadgetInput) GadgetCreate {
+	mut next := b
+	if v := input.created_at {
+		next = next.set_created_at(v)
+	}
+	if v := input.updated_at {
+		next = next.set_updated_at(v)
+	}
+	if v := input.owner_id {
+		next = next.set_owner_id(v)
+	}
+	if v := input.serial_no {
+		next = next.set_serial_no(v)
+	}
+	if v := input.color {
+		next = next.set_color(v)
+	}
+	if v := input.level {
+		next = next.set_level(v)
+	}
+	if v := input.weight {
+		next = next.set_weight(v)
+	}
+	if v := input.parts {
+		next = next.set_parts(v)
+	}
+	if v := input.big {
+		next = next.set_big(v)
+	}
+	if v := input.ratio {
+		next = next.set_ratio(v)
+	}
+	if v := input.rating {
+		next = next.set_rating(v)
+	}
+	if v := input.score {
+		next = next.set_score(v)
+	}
+	if v := input.active {
+		next = next.set_active(v)
+	}
+	if v := input.tags {
+		next = next.set_tags(v)
+	}
+	if input.liker_ids.len > 0 {
+		next = next.add_likers_ids(...input.liker_ids)
+	}
+	return next
+}
+
+// UpdateGadgetInput is what a update of a `gadgets` row sets, as the GraphQL input
+// `UpdateGadgetInput` gives it: `none` and empty lists leave things as
+// they are.
+pub struct UpdateGadgetInput {
+pub mut:
+	updated_at       ?time.Time
+	serial_no        ?models.Serial
+	color            ?models.Color
+	level            ?i8
+	weight           ?u16
+	parts            ?u32
+	big              ?u64
+	ratio            ?f32
+	rating           ?f64
+	clear_rating     bool
+	score            ?i64
+	clear_score      bool
+	active           ?bool
+	clear_active     bool
+	tags             ?string
+	add_liker_ids    []int
+	remove_liker_ids []int
+	clear_likers     bool
+}
+
+// set_input sets what `input` gives: clears first, then values, then edges.
+pub fn (b GadgetUpdateOne) set_input(input UpdateGadgetInput) GadgetUpdateOne {
+	mut next := b
+	if input.clear_rating {
+		next = next.clear_rating()
+	}
+	if input.clear_score {
+		next = next.clear_score()
+	}
+	if input.clear_active {
+		next = next.clear_active()
+	}
+	if input.clear_likers {
+		next = next.clear_likers()
+	}
+	if v := input.updated_at {
+		next = next.set_updated_at(v)
+	}
+	if v := input.serial_no {
+		next = next.set_serial_no(v)
+	}
+	if v := input.color {
+		next = next.set_color(v)
+	}
+	if v := input.level {
+		next = next.set_level(v)
+	}
+	if v := input.weight {
+		next = next.set_weight(v)
+	}
+	if v := input.parts {
+		next = next.set_parts(v)
+	}
+	if v := input.big {
+		next = next.set_big(v)
+	}
+	if v := input.ratio {
+		next = next.set_ratio(v)
+	}
+	if v := input.rating {
+		next = next.set_rating(v)
+	}
+	if v := input.score {
+		next = next.set_score(v)
+	}
+	if v := input.active {
+		next = next.set_active(v)
+	}
+	if v := input.tags {
+		next = next.set_tags(v)
+	}
+	if input.add_liker_ids.len > 0 {
+		next = next.add_likers_ids(...input.add_liker_ids)
+	}
+	if input.remove_liker_ids.len > 0 {
+		next = next.remove_likers_ids(...input.remove_liker_ids)
+	}
+	return next
+}

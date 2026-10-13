@@ -49,8 +49,8 @@ pub fn (q CategoryQuery) where(conds ...load.Cond) CategoryQuery {
 	return next
 }
 
-// limit keeps at most `count` rows. It applies to `all()` and `first()`, not to
-// the rows of an edge load.
+// limit keeps at most `count` rows. In `with_<edge>`, it keeps at most `count`
+// of each row's targets.
 pub fn (q CategoryQuery) limit(count int) CategoryQuery {
 	mut next := q
 	next.query = load.Query{
@@ -60,8 +60,8 @@ pub fn (q CategoryQuery) limit(count int) CategoryQuery {
 	return next
 }
 
-// offset skips the first `count` rows. It applies to `all()` and `first()`, not
-// to the rows of an edge load.
+// offset skips the first `count` rows. In `with_<edge>`, it skips the first
+// `count` of each row's targets.
 pub fn (q CategoryQuery) offset(count int) CategoryQuery {
 	mut next := q
 	next.query = load.Query{
@@ -219,12 +219,12 @@ pub fn category_parent_id_is_not_null() load.Cond {
 
 // category_has_parent returns the condition that it has a `parent`.
 pub fn category_has_parent() load.Cond {
-	return load.in_sub('parent_id', load.Sub{ table: 'categories', column: 'id', kind: .int, conds: []load.Cond{} })
+	return load.and(load.is_not_null('parent_id'), load.in_sub('parent_id', load.Sub{ table: 'categories', column: 'id', kind: .int, conds: []load.Cond{} }))
 }
 
 // category_has_parent_with returns the condition that it has a `parent` that matches `conds`.
 pub fn category_has_parent_with(conds ...load.Cond) load.Cond {
-	return load.in_sub('parent_id', load.Sub{ table: 'categories', column: 'id', kind: .int, conds: conds })
+	return load.and(load.is_not_null('parent_id'), load.in_sub('parent_id', load.Sub{ table: 'categories', column: 'id', kind: .int, conds: conds }))
 }
 
 // category_has_children returns the condition that it has a `children`.
@@ -881,7 +881,7 @@ fn (q CategoryQuery) load_children(rows []models.Category, fns []fn (CategoryQue
 	for configure in fns {
 		sub = configure(sub)
 	}
-	children := sub.nodes(load.select_in[models.Category](q.graph.client.conn, 'parent_id',
+	children := sub.nodes(load.select_each[models.Category](q.graph.client.conn, 'parent_id',
 		rows.map(it.id.str()),
 		query: q.graph.client.prepare_query('categories', sub.query)!
 	)!)!

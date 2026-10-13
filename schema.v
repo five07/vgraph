@@ -44,6 +44,10 @@ pub:
 	enum_values []string // an enum's values, in order
 	embedded    string   // the embedded struct (mixin) the field is from
 	json_type   string   // a JSON field's V type (`Field.json`)
+	// GraphQL options (`Field`)
+	graphql_skip_in []GraphqlSkip
+	order_field     string
+	directives      []string
 }
 
 // Table is a registered struct: its table, key, columns (in field order) and
@@ -66,6 +70,8 @@ pub:
 	hooks        int
 	interceptors int
 	rules        int
+	// graphql: the options its `graphql()` gives
+	graphql GraphqlTable
 }
 
 // column returns the column `name`, or `none` when the table has none.
@@ -115,6 +121,7 @@ pub fn (mut s Schema) add[T]() ! {
 	mut interceptors := []Interceptor{}
 	mut indexes := []Index{}
 	mut policy := Policy{}
+	mut gql := GraphqlTable{}
 	record := T{}
 	$for field in T.fields {
 		$if field.typ is $array || field.typ is $map {
@@ -290,6 +297,8 @@ pub fn (mut s Schema) add[T]() ! {
 			indexes << record.$method()
 		} $else $if method.name == 'policy' {
 			policy = policy.merged(record.$method())
+		} $else $if method.name == 'graphql' {
+			gql = record.$method()
 		}
 	}
 	for i, column in columns {
@@ -326,6 +335,7 @@ pub fn (mut s Schema) add[T]() ! {
 		hooks:        hooks.len
 		interceptors: interceptors.len
 		rules:        policy.query.len + policy.mutation.len
+		graphql:      gql
 	}
 }
 
@@ -419,6 +429,12 @@ pub fn (s Schema) validate() ! {
 	for name in s.order {
 		table := s.tables[name]
 		check_options(mut problems, table, s.options[name] or { [] })
+		if table.graphql.node {
+			key := table.column(table.key) or { Column{} }
+			if key.typ != 'i64' || !key.serial {
+				problems << '${name}.graphql: `node` needs an i64 serial key, which `global_ids` gives a range to'
+			}
+		}
 		for index in table.indexes {
 			for column in index.columns {
 				if _ := table.column(column) {
@@ -465,6 +481,14 @@ pub fn (s Schema) validate() ! {
 				problems << '${at}: `type_col` and `type_val` go together'
 			}
 			check_edge_options(mut problems, at, s, table, edge, target)
+			if edge.order_field != '' {
+				if edge.kind !in [.many_to_one, .one_to_one] {
+					problems << '${at}: `order_field` is for a many_to_one or one_to_one edge'
+				} else if _ := target.column(edge.order_field) {
+				} else {
+					problems << '${at}: `order_field` names `${edge.to}.${edge.order_field}`, which does not exist'
+				}
+			}
 			if edge.soft_del != '' {
 				if column := target.column(edge.soft_del) {
 					if !column.nullable {
