@@ -114,6 +114,52 @@ variants by type, `order_by_<field>`, `limit`, `offset`, `with_<edge>`, `all`,
 `query_<edge>` to traverse. Regenerate it after changing a model; it is checked in,
 like any code.
 
+### More queries
+
+```v ignore
+// OR and NOT, with a function per field and operator
+g.articles().where(load.or(graph.article_title_contains('V'), graph.article_views_gt(10)))
+g.users().where(load.not(graph.user_has_card()))
+// edge predicates, and traversal from a query
+g.users().has_pets().all()!
+g.users().has_groups_with(fn (q graph.GroupQuery) graph.GroupQuery {
+	return q.where_name('admins')
+}).all()!
+g.users().where_name('ada').query_pets().query_owner().all()!
+// results, aggregates, groups
+g.users().where_name('ada').only()!           // NotFoundError, NotSingularError
+g.users().order_by_name().ids()!              // []int
+g.users().select('name').all()!               // other columns left at zero
+g.users().unique().scan[UserName]()!          // into the app's struct
+g.logins().sum_at()!                          // also min_, max_, mean_
+g.logins().group_by('device_id').aggregate(vgraph.count(), vgraph.sum('at')).all()!
+// orders: several columns, by an edge, nulls last; locks
+g.users().order_by_pets_count_desc().order_by_name().all()!
+g.pets().order_by(vgraph.asc('owner_id').nulls_last()).all()!
+tx.users().where_id(1).for_update().no_wait().all()! // in g.tx, on PostgreSQL
+// an edge loaded twice, and an edge that wasn't loaded
+u := g.users().with_named_pets('young', fn (q graph.PetQuery) graph.PetQuery {
+	return q.where_age_lt(2)
+}).first()!
+u.named_pets['young']
+u.pets_or_err()!                              // NotLoadedError: no with_pets()
+```
+
+Predicates on each field, by type: `where_<field>` and `_ne`, `_lt`/`_le`/`_gt`/`_ge`,
+`_in`/`_not_in`, `_like`, `_contains`, `_has_prefix`, `_has_suffix` (with `%` and `_`
+matched as themselves), `_equal_fold`, `_contains_fold`, `_is_null`/`_is_not_null`;
+the same as functions, `graph.<struct>_<field>_<op>`, for `load.and` / `or` / `not`.
+`load.raw('length(name) > ?', 3)` takes SQL with parameters.
+
+A query the ORM can express runs as one query, as before. One that needs more
+(NOT around LIKE, escaped or case-insensitive matches, subqueries, several order
+columns, edge orders, nulls first/last, locks, raw SQL, `group_by`) runs keys
+first through a driver: the driver selects the matching keys, in order, then the
+ORM reads those rows. Without a driver, a subquery runs first as a query of its
+own, and the rest is refused with an error naming the drivers. Edge predicates
+and traversals apply the target table's privacy rules and interceptors, as edge
+loads do.
+
 ## Writes
 
 The generated client writes too. Each table gets builders, as Ent's:

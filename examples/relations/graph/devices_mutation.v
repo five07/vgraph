@@ -606,64 +606,174 @@ pub fn (b DeviceUpdate) where(conds ...load.Cond) DeviceUpdate {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q DeviceUpdate) where_id(value string) DeviceUpdate {
-	return q.where(load.eq('id', value))
+	return q.where(device_id_eq(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q DeviceUpdate) where_id_ne(value string) DeviceUpdate {
+	return q.where(device_id_ne(value))
+}
+
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q DeviceUpdate) where_id_in(values []string) DeviceUpdate {
-	return q.where(load.in_strings('id', values))
+	return q.where(device_id_in(values))
 }
 
-// where_id_like keeps the rows whose `id` matches the SQL LIKE `pattern`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q DeviceUpdate) where_id_not_in(values []string) DeviceUpdate {
+	return q.where(device_id_not_in(values))
+}
+
+// where_id_like keeps the rows where `id` matches the SQL LIKE `pattern`.
 pub fn (q DeviceUpdate) where_id_like(pattern string) DeviceUpdate {
-	return q.where(load.like('id', pattern))
+	return q.where(device_id_like(pattern))
 }
 
-// where_name keeps the rows whose `name` is `value`.
+// where_id_contains keeps the rows where `id` contains `value`.
+pub fn (q DeviceUpdate) where_id_contains(value string) DeviceUpdate {
+	return q.where(device_id_contains(value))
+}
+
+// where_id_has_prefix keeps the rows where `id` starts with `value`.
+pub fn (q DeviceUpdate) where_id_has_prefix(value string) DeviceUpdate {
+	return q.where(device_id_has_prefix(value))
+}
+
+// where_id_has_suffix keeps the rows where `id` ends with `value`.
+pub fn (q DeviceUpdate) where_id_has_suffix(value string) DeviceUpdate {
+	return q.where(device_id_has_suffix(value))
+}
+
+// where_id_equal_fold keeps the rows where `id` is `value`, ignoring case.
+pub fn (q DeviceUpdate) where_id_equal_fold(value string) DeviceUpdate {
+	return q.where(device_id_equal_fold(value))
+}
+
+// where_id_contains_fold keeps the rows where `id` contains `value`, ignoring case.
+pub fn (q DeviceUpdate) where_id_contains_fold(value string) DeviceUpdate {
+	return q.where(device_id_contains_fold(value))
+}
+
+// where_name keeps the rows where `name` is `value`.
 pub fn (q DeviceUpdate) where_name(value string) DeviceUpdate {
-	return q.where(load.eq('name', value))
+	return q.where(device_name_eq(value))
 }
 
-// where_name_in keeps the rows whose `name` is one of `values`.
+// where_name_ne keeps the rows where `name` is not `value`.
+pub fn (q DeviceUpdate) where_name_ne(value string) DeviceUpdate {
+	return q.where(device_name_ne(value))
+}
+
+// where_name_in keeps the rows where `name` is one of `values`.
 pub fn (q DeviceUpdate) where_name_in(values []string) DeviceUpdate {
-	return q.where(load.in_strings('name', values))
+	return q.where(device_name_in(values))
 }
 
-// where_name_like keeps the rows whose `name` matches the SQL LIKE `pattern`.
+// where_name_not_in keeps the rows where `name` is none of `values`.
+pub fn (q DeviceUpdate) where_name_not_in(values []string) DeviceUpdate {
+	return q.where(device_name_not_in(values))
+}
+
+// where_name_like keeps the rows where `name` matches the SQL LIKE `pattern`.
 pub fn (q DeviceUpdate) where_name_like(pattern string) DeviceUpdate {
-	return q.where(load.like('name', pattern))
+	return q.where(device_name_like(pattern))
 }
 
-// where_owner_id keeps the rows whose `owner_id` is `value`.
+// where_name_contains keeps the rows where `name` contains `value`.
+pub fn (q DeviceUpdate) where_name_contains(value string) DeviceUpdate {
+	return q.where(device_name_contains(value))
+}
+
+// where_name_has_prefix keeps the rows where `name` starts with `value`.
+pub fn (q DeviceUpdate) where_name_has_prefix(value string) DeviceUpdate {
+	return q.where(device_name_has_prefix(value))
+}
+
+// where_name_has_suffix keeps the rows where `name` ends with `value`.
+pub fn (q DeviceUpdate) where_name_has_suffix(value string) DeviceUpdate {
+	return q.where(device_name_has_suffix(value))
+}
+
+// where_name_equal_fold keeps the rows where `name` is `value`, ignoring case.
+pub fn (q DeviceUpdate) where_name_equal_fold(value string) DeviceUpdate {
+	return q.where(device_name_equal_fold(value))
+}
+
+// where_name_contains_fold keeps the rows where `name` contains `value`, ignoring case.
+pub fn (q DeviceUpdate) where_name_contains_fold(value string) DeviceUpdate {
+	return q.where(device_name_contains_fold(value))
+}
+
+// where_owner_id keeps the rows where `owner_id` is `value`.
 pub fn (q DeviceUpdate) where_owner_id(value int) DeviceUpdate {
-	return q.where(load.eq('owner_id', value))
+	return q.where(device_owner_id_eq(value))
 }
 
-// where_owner_id_lt keeps the rows whose `owner_id` comes before `value`.
+// where_owner_id_ne keeps the rows where `owner_id` is not `value`.
+pub fn (q DeviceUpdate) where_owner_id_ne(value int) DeviceUpdate {
+	return q.where(device_owner_id_ne(value))
+}
+
+// where_owner_id_lt keeps the rows where `owner_id` comes before `value`.
 pub fn (q DeviceUpdate) where_owner_id_lt(value int) DeviceUpdate {
-	return q.where(load.lt('owner_id', value))
+	return q.where(device_owner_id_lt(value))
 }
 
-// where_owner_id_le keeps the rows whose `owner_id` comes at or before `value`.
+// where_owner_id_le keeps the rows where `owner_id` comes at or before `value`.
 pub fn (q DeviceUpdate) where_owner_id_le(value int) DeviceUpdate {
-	return q.where(load.le('owner_id', value))
+	return q.where(device_owner_id_le(value))
 }
 
-// where_owner_id_gt keeps the rows whose `owner_id` comes after `value`.
+// where_owner_id_gt keeps the rows where `owner_id` comes after `value`.
 pub fn (q DeviceUpdate) where_owner_id_gt(value int) DeviceUpdate {
-	return q.where(load.gt('owner_id', value))
+	return q.where(device_owner_id_gt(value))
 }
 
-// where_owner_id_ge keeps the rows whose `owner_id` comes at or after `value`.
+// where_owner_id_ge keeps the rows where `owner_id` comes at or after `value`.
 pub fn (q DeviceUpdate) where_owner_id_ge(value int) DeviceUpdate {
-	return q.where(load.ge('owner_id', value))
+	return q.where(device_owner_id_ge(value))
 }
 
-// where_owner_id_in keeps the rows whose `owner_id` is one of `values`.
+// where_owner_id_in keeps the rows where `owner_id` is one of `values`.
 pub fn (q DeviceUpdate) where_owner_id_in(values []int) DeviceUpdate {
-	return q.where(load.in_ints('owner_id', values))
+	return q.where(device_owner_id_in(values))
+}
+
+// where_owner_id_not_in keeps the rows where `owner_id` is none of `values`.
+pub fn (q DeviceUpdate) where_owner_id_not_in(values []int) DeviceUpdate {
+	return q.where(device_owner_id_not_in(values))
+}
+
+// has_owner keeps the rows where it has a `owner`.
+pub fn (q DeviceUpdate) has_owner() DeviceUpdate {
+	return q.where(device_has_owner())
+}
+
+// has_owner_with keeps the rows that have a `owner` that `configure` keeps.
+pub fn (q DeviceUpdate) has_owner_with(configure fn (UserQuery) UserQuery) DeviceUpdate {
+	return q.where(device_has_owner_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_logins keeps the rows where it has a `logins`.
+pub fn (q DeviceUpdate) has_logins() DeviceUpdate {
+	return q.where(device_has_logins())
+}
+
+// has_logins_with keeps the rows that have a `logins` that `configure` keeps.
+pub fn (q DeviceUpdate) has_logins_with(configure fn (LoginQuery) LoginQuery) DeviceUpdate {
+	return q.where(device_has_logins_with(...configure(q.graph.logins()).query.conds))
+}
+
+// has_groups keeps the rows where it has a `groups`.
+pub fn (q DeviceUpdate) has_groups() DeviceUpdate {
+	return q.where(device_has_groups())
+}
+
+// has_groups_with keeps the rows that have a `groups` that `configure` keeps.
+pub fn (q DeviceUpdate) has_groups_with(configure fn (GroupQuery) GroupQuery) DeviceUpdate {
+	return q.where(device_has_groups_with(...configure(q.graph.groups()).query.conds))
 }
 
 // set_name sets `name`.
@@ -840,64 +950,174 @@ pub fn (b DeviceDelete) where(conds ...load.Cond) DeviceDelete {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q DeviceDelete) where_id(value string) DeviceDelete {
-	return q.where(load.eq('id', value))
+	return q.where(device_id_eq(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q DeviceDelete) where_id_ne(value string) DeviceDelete {
+	return q.where(device_id_ne(value))
+}
+
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q DeviceDelete) where_id_in(values []string) DeviceDelete {
-	return q.where(load.in_strings('id', values))
+	return q.where(device_id_in(values))
 }
 
-// where_id_like keeps the rows whose `id` matches the SQL LIKE `pattern`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q DeviceDelete) where_id_not_in(values []string) DeviceDelete {
+	return q.where(device_id_not_in(values))
+}
+
+// where_id_like keeps the rows where `id` matches the SQL LIKE `pattern`.
 pub fn (q DeviceDelete) where_id_like(pattern string) DeviceDelete {
-	return q.where(load.like('id', pattern))
+	return q.where(device_id_like(pattern))
 }
 
-// where_name keeps the rows whose `name` is `value`.
+// where_id_contains keeps the rows where `id` contains `value`.
+pub fn (q DeviceDelete) where_id_contains(value string) DeviceDelete {
+	return q.where(device_id_contains(value))
+}
+
+// where_id_has_prefix keeps the rows where `id` starts with `value`.
+pub fn (q DeviceDelete) where_id_has_prefix(value string) DeviceDelete {
+	return q.where(device_id_has_prefix(value))
+}
+
+// where_id_has_suffix keeps the rows where `id` ends with `value`.
+pub fn (q DeviceDelete) where_id_has_suffix(value string) DeviceDelete {
+	return q.where(device_id_has_suffix(value))
+}
+
+// where_id_equal_fold keeps the rows where `id` is `value`, ignoring case.
+pub fn (q DeviceDelete) where_id_equal_fold(value string) DeviceDelete {
+	return q.where(device_id_equal_fold(value))
+}
+
+// where_id_contains_fold keeps the rows where `id` contains `value`, ignoring case.
+pub fn (q DeviceDelete) where_id_contains_fold(value string) DeviceDelete {
+	return q.where(device_id_contains_fold(value))
+}
+
+// where_name keeps the rows where `name` is `value`.
 pub fn (q DeviceDelete) where_name(value string) DeviceDelete {
-	return q.where(load.eq('name', value))
+	return q.where(device_name_eq(value))
 }
 
-// where_name_in keeps the rows whose `name` is one of `values`.
+// where_name_ne keeps the rows where `name` is not `value`.
+pub fn (q DeviceDelete) where_name_ne(value string) DeviceDelete {
+	return q.where(device_name_ne(value))
+}
+
+// where_name_in keeps the rows where `name` is one of `values`.
 pub fn (q DeviceDelete) where_name_in(values []string) DeviceDelete {
-	return q.where(load.in_strings('name', values))
+	return q.where(device_name_in(values))
 }
 
-// where_name_like keeps the rows whose `name` matches the SQL LIKE `pattern`.
+// where_name_not_in keeps the rows where `name` is none of `values`.
+pub fn (q DeviceDelete) where_name_not_in(values []string) DeviceDelete {
+	return q.where(device_name_not_in(values))
+}
+
+// where_name_like keeps the rows where `name` matches the SQL LIKE `pattern`.
 pub fn (q DeviceDelete) where_name_like(pattern string) DeviceDelete {
-	return q.where(load.like('name', pattern))
+	return q.where(device_name_like(pattern))
 }
 
-// where_owner_id keeps the rows whose `owner_id` is `value`.
+// where_name_contains keeps the rows where `name` contains `value`.
+pub fn (q DeviceDelete) where_name_contains(value string) DeviceDelete {
+	return q.where(device_name_contains(value))
+}
+
+// where_name_has_prefix keeps the rows where `name` starts with `value`.
+pub fn (q DeviceDelete) where_name_has_prefix(value string) DeviceDelete {
+	return q.where(device_name_has_prefix(value))
+}
+
+// where_name_has_suffix keeps the rows where `name` ends with `value`.
+pub fn (q DeviceDelete) where_name_has_suffix(value string) DeviceDelete {
+	return q.where(device_name_has_suffix(value))
+}
+
+// where_name_equal_fold keeps the rows where `name` is `value`, ignoring case.
+pub fn (q DeviceDelete) where_name_equal_fold(value string) DeviceDelete {
+	return q.where(device_name_equal_fold(value))
+}
+
+// where_name_contains_fold keeps the rows where `name` contains `value`, ignoring case.
+pub fn (q DeviceDelete) where_name_contains_fold(value string) DeviceDelete {
+	return q.where(device_name_contains_fold(value))
+}
+
+// where_owner_id keeps the rows where `owner_id` is `value`.
 pub fn (q DeviceDelete) where_owner_id(value int) DeviceDelete {
-	return q.where(load.eq('owner_id', value))
+	return q.where(device_owner_id_eq(value))
 }
 
-// where_owner_id_lt keeps the rows whose `owner_id` comes before `value`.
+// where_owner_id_ne keeps the rows where `owner_id` is not `value`.
+pub fn (q DeviceDelete) where_owner_id_ne(value int) DeviceDelete {
+	return q.where(device_owner_id_ne(value))
+}
+
+// where_owner_id_lt keeps the rows where `owner_id` comes before `value`.
 pub fn (q DeviceDelete) where_owner_id_lt(value int) DeviceDelete {
-	return q.where(load.lt('owner_id', value))
+	return q.where(device_owner_id_lt(value))
 }
 
-// where_owner_id_le keeps the rows whose `owner_id` comes at or before `value`.
+// where_owner_id_le keeps the rows where `owner_id` comes at or before `value`.
 pub fn (q DeviceDelete) where_owner_id_le(value int) DeviceDelete {
-	return q.where(load.le('owner_id', value))
+	return q.where(device_owner_id_le(value))
 }
 
-// where_owner_id_gt keeps the rows whose `owner_id` comes after `value`.
+// where_owner_id_gt keeps the rows where `owner_id` comes after `value`.
 pub fn (q DeviceDelete) where_owner_id_gt(value int) DeviceDelete {
-	return q.where(load.gt('owner_id', value))
+	return q.where(device_owner_id_gt(value))
 }
 
-// where_owner_id_ge keeps the rows whose `owner_id` comes at or after `value`.
+// where_owner_id_ge keeps the rows where `owner_id` comes at or after `value`.
 pub fn (q DeviceDelete) where_owner_id_ge(value int) DeviceDelete {
-	return q.where(load.ge('owner_id', value))
+	return q.where(device_owner_id_ge(value))
 }
 
-// where_owner_id_in keeps the rows whose `owner_id` is one of `values`.
+// where_owner_id_in keeps the rows where `owner_id` is one of `values`.
 pub fn (q DeviceDelete) where_owner_id_in(values []int) DeviceDelete {
-	return q.where(load.in_ints('owner_id', values))
+	return q.where(device_owner_id_in(values))
+}
+
+// where_owner_id_not_in keeps the rows where `owner_id` is none of `values`.
+pub fn (q DeviceDelete) where_owner_id_not_in(values []int) DeviceDelete {
+	return q.where(device_owner_id_not_in(values))
+}
+
+// has_owner keeps the rows where it has a `owner`.
+pub fn (q DeviceDelete) has_owner() DeviceDelete {
+	return q.where(device_has_owner())
+}
+
+// has_owner_with keeps the rows that have a `owner` that `configure` keeps.
+pub fn (q DeviceDelete) has_owner_with(configure fn (UserQuery) UserQuery) DeviceDelete {
+	return q.where(device_has_owner_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_logins keeps the rows where it has a `logins`.
+pub fn (q DeviceDelete) has_logins() DeviceDelete {
+	return q.where(device_has_logins())
+}
+
+// has_logins_with keeps the rows that have a `logins` that `configure` keeps.
+pub fn (q DeviceDelete) has_logins_with(configure fn (LoginQuery) LoginQuery) DeviceDelete {
+	return q.where(device_has_logins_with(...configure(q.graph.logins()).query.conds))
+}
+
+// has_groups keeps the rows where it has a `groups`.
+pub fn (q DeviceDelete) has_groups() DeviceDelete {
+	return q.where(device_has_groups())
+}
+
+// has_groups_with keeps the rows that have a `groups` that `configure` keeps.
+pub fn (q DeviceDelete) has_groups_with(configure fn (GroupQuery) GroupQuery) DeviceDelete {
+	return q.where(device_has_groups_with(...configure(q.graph.groups()).query.conds))
 }
 
 // exec deletes the rows, with their join table rows, in one transaction, and

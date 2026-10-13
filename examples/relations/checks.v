@@ -7,6 +7,7 @@ import orm
 import v.migrations
 import five07.vgraph
 import five07.vgraph.graphql
+import five07.vgraph.load
 import graph
 import models
 
@@ -621,4 +622,232 @@ fn check_soft_delete(f Fixture) ! {
 	// skipped, a delete is a delete
 	assert w.skip('soft_delete').pets().delete().where_deleted_at_is_not_null().exec()! == 1
 	assert w.skip('soft_delete').pets().count()! == 2
+}
+
+struct UserName {
+	name string
+}
+
+struct LoginGroup {
+	device_id string
+	count     int
+	sum_at    f64
+}
+
+fn ids_of(users []graph.UserNode) []int {
+	return users.map(it.user.id)
+}
+
+// Queries (6b): edge predicates and traversal from a query for each kind,
+// predicates, results, aggregates, orders, locks and named edges. Each runs on
+// the client without a driver (`f.g`, whose selects are logged) and on the one
+// with a driver (`f.w`).
+fn check_queries(f Fixture) ! {
+	driver := f.w.client.conn as vgraph.Driver
+	on_pg := driver.dialect() == .pg
+	for with_driver in [false, true] {
+		g := if with_driver { f.w } else { f.g }
+		f.queries()
+		// O2O two types
+		assert names(g.users().has_card().order_by_id().all()!) == ['ada', 'bob']
+		if !with_driver {
+			// the cards' owners first, then the users
+			assert f.queries() == ['cards', 'users']
+		}
+		assert names(g.users().where(load.not(graph.user_has_card())).order_by_id().all()!) == [
+			'cy',
+			'dee',
+		]
+		assert g.cards().has_owner_with(fn (q graph.UserQuery) graph.UserQuery {
+			return q.where_name('bob')
+		}).all()!.map(it.card.number) == ['5555']
+		// O2O same type, and bidirectional
+		assert g.nodes().has_prev().order_by_id().ids()! == [2, 3]
+		assert g.nodes().where(graph.node_has_next_with(graph.node_value_eq(3))).ids()! == [2]
+		assert names(g.users().has_spouse().order_by_id().all()!) == ['ada', 'bob']
+		// O2M two types, both ways, and traversal from a query
+		assert names(g.users().has_pets().all()!) == ['ada']
+		assert g.pets().has_owner().order_by_id().all()!.map(it.pet.name) == ['rex', 'tom']
+		f.queries()
+		assert g.users().where_name('ada').query_pets().order_by_name().all()!.map(it.pet.name) == [
+			'rex',
+			'tom',
+		]
+		if !with_driver {
+			assert f.queries() == ['users', 'pets']
+		}
+		assert names(g.pets().where_name_in(['rex', 'stray']).query_owner().all()!) == ['ada']
+		// O2M same type, two levels
+		assert g.categories().has_children().order_by_id().all()!.map(it.category.name) == [
+			'root',
+			'a',
+		]
+		assert g.categories().where_name('root').query_children().query_children().all()!.map(it.category.name) == [
+			'a1',
+		]
+		// M2M two types, same type, bidirectional
+		assert names(g.users().has_groups_with(fn (q graph.GroupQuery) graph.GroupQuery {
+			return q.where_name('admins')
+		}).all()!) == ['ada']
+		assert names(g.groups().where_name('devs').query_users().order_by_id().all()!) == [
+			'ada',
+			'bob',
+		]
+		assert names(g.users().has_followers().order_by_id().all()!) == ['bob', 'cy']
+		assert names(g.users().where_name('ada').query_following().order_by_id().all()!) == [
+			'bob',
+			'cy',
+		]
+		assert names(g.users().where_name('cy').query_friends().all()!) == ['dee']
+		// UUID keys
+		assert g.devices().has_logins().order_by_name().all()!.map(it.device.name) == [
+			'phone',
+			'tablet',
+		]
+		assert g.users().where_name('ada').query_devices().query_logins().count()! == 2
+		assert g.groups().where(graph.group_has_devices_with(graph.device_name_eq('tablet'))).all()!.map(it.group.name) == [
+			'devs',
+		]
+		// and, or, not; string predicates
+		assert names(g.users().where(load.or(graph.user_name_eq('ada'), graph.user_name_eq('dee'))).order_by_id().all()!) == [
+			'ada',
+			'dee',
+		]
+		assert names(g.users().where(load.not(load.or(graph.user_name_eq('ada'), graph.user_id_gt(3)))).order_by_id().all()!) == [
+			'bob',
+			'cy',
+		]
+		assert names(g.users().where_name_contains('d').order_by_id().all()!) == ['ada', 'dee']
+		assert names(g.users().where_name_has_prefix('b').all()!) == ['bob']
+		assert names(g.users().where_name_ne('ada').where_id_not_in([4]).order_by_id().all()!) == [
+			'bob',
+			'cy',
+		]
+		if with_driver {
+			assert names(g.users().where_name_equal_fold('ADA').all()!) == ['ada']
+			assert names(g.users().where_name_contains_fold('E').all()!) == ['dee']
+			// `%` is itself, not a wildcard
+			assert g.users().where_name_contains('%').count()! == 0
+			assert names(g.users().where(load.raw('length(name) = ?', 2)).all()!) == ['cy']
+		} else {
+			for refused in [
+				g.users().where_name_equal_fold('ADA'),
+				g.users().where_name_contains('%'),
+				g.users().where(load.raw('length(name) = ?', 2)),
+				g.users().order_by_name().order_by_id(),
+			] {
+				if _ := refused.all() {
+					assert false
+				} else {
+					assert err.msg().contains('vgraph driver')
+				}
+			}
+		}
+		// results
+		assert g.users().where_name('ada').only()!.user.id == 1
+		if _ := g.users().only() {
+			assert false
+		} else {
+			assert err is graph.NotSingularError
+		}
+		assert g.users().order_by_name_desc().ids()! == [4, 3, 2, 1]
+		assert g.users().order_by_id_desc().first_id()! == 4
+		assert g.users().where_name('cy').only_id()! == 3
+		assert g.users().where_name('cy').exist()!
+		assert !g.users().where_name('zed').exist()!
+		selected := g.users().select('name').where_id(1).first()!
+		assert selected.user.name == 'ada'
+		assert selected.user.spouse_id == none, 'not read'
+		assert g.pets().has_owner().unique().scan[UserName]()!.len == 2
+		assert g.users().where_id_lt(3).order_by_id().scan[UserName]()!.map(it.name) == [
+			'ada',
+			'bob',
+		]
+		// aggregates
+		assert g.logins().sum_at()! == 6
+		assert g.logins().min_at()! == 1
+		assert g.logins().max_at()! == 3
+		assert g.logins().mean_at()! == 2
+		assert g.logins().where_at_gt(1).sum_at()! == 5
+		if with_driver {
+			groups := g.logins().group_by('device_id').aggregate(vgraph.count(), vgraph.sum('at')).all()!
+			assert groups.map('${it.key['device_id'] or { orm.Null{} }} ${it.values['count']} ${it.values['sum_at']}') == [
+				"Primitive('${phone}') 2.0 3.0",
+				"Primitive('${tablet}') 1.0 3.0",
+			]
+			scanned := g.logins().group_by('device_id').aggregate(vgraph.count(), vgraph.sum('at')).scan[LoginGroup]()!
+			assert scanned == [LoginGroup{phone, 2, 3}, LoginGroup{tablet, 1, 3}]
+		} else {
+			if _ := g.logins().group_by('device_id').all() {
+				assert false
+			} else {
+				assert err.msg().contains('vgraph driver')
+			}
+		}
+		// orders by more than one column, by an edge, nulls last
+		if with_driver {
+			assert ids_of(g.users().order_by_pets_count_desc().order_by_id().all()!) == [
+				1,
+				2,
+				3,
+				4,
+			]
+			assert ids_of(g.users().order_by_followers_count_desc().order_by_id().all()!) == [
+				3,
+				2,
+				1,
+				4,
+			]
+			assert g.cards().order_by_owner_name_desc().all()!.map(it.card.number) == [
+				'5555',
+				'4242',
+			]
+			// users without a card sort as nulls do, which differs by database
+			assert ids_of(g.users().order_by_card_number_desc().order_by_id().all()!).filter(it <= 2) == [
+				2,
+				1,
+			]
+			assert g.pets().order_by(vgraph.asc('owner_id').nulls_last(), vgraph.asc('id')).all()!.map(it.pet.name) == [
+				'rex',
+				'tom',
+				'stray',
+			]
+			// a lock needs a transaction, and PostgreSQL
+			if _ := g.users().for_update().all() {
+				assert false
+			} else {
+				assert err.msg().contains('transaction')
+			}
+			g.tx(fn [on_pg] (tx graph.Graph) ! {
+				locked := tx.users().where_id(1).for_update().no_wait().all() or {
+					assert !on_pg
+					assert err.msg().contains('SQLite has no row locks')
+					return
+				}
+				assert on_pg
+				assert names(locked) == ['ada']
+				assert names(tx.users().where_id(2).for_share().skip_locked().all()!) == ['bob']
+			})!
+		}
+		// named edges, and edges not loaded
+		ada := g.users().where_id(1).with_pets().with_named_pets('r', fn (q graph.PetQuery) graph.PetQuery {
+			return q.where_name_has_prefix('r')
+		}).with_named_pets('none', fn (q graph.PetQuery) graph.PetQuery {
+			return q.where_name('zed')
+		}).first()!
+		assert ada.named_pets['r'].map(it.pet.name) == ['rex']
+		assert ada.named_pets['none'].len == 0
+		assert ada.pets_or_err()!.len == 2
+		if _ := ada.card_or_err() {
+			assert false
+		} else {
+			assert err is graph.NotLoadedError
+		}
+		cy := g.users().where_id(3).with_card().first()!
+		if _ := cy.card_or_err() {
+			assert false
+		} else {
+			assert err is graph.NotFoundError
+		}
+	}
 }

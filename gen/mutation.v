@@ -563,7 +563,7 @@ pub fn (b ${up}) where(conds ...load.Cond) ${up} {
 		data: b.data.with_conds(conds)
 	}
 }')
-	write_predicates(mut b, t, up, false)
+	write_pred_methods(mut b, up, predicates(info, infos)!, infos, info)
 	write_setters(mut b, up, update_setters)
 	b.writeln('
 // exec updates the rows and their edges, in one transaction, and returns how
@@ -639,7 +639,7 @@ pub fn (b ${de}) where(conds ...load.Cond) ${de} {
 		data: b.data.with_conds(conds)
 	}
 }')
-	write_predicates(mut b, t, de, false)
+	write_pred_methods(mut b, de, predicates(info, infos)!, infos, info)
 	b.writeln('
 // exec deletes the rows, with their join table rows, in one transaction, and
 // returns how many there were.

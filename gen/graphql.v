@@ -605,9 +605,9 @@ fn cond_expr(f GqlField, suffix string) string {
 		'GTE' { 'load.ge(${col}, ${one})' }
 		'LT' { 'load.lt(${col}, ${one})' }
 		'LTE' { 'load.le(${col}, ${one})' }
-		'Contains' { "load.like(${col}, '%' + v.as_string() + '%')" }
-		'HasPrefix' { "load.like(${col}, v.as_string() + '%')" }
-		'HasSuffix' { "load.like(${col}, '%' + v.as_string())" }
+		'Contains' { 'load.contains(${col}, v.as_string())' }
+		'HasPrefix' { 'load.has_prefix(${col}, v.as_string())' }
+		'HasSuffix' { 'load.has_suffix(${col}, v.as_string())' }
 		else { '' }
 	}
 }

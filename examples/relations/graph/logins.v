@@ -20,6 +20,8 @@ pub struct LoginNode {
 pub mut:
 	login  models.Login
 	device ?&DeviceNode // set by `with_device()`
+	// loaded: the edges the query loaded
+	loaded []string
 }
 
 // logins starts a query of `logins`.
@@ -70,145 +72,612 @@ pub fn (q LoginQuery) count() !int {
 	return load.count_where[models.Login](q.graph.client.conn, q.graph.client.prepare_query('logins', q.query)!)
 }
 
-// where_id keeps the rows whose `id` is `value`.
-pub fn (q LoginQuery) where_id(value int) LoginQuery {
-	return q.where(load.eq('id', value))
+// login_id_eq returns the condition that `id` is `value`.
+pub fn login_id_eq(value int) load.Cond {
+	return load.eq('id', value)
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
-pub fn (q LoginQuery) where_id_lt(value int) LoginQuery {
-	return q.where(load.lt('id', value))
+// login_id_ne returns the condition that `id` is not `value`.
+pub fn login_id_ne(value int) load.Cond {
+	return load.ne('id', value)
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
-pub fn (q LoginQuery) where_id_le(value int) LoginQuery {
-	return q.where(load.le('id', value))
+// login_id_lt returns the condition that `id` comes before `value`.
+pub fn login_id_lt(value int) load.Cond {
+	return load.lt('id', value)
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
-pub fn (q LoginQuery) where_id_gt(value int) LoginQuery {
-	return q.where(load.gt('id', value))
+// login_id_le returns the condition that `id` comes at or before `value`.
+pub fn login_id_le(value int) load.Cond {
+	return load.le('id', value)
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
-pub fn (q LoginQuery) where_id_ge(value int) LoginQuery {
-	return q.where(load.ge('id', value))
+// login_id_gt returns the condition that `id` comes after `value`.
+pub fn login_id_gt(value int) load.Cond {
+	return load.gt('id', value)
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
-pub fn (q LoginQuery) where_id_in(values []int) LoginQuery {
-	return q.where(load.in_ints('id', values))
+// login_id_ge returns the condition that `id` comes at or after `value`.
+pub fn login_id_ge(value int) load.Cond {
+	return load.ge('id', value)
 }
 
-// order_by_id orders the rows by `id`, ascending.
+// login_id_in returns the condition that `id` is one of `values`.
+pub fn login_id_in(values []int) load.Cond {
+	return load.in_ints('id', values)
+}
+
+// login_id_not_in returns the condition that `id` is none of `values`.
+pub fn login_id_not_in(values []int) load.Cond {
+	return load.not_in_ints('id', values)
+}
+
+// login_device_id_eq returns the condition that `device_id` is `value`.
+pub fn login_device_id_eq(value string) load.Cond {
+	return load.eq('device_id', value)
+}
+
+// login_device_id_ne returns the condition that `device_id` is not `value`.
+pub fn login_device_id_ne(value string) load.Cond {
+	return load.ne('device_id', value)
+}
+
+// login_device_id_in returns the condition that `device_id` is one of `values`.
+pub fn login_device_id_in(values []string) load.Cond {
+	return load.in_strings('device_id', values)
+}
+
+// login_device_id_not_in returns the condition that `device_id` is none of `values`.
+pub fn login_device_id_not_in(values []string) load.Cond {
+	return load.not_in_strings('device_id', values)
+}
+
+// login_device_id_like returns the condition that `device_id` matches the SQL LIKE `pattern`.
+pub fn login_device_id_like(pattern string) load.Cond {
+	return load.like('device_id', pattern)
+}
+
+// login_device_id_contains returns the condition that `device_id` contains `value`.
+pub fn login_device_id_contains(value string) load.Cond {
+	return load.contains('device_id', value)
+}
+
+// login_device_id_has_prefix returns the condition that `device_id` starts with `value`.
+pub fn login_device_id_has_prefix(value string) load.Cond {
+	return load.has_prefix('device_id', value)
+}
+
+// login_device_id_has_suffix returns the condition that `device_id` ends with `value`.
+pub fn login_device_id_has_suffix(value string) load.Cond {
+	return load.has_suffix('device_id', value)
+}
+
+// login_device_id_equal_fold returns the condition that `device_id` is `value`, ignoring case.
+pub fn login_device_id_equal_fold(value string) load.Cond {
+	return load.equal_fold('device_id', value)
+}
+
+// login_device_id_contains_fold returns the condition that `device_id` contains `value`, ignoring case.
+pub fn login_device_id_contains_fold(value string) load.Cond {
+	return load.contains_fold('device_id', value)
+}
+
+// login_at_eq returns the condition that `at` is `value`.
+pub fn login_at_eq(value int) load.Cond {
+	return load.eq('at', value)
+}
+
+// login_at_ne returns the condition that `at` is not `value`.
+pub fn login_at_ne(value int) load.Cond {
+	return load.ne('at', value)
+}
+
+// login_at_lt returns the condition that `at` comes before `value`.
+pub fn login_at_lt(value int) load.Cond {
+	return load.lt('at', value)
+}
+
+// login_at_le returns the condition that `at` comes at or before `value`.
+pub fn login_at_le(value int) load.Cond {
+	return load.le('at', value)
+}
+
+// login_at_gt returns the condition that `at` comes after `value`.
+pub fn login_at_gt(value int) load.Cond {
+	return load.gt('at', value)
+}
+
+// login_at_ge returns the condition that `at` comes at or after `value`.
+pub fn login_at_ge(value int) load.Cond {
+	return load.ge('at', value)
+}
+
+// login_at_in returns the condition that `at` is one of `values`.
+pub fn login_at_in(values []int) load.Cond {
+	return load.in_ints('at', values)
+}
+
+// login_at_not_in returns the condition that `at` is none of `values`.
+pub fn login_at_not_in(values []int) load.Cond {
+	return load.not_in_ints('at', values)
+}
+
+// login_has_device returns the condition that it has a `device`.
+pub fn login_has_device() load.Cond {
+	return load.in_sub('device_id', load.Sub{ table: 'devices', column: 'id', kind: .string, conds: []load.Cond{} })
+}
+
+// login_has_device_with returns the condition that it has a `device` that matches `conds`.
+pub fn login_has_device_with(conds ...load.Cond) load.Cond {
+	return load.in_sub('device_id', load.Sub{ table: 'devices', column: 'id', kind: .string, conds: conds })
+}
+
+// order_by_id orders the rows by `id`, ascending, after the orders
+// given before.
 pub fn (q LoginQuery) order_by_id() LoginQuery {
-	mut next := q
-	next.query = load.Query{
-		...q.query
-		order: 'id'
-		desc:  false
-	}
-	return next
+	return q.order_by(load.asc('id'))
 }
 
-// order_by_id_desc orders the rows by `id`, descending.
+// order_by_id_desc orders the rows by `id`, descending, after the
+// orders given before.
 pub fn (q LoginQuery) order_by_id_desc() LoginQuery {
-	mut next := q
-	next.query = load.Query{
-		...q.query
-		order: 'id'
-		desc:  true
-	}
-	return next
+	return q.order_by(load.desc('id'))
 }
 
-// where_device_id keeps the rows whose `device_id` is `value`.
-pub fn (q LoginQuery) where_device_id(value string) LoginQuery {
-	return q.where(load.eq('device_id', value))
-}
-
-// where_device_id_in keeps the rows whose `device_id` is one of `values`.
-pub fn (q LoginQuery) where_device_id_in(values []string) LoginQuery {
-	return q.where(load.in_strings('device_id', values))
-}
-
-// where_device_id_like keeps the rows whose `device_id` matches the SQL LIKE `pattern`.
-pub fn (q LoginQuery) where_device_id_like(pattern string) LoginQuery {
-	return q.where(load.like('device_id', pattern))
-}
-
-// order_by_device_id orders the rows by `device_id`, ascending.
+// order_by_device_id orders the rows by `device_id`, ascending, after the orders
+// given before.
 pub fn (q LoginQuery) order_by_device_id() LoginQuery {
-	mut next := q
-	next.query = load.Query{
-		...q.query
-		order: 'device_id'
-		desc:  false
-	}
-	return next
+	return q.order_by(load.asc('device_id'))
 }
 
-// order_by_device_id_desc orders the rows by `device_id`, descending.
+// order_by_device_id_desc orders the rows by `device_id`, descending, after the
+// orders given before.
 pub fn (q LoginQuery) order_by_device_id_desc() LoginQuery {
-	mut next := q
-	next.query = load.Query{
-		...q.query
-		order: 'device_id'
-		desc:  true
-	}
-	return next
+	return q.order_by(load.desc('device_id'))
 }
 
-// where_at keeps the rows whose `at` is `value`.
-pub fn (q LoginQuery) where_at(value int) LoginQuery {
-	return q.where(load.eq('at', value))
-}
-
-// where_at_lt keeps the rows whose `at` comes before `value`.
-pub fn (q LoginQuery) where_at_lt(value int) LoginQuery {
-	return q.where(load.lt('at', value))
-}
-
-// where_at_le keeps the rows whose `at` comes at or before `value`.
-pub fn (q LoginQuery) where_at_le(value int) LoginQuery {
-	return q.where(load.le('at', value))
-}
-
-// where_at_gt keeps the rows whose `at` comes after `value`.
-pub fn (q LoginQuery) where_at_gt(value int) LoginQuery {
-	return q.where(load.gt('at', value))
-}
-
-// where_at_ge keeps the rows whose `at` comes at or after `value`.
-pub fn (q LoginQuery) where_at_ge(value int) LoginQuery {
-	return q.where(load.ge('at', value))
-}
-
-// where_at_in keeps the rows whose `at` is one of `values`.
-pub fn (q LoginQuery) where_at_in(values []int) LoginQuery {
-	return q.where(load.in_ints('at', values))
-}
-
-// order_by_at orders the rows by `at`, ascending.
+// order_by_at orders the rows by `at`, ascending, after the orders
+// given before.
 pub fn (q LoginQuery) order_by_at() LoginQuery {
+	return q.order_by(load.asc('at'))
+}
+
+// order_by_at_desc orders the rows by `at`, descending, after the
+// orders given before.
+pub fn (q LoginQuery) order_by_at_desc() LoginQuery {
+	return q.order_by(load.desc('at'))
+}
+
+// where_id keeps the rows where `id` is `value`.
+pub fn (q LoginQuery) where_id(value int) LoginQuery {
+	return q.where(login_id_eq(value))
+}
+
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q LoginQuery) where_id_ne(value int) LoginQuery {
+	return q.where(login_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
+pub fn (q LoginQuery) where_id_lt(value int) LoginQuery {
+	return q.where(login_id_lt(value))
+}
+
+// where_id_le keeps the rows where `id` comes at or before `value`.
+pub fn (q LoginQuery) where_id_le(value int) LoginQuery {
+	return q.where(login_id_le(value))
+}
+
+// where_id_gt keeps the rows where `id` comes after `value`.
+pub fn (q LoginQuery) where_id_gt(value int) LoginQuery {
+	return q.where(login_id_gt(value))
+}
+
+// where_id_ge keeps the rows where `id` comes at or after `value`.
+pub fn (q LoginQuery) where_id_ge(value int) LoginQuery {
+	return q.where(login_id_ge(value))
+}
+
+// where_id_in keeps the rows where `id` is one of `values`.
+pub fn (q LoginQuery) where_id_in(values []int) LoginQuery {
+	return q.where(login_id_in(values))
+}
+
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q LoginQuery) where_id_not_in(values []int) LoginQuery {
+	return q.where(login_id_not_in(values))
+}
+
+// where_device_id keeps the rows where `device_id` is `value`.
+pub fn (q LoginQuery) where_device_id(value string) LoginQuery {
+	return q.where(login_device_id_eq(value))
+}
+
+// where_device_id_ne keeps the rows where `device_id` is not `value`.
+pub fn (q LoginQuery) where_device_id_ne(value string) LoginQuery {
+	return q.where(login_device_id_ne(value))
+}
+
+// where_device_id_in keeps the rows where `device_id` is one of `values`.
+pub fn (q LoginQuery) where_device_id_in(values []string) LoginQuery {
+	return q.where(login_device_id_in(values))
+}
+
+// where_device_id_not_in keeps the rows where `device_id` is none of `values`.
+pub fn (q LoginQuery) where_device_id_not_in(values []string) LoginQuery {
+	return q.where(login_device_id_not_in(values))
+}
+
+// where_device_id_like keeps the rows where `device_id` matches the SQL LIKE `pattern`.
+pub fn (q LoginQuery) where_device_id_like(pattern string) LoginQuery {
+	return q.where(login_device_id_like(pattern))
+}
+
+// where_device_id_contains keeps the rows where `device_id` contains `value`.
+pub fn (q LoginQuery) where_device_id_contains(value string) LoginQuery {
+	return q.where(login_device_id_contains(value))
+}
+
+// where_device_id_has_prefix keeps the rows where `device_id` starts with `value`.
+pub fn (q LoginQuery) where_device_id_has_prefix(value string) LoginQuery {
+	return q.where(login_device_id_has_prefix(value))
+}
+
+// where_device_id_has_suffix keeps the rows where `device_id` ends with `value`.
+pub fn (q LoginQuery) where_device_id_has_suffix(value string) LoginQuery {
+	return q.where(login_device_id_has_suffix(value))
+}
+
+// where_device_id_equal_fold keeps the rows where `device_id` is `value`, ignoring case.
+pub fn (q LoginQuery) where_device_id_equal_fold(value string) LoginQuery {
+	return q.where(login_device_id_equal_fold(value))
+}
+
+// where_device_id_contains_fold keeps the rows where `device_id` contains `value`, ignoring case.
+pub fn (q LoginQuery) where_device_id_contains_fold(value string) LoginQuery {
+	return q.where(login_device_id_contains_fold(value))
+}
+
+// where_at keeps the rows where `at` is `value`.
+pub fn (q LoginQuery) where_at(value int) LoginQuery {
+	return q.where(login_at_eq(value))
+}
+
+// where_at_ne keeps the rows where `at` is not `value`.
+pub fn (q LoginQuery) where_at_ne(value int) LoginQuery {
+	return q.where(login_at_ne(value))
+}
+
+// where_at_lt keeps the rows where `at` comes before `value`.
+pub fn (q LoginQuery) where_at_lt(value int) LoginQuery {
+	return q.where(login_at_lt(value))
+}
+
+// where_at_le keeps the rows where `at` comes at or before `value`.
+pub fn (q LoginQuery) where_at_le(value int) LoginQuery {
+	return q.where(login_at_le(value))
+}
+
+// where_at_gt keeps the rows where `at` comes after `value`.
+pub fn (q LoginQuery) where_at_gt(value int) LoginQuery {
+	return q.where(login_at_gt(value))
+}
+
+// where_at_ge keeps the rows where `at` comes at or after `value`.
+pub fn (q LoginQuery) where_at_ge(value int) LoginQuery {
+	return q.where(login_at_ge(value))
+}
+
+// where_at_in keeps the rows where `at` is one of `values`.
+pub fn (q LoginQuery) where_at_in(values []int) LoginQuery {
+	return q.where(login_at_in(values))
+}
+
+// where_at_not_in keeps the rows where `at` is none of `values`.
+pub fn (q LoginQuery) where_at_not_in(values []int) LoginQuery {
+	return q.where(login_at_not_in(values))
+}
+
+// has_device keeps the rows where it has a `device`.
+pub fn (q LoginQuery) has_device() LoginQuery {
+	return q.where(login_has_device())
+}
+
+// has_device_with keeps the rows that have a `device` that `configure` keeps.
+pub fn (q LoginQuery) has_device_with(configure fn (DeviceQuery) DeviceQuery) LoginQuery {
+	return q.where(login_has_device_with(...configure(q.graph.devices()).query.conds))
+}
+
+// query_device starts a query of the `device` of the rows that match this
+// query's conditions; its order, limit and offset don't apply.
+pub fn (q LoginQuery) query_device() DeviceQuery {
+	return q.graph.devices().where(load.in_sub('id', load.Sub{ table: 'logins', column: 'device_id', kind: .string, conds: q.query.conds }))
+}
+
+// only returns the one matching row, with the requested edges: a
+// `NotFoundError` when there is none, a `NotSingularError` when there are more.
+pub fn (q LoginQuery) only() !LoginNode {
+	nodes := q.limit(2).all()!
+	if nodes.len == 0 {
+		return NotFoundError{
+			table: 'logins'
+		}
+	}
+	if nodes.len > 1 {
+		return NotSingularError{
+			table: 'logins'
+		}
+	}
+	return nodes[0]
+}
+
+// ids returns the keys of the matching rows, in order, and no edges.
+pub fn (q LoginQuery) ids() ![]int {
+	keys := load.select_keys_where(q.graph.client.conn, 'logins', 'id', .int, q.graph.client.prepare_query('logins', q.query)!, true)!
+	return keys.map(it.int())
+}
+
+// first_id returns the key of the first matching row, or a `NotFoundError`.
+pub fn (q LoginQuery) first_id() !int {
+	ids := q.limit(1).ids()!
+	if ids.len == 0 {
+		return NotFoundError{
+			table: 'logins'
+		}
+	}
+	return ids[0]
+}
+
+// only_id returns the key of the one matching row: a `NotFoundError` when
+// there is none, a `NotSingularError` when there are more.
+pub fn (q LoginQuery) only_id() !int {
+	ids := q.limit(2).ids()!
+	if ids.len == 0 {
+		return NotFoundError{
+			table: 'logins'
+		}
+	}
+	if ids.len > 1 {
+		return NotSingularError{
+			table: 'logins'
+		}
+	}
+	return ids[0]
+}
+
+// exist reports whether any row matches.
+pub fn (q LoginQuery) exist() !bool {
+	return q.limit(1).ids()!.len > 0
+}
+
+// select reads only `columns`, and the key, of the rows; the others keep their
+// zero values. An edge load needs the columns it follows.
+pub fn (q LoginQuery) select(columns ...string) LoginQuery {
+	mut all := columns.clone()
+	if 'id' !in all {
+		all << 'id'
+	}
 	mut next := q
 	next.query = load.Query{
 		...q.query
-		order: 'at'
-		desc:  false
+		columns: all
 	}
 	return next
 }
 
-// order_by_at_desc orders the rows by `at`, descending.
-pub fn (q LoginQuery) order_by_at_desc() LoginQuery {
+// unique makes `scan` read each distinct row once.
+pub fn (q LoginQuery) unique() LoginQuery {
 	mut next := q
 	next.query = load.Query{
 		...q.query
-		order: 'at'
-		desc:  true
+		distinct: true
 	}
 	return next
+}
+
+// scan reads the matching rows into `T`, the app's struct for some of the
+// columns, by column name.
+pub fn (q LoginQuery) scan[T]() ![]T {
+	return load.select_into[T](q.graph.client.conn, 'logins', 'id', .int, q.graph.client.prepare_query('logins', q.query)!)
+}
+
+// order_by orders the rows by `orders` too, after the orders given before,
+// such as `vgraph.desc('id').nulls_last()`.
+pub fn (q LoginQuery) order_by(orders ...load.Order) LoginQuery {
+	mut all := q.query.orders.clone()
+	all << orders
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		orders: all
+	}
+	return next
+}
+
+// for_update locks the matching rows (FOR UPDATE) until the transaction ends.
+// It runs in `tx`, on PostgreSQL.
+pub fn (q LoginQuery) for_update() LoginQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		lock: load.Lock{
+			...q.query.lock
+			mode: .update
+		}
+	}
+	return next
+}
+
+// for_share locks the matching rows (FOR SHARE) until the transaction ends.
+// It runs in `tx`, on PostgreSQL.
+pub fn (q LoginQuery) for_share() LoginQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		lock: load.Lock{
+			...q.query.lock
+			mode: .share
+		}
+	}
+	return next
+}
+
+// no_wait: a lock fails at once on a row another transaction locked.
+pub fn (q LoginQuery) no_wait() LoginQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		lock: load.Lock{
+			...q.query.lock
+			no_wait: true
+		}
+	}
+	return next
+}
+
+// skip_locked: a lock leaves out the rows other transactions locked.
+pub fn (q LoginQuery) skip_locked() LoginQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		lock: load.Lock{
+			...q.query.lock
+			skip_locked: true
+		}
+	}
+	return next
+}
+
+// sum_id returns the sum of `id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q LoginQuery) sum_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'logins', 'id', q.graph.client.prepare_query('logins', q.query)!, .sum, 'id')
+}
+
+// min_id returns the min of `id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q LoginQuery) min_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'logins', 'id', q.graph.client.prepare_query('logins', q.query)!, .min, 'id')
+}
+
+// max_id returns the max of `id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q LoginQuery) max_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'logins', 'id', q.graph.client.prepare_query('logins', q.query)!, .max, 'id')
+}
+
+// mean_id returns the mean of `id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q LoginQuery) mean_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'logins', 'id', q.graph.client.prepare_query('logins', q.query)!, .avg, 'id')
+}
+
+// sum_at returns the sum of `at` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q LoginQuery) sum_at() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'logins', 'id', q.graph.client.prepare_query('logins', q.query)!, .sum, 'at')
+}
+
+// min_at returns the min of `at` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q LoginQuery) min_at() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'logins', 'id', q.graph.client.prepare_query('logins', q.query)!, .min, 'at')
+}
+
+// max_at returns the max of `at` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q LoginQuery) max_at() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'logins', 'id', q.graph.client.prepare_query('logins', q.query)!, .max, 'at')
+}
+
+// mean_at returns the mean of `at` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q LoginQuery) mean_at() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'logins', 'id', q.graph.client.prepare_query('logins', q.query)!, .avg, 'at')
+}
+
+// LoginGroupBy groups the rows of a `LoginQuery`. Start one with `group_by`.
+pub struct LoginGroupBy {
+	query LoginQuery
+pub:
+	columns    []string
+	aggregates []load.Aggregate
+}
+
+// group_by groups the matching rows by `columns`. It needs a vgraph driver.
+pub fn (q LoginQuery) group_by(columns ...string) LoginGroupBy {
+	return LoginGroupBy{
+		query:   q
+		columns: columns
+	}
+}
+
+// aggregate adds what each group gets, such as `vgraph.count()` or
+// `vgraph.sum('views')`.
+pub fn (g LoginGroupBy) aggregate(aggregates ...load.Aggregate) LoginGroupBy {
+	mut all := g.aggregates.clone()
+	all << aggregates
+	return LoginGroupBy{
+		...g
+		aggregates: all
+	}
+}
+
+// all returns the groups, ordered by their columns.
+pub fn (g LoginGroupBy) all() ![]load.Group {
+	q := g.query
+	return load.group_where(q.graph.client.conn, 'logins', q.graph.client.prepare_query('logins', q.query)!, g.columns.map(load.GroupColumn{
+		name: it
+		typ:  login_column_type(it)
+	}), g.aggregates)
+}
+
+// scan reads the groups into `T`, by name: its fields named after the grouped
+// columns and the aggregates (`count`, `sum_views`).
+pub fn (g LoginGroupBy) scan[T]() ![]T {
+	return load.scan_groups[T](g.all()!)
+}
+
+// login_column_type returns the V type of a column of `logins`.
+fn login_column_type(column string) string {
+	return match column {
+		'id' { 'int' }
+		'device_id' { 'string' }
+		'at' { 'int' }
+		else { '' }
+	}
+}
+
+// order_by_device_name orders the rows by the `name` of their `device`.
+pub fn (q LoginQuery) order_by_device_name() LoginQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."name" FROM "devices" AS "t1" WHERE "t1"."id" = "t0"."device_id")'
+	})
+}
+
+// order_by_device_name_desc orders the rows by the `name` of their
+// `device`, descending.
+pub fn (q LoginQuery) order_by_device_name_desc() LoginQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."name" FROM "devices" AS "t1" WHERE "t1"."id" = "t0"."device_id")'
+		desc: true
+	})
+}
+
+// order_by_device_owner_id orders the rows by the `owner_id` of their `device`.
+pub fn (q LoginQuery) order_by_device_owner_id() LoginQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."owner_id" FROM "devices" AS "t1" WHERE "t1"."id" = "t0"."device_id")'
+	})
+}
+
+// order_by_device_owner_id_desc orders the rows by the `owner_id` of their
+// `device`, descending.
+pub fn (q LoginQuery) order_by_device_owner_id_desc() LoginQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."owner_id" FROM "devices" AS "t1" WHERE "t1"."id" = "t0"."device_id")'
+		desc: true
+	})
 }
 
 // with_device loads each row's `device` (many_to_one `devices`) with it, in one
@@ -246,31 +715,61 @@ pub fn (q LoginQuery) nodes(rows []models.Login) ![]LoginNode {
 		login: it
 	})
 	if q.with_device {
-		mut sub := q.graph.devices()
-		for configure in q.device_fns {
-			sub = configure(sub)
-		}
-		mut keys := []string{}
-		for row in rows {
-			keys << row.device_id.str()
-		}
-		targets := sub.nodes(load.select_in[models.Device](q.graph.client.conn, 'id',
-			load.unique(keys),
-			query: q.graph.client.prepare_query('devices', sub.query)!
-		)!)!
-		mut by_key := map[string]&DeviceNode{}
-		for target in targets {
-			by_key[target.device.id.str()] = &DeviceNode{
-				...target
-			}
-		}
+		found := q.load_device(rows, q.device_fns)!
 		for mut node in nodes {
-			if target := by_key[node.login.device_id.str()] {
-				node.device = target
+			// at most one each: the first, in the order of the query
+			list := found[node.login.id.str()] or { [] }
+			if list.len > 0 {
+				node.device = &DeviceNode{
+					...list[0]
+				}
 			}
+			node.loaded << 'device'
 		}
 	}
 	return nodes
+}
+
+// load_device loads the `device` of `rows`, keyed by each row's key.
+fn (q LoginQuery) load_device(rows []models.Login, fns []fn (DeviceQuery) DeviceQuery) !map[string][]DeviceNode {
+	mut sub := q.graph.devices()
+	for configure in fns {
+		sub = configure(sub)
+	}
+	mut keys := []string{}
+	for row in rows {
+		keys << row.device_id.str()
+	}
+	targets := sub.nodes(load.select_in[models.Device](q.graph.client.conn, 'id', load.unique(keys),
+		query: q.graph.client.prepare_query('devices', sub.query)!
+	)!)!
+	mut by_key := map[string]DeviceNode{}
+	for target in targets {
+		by_key[target.device.id.str()] = target
+	}
+	mut found := map[string][]DeviceNode{}
+	for row in rows {
+		if target := by_key[row.device_id.str()] {
+			found[row.id.str()] = [target]
+		}
+	}
+	return found
+}
+
+// device_or_err returns the `device`: a `NotLoadedError` when the query didn't
+// load it, a `NotFoundError` when the row has none.
+pub fn (n LoginNode) device_or_err() !&DeviceNode {
+	if 'device' !in n.loaded {
+		return NotLoadedError{
+			edge: 'logins.device'
+		}
+	}
+	if target := n.device {
+		return target
+	}
+	return NotFoundError{
+		table: 'devices'
+	}
 }
 
 // query_device starts a query of this row's `device`, which matches

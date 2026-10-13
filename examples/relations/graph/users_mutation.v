@@ -900,89 +900,224 @@ pub fn (b UserUpdate) where(conds ...load.Cond) UserUpdate {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q UserUpdate) where_id(value int) UserUpdate {
-	return q.where(load.eq('id', value))
+	return q.where(user_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q UserUpdate) where_id_ne(value int) UserUpdate {
+	return q.where(user_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q UserUpdate) where_id_lt(value int) UserUpdate {
-	return q.where(load.lt('id', value))
+	return q.where(user_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q UserUpdate) where_id_le(value int) UserUpdate {
-	return q.where(load.le('id', value))
+	return q.where(user_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q UserUpdate) where_id_gt(value int) UserUpdate {
-	return q.where(load.gt('id', value))
+	return q.where(user_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q UserUpdate) where_id_ge(value int) UserUpdate {
-	return q.where(load.ge('id', value))
+	return q.where(user_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q UserUpdate) where_id_in(values []int) UserUpdate {
-	return q.where(load.in_ints('id', values))
+	return q.where(user_id_in(values))
 }
 
-// where_name keeps the rows whose `name` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q UserUpdate) where_id_not_in(values []int) UserUpdate {
+	return q.where(user_id_not_in(values))
+}
+
+// where_name keeps the rows where `name` is `value`.
 pub fn (q UserUpdate) where_name(value string) UserUpdate {
-	return q.where(load.eq('name', value))
+	return q.where(user_name_eq(value))
 }
 
-// where_name_in keeps the rows whose `name` is one of `values`.
+// where_name_ne keeps the rows where `name` is not `value`.
+pub fn (q UserUpdate) where_name_ne(value string) UserUpdate {
+	return q.where(user_name_ne(value))
+}
+
+// where_name_in keeps the rows where `name` is one of `values`.
 pub fn (q UserUpdate) where_name_in(values []string) UserUpdate {
-	return q.where(load.in_strings('name', values))
+	return q.where(user_name_in(values))
 }
 
-// where_name_like keeps the rows whose `name` matches the SQL LIKE `pattern`.
+// where_name_not_in keeps the rows where `name` is none of `values`.
+pub fn (q UserUpdate) where_name_not_in(values []string) UserUpdate {
+	return q.where(user_name_not_in(values))
+}
+
+// where_name_like keeps the rows where `name` matches the SQL LIKE `pattern`.
 pub fn (q UserUpdate) where_name_like(pattern string) UserUpdate {
-	return q.where(load.like('name', pattern))
+	return q.where(user_name_like(pattern))
 }
 
-// where_spouse_id keeps the rows whose `spouse_id` is `value`.
+// where_name_contains keeps the rows where `name` contains `value`.
+pub fn (q UserUpdate) where_name_contains(value string) UserUpdate {
+	return q.where(user_name_contains(value))
+}
+
+// where_name_has_prefix keeps the rows where `name` starts with `value`.
+pub fn (q UserUpdate) where_name_has_prefix(value string) UserUpdate {
+	return q.where(user_name_has_prefix(value))
+}
+
+// where_name_has_suffix keeps the rows where `name` ends with `value`.
+pub fn (q UserUpdate) where_name_has_suffix(value string) UserUpdate {
+	return q.where(user_name_has_suffix(value))
+}
+
+// where_name_equal_fold keeps the rows where `name` is `value`, ignoring case.
+pub fn (q UserUpdate) where_name_equal_fold(value string) UserUpdate {
+	return q.where(user_name_equal_fold(value))
+}
+
+// where_name_contains_fold keeps the rows where `name` contains `value`, ignoring case.
+pub fn (q UserUpdate) where_name_contains_fold(value string) UserUpdate {
+	return q.where(user_name_contains_fold(value))
+}
+
+// where_spouse_id keeps the rows where `spouse_id` is `value`.
 pub fn (q UserUpdate) where_spouse_id(value int) UserUpdate {
-	return q.where(load.eq('spouse_id', value))
+	return q.where(user_spouse_id_eq(value))
 }
 
-// where_spouse_id_lt keeps the rows whose `spouse_id` comes before `value`.
+// where_spouse_id_ne keeps the rows where `spouse_id` is not `value`.
+pub fn (q UserUpdate) where_spouse_id_ne(value int) UserUpdate {
+	return q.where(user_spouse_id_ne(value))
+}
+
+// where_spouse_id_lt keeps the rows where `spouse_id` comes before `value`.
 pub fn (q UserUpdate) where_spouse_id_lt(value int) UserUpdate {
-	return q.where(load.lt('spouse_id', value))
+	return q.where(user_spouse_id_lt(value))
 }
 
-// where_spouse_id_le keeps the rows whose `spouse_id` comes at or before `value`.
+// where_spouse_id_le keeps the rows where `spouse_id` comes at or before `value`.
 pub fn (q UserUpdate) where_spouse_id_le(value int) UserUpdate {
-	return q.where(load.le('spouse_id', value))
+	return q.where(user_spouse_id_le(value))
 }
 
-// where_spouse_id_gt keeps the rows whose `spouse_id` comes after `value`.
+// where_spouse_id_gt keeps the rows where `spouse_id` comes after `value`.
 pub fn (q UserUpdate) where_spouse_id_gt(value int) UserUpdate {
-	return q.where(load.gt('spouse_id', value))
+	return q.where(user_spouse_id_gt(value))
 }
 
-// where_spouse_id_ge keeps the rows whose `spouse_id` comes at or after `value`.
+// where_spouse_id_ge keeps the rows where `spouse_id` comes at or after `value`.
 pub fn (q UserUpdate) where_spouse_id_ge(value int) UserUpdate {
-	return q.where(load.ge('spouse_id', value))
+	return q.where(user_spouse_id_ge(value))
 }
 
-// where_spouse_id_in keeps the rows whose `spouse_id` is one of `values`.
+// where_spouse_id_in keeps the rows where `spouse_id` is one of `values`.
 pub fn (q UserUpdate) where_spouse_id_in(values []int) UserUpdate {
-	return q.where(load.in_ints('spouse_id', values))
+	return q.where(user_spouse_id_in(values))
 }
 
-// where_spouse_id_is_null keeps the rows whose `spouse_id` is null.
+// where_spouse_id_not_in keeps the rows where `spouse_id` is none of `values`.
+pub fn (q UserUpdate) where_spouse_id_not_in(values []int) UserUpdate {
+	return q.where(user_spouse_id_not_in(values))
+}
+
+// where_spouse_id_is_null keeps the rows where `spouse_id` is null.
 pub fn (q UserUpdate) where_spouse_id_is_null() UserUpdate {
-	return q.where(load.is_null('spouse_id'))
+	return q.where(user_spouse_id_is_null())
 }
 
-// where_spouse_id_is_not_null keeps the rows whose `spouse_id` is not null.
+// where_spouse_id_is_not_null keeps the rows where `spouse_id` is not null.
 pub fn (q UserUpdate) where_spouse_id_is_not_null() UserUpdate {
-	return q.where(load.is_not_null('spouse_id'))
+	return q.where(user_spouse_id_is_not_null())
+}
+
+// has_card keeps the rows where it has a `card`.
+pub fn (q UserUpdate) has_card() UserUpdate {
+	return q.where(user_has_card())
+}
+
+// has_card_with keeps the rows that have a `card` that `configure` keeps.
+pub fn (q UserUpdate) has_card_with(configure fn (CardQuery) CardQuery) UserUpdate {
+	return q.where(user_has_card_with(...configure(q.graph.cards()).query.conds))
+}
+
+// has_spouse keeps the rows where it has a `spouse`.
+pub fn (q UserUpdate) has_spouse() UserUpdate {
+	return q.where(user_has_spouse())
+}
+
+// has_spouse_with keeps the rows that have a `spouse` that `configure` keeps.
+pub fn (q UserUpdate) has_spouse_with(configure fn (UserQuery) UserQuery) UserUpdate {
+	return q.where(user_has_spouse_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_pets keeps the rows where it has a `pets`.
+pub fn (q UserUpdate) has_pets() UserUpdate {
+	return q.where(user_has_pets())
+}
+
+// has_pets_with keeps the rows that have a `pets` that `configure` keeps.
+pub fn (q UserUpdate) has_pets_with(configure fn (PetQuery) PetQuery) UserUpdate {
+	return q.where(user_has_pets_with(...configure(q.graph.pets()).query.conds))
+}
+
+// has_groups keeps the rows where it has a `groups`.
+pub fn (q UserUpdate) has_groups() UserUpdate {
+	return q.where(user_has_groups())
+}
+
+// has_groups_with keeps the rows that have a `groups` that `configure` keeps.
+pub fn (q UserUpdate) has_groups_with(configure fn (GroupQuery) GroupQuery) UserUpdate {
+	return q.where(user_has_groups_with(...configure(q.graph.groups()).query.conds))
+}
+
+// has_following keeps the rows where it has a `following`.
+pub fn (q UserUpdate) has_following() UserUpdate {
+	return q.where(user_has_following())
+}
+
+// has_following_with keeps the rows that have a `following` that `configure` keeps.
+pub fn (q UserUpdate) has_following_with(configure fn (UserQuery) UserQuery) UserUpdate {
+	return q.where(user_has_following_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_followers keeps the rows where it has a `followers`.
+pub fn (q UserUpdate) has_followers() UserUpdate {
+	return q.where(user_has_followers())
+}
+
+// has_followers_with keeps the rows that have a `followers` that `configure` keeps.
+pub fn (q UserUpdate) has_followers_with(configure fn (UserQuery) UserQuery) UserUpdate {
+	return q.where(user_has_followers_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_friends keeps the rows where it has a `friends`.
+pub fn (q UserUpdate) has_friends() UserUpdate {
+	return q.where(user_has_friends())
+}
+
+// has_friends_with keeps the rows that have a `friends` that `configure` keeps.
+pub fn (q UserUpdate) has_friends_with(configure fn (UserQuery) UserQuery) UserUpdate {
+	return q.where(user_has_friends_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_devices keeps the rows where it has a `devices`.
+pub fn (q UserUpdate) has_devices() UserUpdate {
+	return q.where(user_has_devices())
+}
+
+// has_devices_with keeps the rows that have a `devices` that `configure` keeps.
+pub fn (q UserUpdate) has_devices_with(configure fn (DeviceQuery) DeviceQuery) UserUpdate {
+	return q.where(user_has_devices_with(...configure(q.graph.devices()).query.conds))
 }
 
 // set_name sets `name`.
@@ -1371,89 +1506,224 @@ pub fn (b UserDelete) where(conds ...load.Cond) UserDelete {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q UserDelete) where_id(value int) UserDelete {
-	return q.where(load.eq('id', value))
+	return q.where(user_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q UserDelete) where_id_ne(value int) UserDelete {
+	return q.where(user_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q UserDelete) where_id_lt(value int) UserDelete {
-	return q.where(load.lt('id', value))
+	return q.where(user_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q UserDelete) where_id_le(value int) UserDelete {
-	return q.where(load.le('id', value))
+	return q.where(user_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q UserDelete) where_id_gt(value int) UserDelete {
-	return q.where(load.gt('id', value))
+	return q.where(user_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q UserDelete) where_id_ge(value int) UserDelete {
-	return q.where(load.ge('id', value))
+	return q.where(user_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q UserDelete) where_id_in(values []int) UserDelete {
-	return q.where(load.in_ints('id', values))
+	return q.where(user_id_in(values))
 }
 
-// where_name keeps the rows whose `name` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q UserDelete) where_id_not_in(values []int) UserDelete {
+	return q.where(user_id_not_in(values))
+}
+
+// where_name keeps the rows where `name` is `value`.
 pub fn (q UserDelete) where_name(value string) UserDelete {
-	return q.where(load.eq('name', value))
+	return q.where(user_name_eq(value))
 }
 
-// where_name_in keeps the rows whose `name` is one of `values`.
+// where_name_ne keeps the rows where `name` is not `value`.
+pub fn (q UserDelete) where_name_ne(value string) UserDelete {
+	return q.where(user_name_ne(value))
+}
+
+// where_name_in keeps the rows where `name` is one of `values`.
 pub fn (q UserDelete) where_name_in(values []string) UserDelete {
-	return q.where(load.in_strings('name', values))
+	return q.where(user_name_in(values))
 }
 
-// where_name_like keeps the rows whose `name` matches the SQL LIKE `pattern`.
+// where_name_not_in keeps the rows where `name` is none of `values`.
+pub fn (q UserDelete) where_name_not_in(values []string) UserDelete {
+	return q.where(user_name_not_in(values))
+}
+
+// where_name_like keeps the rows where `name` matches the SQL LIKE `pattern`.
 pub fn (q UserDelete) where_name_like(pattern string) UserDelete {
-	return q.where(load.like('name', pattern))
+	return q.where(user_name_like(pattern))
 }
 
-// where_spouse_id keeps the rows whose `spouse_id` is `value`.
+// where_name_contains keeps the rows where `name` contains `value`.
+pub fn (q UserDelete) where_name_contains(value string) UserDelete {
+	return q.where(user_name_contains(value))
+}
+
+// where_name_has_prefix keeps the rows where `name` starts with `value`.
+pub fn (q UserDelete) where_name_has_prefix(value string) UserDelete {
+	return q.where(user_name_has_prefix(value))
+}
+
+// where_name_has_suffix keeps the rows where `name` ends with `value`.
+pub fn (q UserDelete) where_name_has_suffix(value string) UserDelete {
+	return q.where(user_name_has_suffix(value))
+}
+
+// where_name_equal_fold keeps the rows where `name` is `value`, ignoring case.
+pub fn (q UserDelete) where_name_equal_fold(value string) UserDelete {
+	return q.where(user_name_equal_fold(value))
+}
+
+// where_name_contains_fold keeps the rows where `name` contains `value`, ignoring case.
+pub fn (q UserDelete) where_name_contains_fold(value string) UserDelete {
+	return q.where(user_name_contains_fold(value))
+}
+
+// where_spouse_id keeps the rows where `spouse_id` is `value`.
 pub fn (q UserDelete) where_spouse_id(value int) UserDelete {
-	return q.where(load.eq('spouse_id', value))
+	return q.where(user_spouse_id_eq(value))
 }
 
-// where_spouse_id_lt keeps the rows whose `spouse_id` comes before `value`.
+// where_spouse_id_ne keeps the rows where `spouse_id` is not `value`.
+pub fn (q UserDelete) where_spouse_id_ne(value int) UserDelete {
+	return q.where(user_spouse_id_ne(value))
+}
+
+// where_spouse_id_lt keeps the rows where `spouse_id` comes before `value`.
 pub fn (q UserDelete) where_spouse_id_lt(value int) UserDelete {
-	return q.where(load.lt('spouse_id', value))
+	return q.where(user_spouse_id_lt(value))
 }
 
-// where_spouse_id_le keeps the rows whose `spouse_id` comes at or before `value`.
+// where_spouse_id_le keeps the rows where `spouse_id` comes at or before `value`.
 pub fn (q UserDelete) where_spouse_id_le(value int) UserDelete {
-	return q.where(load.le('spouse_id', value))
+	return q.where(user_spouse_id_le(value))
 }
 
-// where_spouse_id_gt keeps the rows whose `spouse_id` comes after `value`.
+// where_spouse_id_gt keeps the rows where `spouse_id` comes after `value`.
 pub fn (q UserDelete) where_spouse_id_gt(value int) UserDelete {
-	return q.where(load.gt('spouse_id', value))
+	return q.where(user_spouse_id_gt(value))
 }
 
-// where_spouse_id_ge keeps the rows whose `spouse_id` comes at or after `value`.
+// where_spouse_id_ge keeps the rows where `spouse_id` comes at or after `value`.
 pub fn (q UserDelete) where_spouse_id_ge(value int) UserDelete {
-	return q.where(load.ge('spouse_id', value))
+	return q.where(user_spouse_id_ge(value))
 }
 
-// where_spouse_id_in keeps the rows whose `spouse_id` is one of `values`.
+// where_spouse_id_in keeps the rows where `spouse_id` is one of `values`.
 pub fn (q UserDelete) where_spouse_id_in(values []int) UserDelete {
-	return q.where(load.in_ints('spouse_id', values))
+	return q.where(user_spouse_id_in(values))
 }
 
-// where_spouse_id_is_null keeps the rows whose `spouse_id` is null.
+// where_spouse_id_not_in keeps the rows where `spouse_id` is none of `values`.
+pub fn (q UserDelete) where_spouse_id_not_in(values []int) UserDelete {
+	return q.where(user_spouse_id_not_in(values))
+}
+
+// where_spouse_id_is_null keeps the rows where `spouse_id` is null.
 pub fn (q UserDelete) where_spouse_id_is_null() UserDelete {
-	return q.where(load.is_null('spouse_id'))
+	return q.where(user_spouse_id_is_null())
 }
 
-// where_spouse_id_is_not_null keeps the rows whose `spouse_id` is not null.
+// where_spouse_id_is_not_null keeps the rows where `spouse_id` is not null.
 pub fn (q UserDelete) where_spouse_id_is_not_null() UserDelete {
-	return q.where(load.is_not_null('spouse_id'))
+	return q.where(user_spouse_id_is_not_null())
+}
+
+// has_card keeps the rows where it has a `card`.
+pub fn (q UserDelete) has_card() UserDelete {
+	return q.where(user_has_card())
+}
+
+// has_card_with keeps the rows that have a `card` that `configure` keeps.
+pub fn (q UserDelete) has_card_with(configure fn (CardQuery) CardQuery) UserDelete {
+	return q.where(user_has_card_with(...configure(q.graph.cards()).query.conds))
+}
+
+// has_spouse keeps the rows where it has a `spouse`.
+pub fn (q UserDelete) has_spouse() UserDelete {
+	return q.where(user_has_spouse())
+}
+
+// has_spouse_with keeps the rows that have a `spouse` that `configure` keeps.
+pub fn (q UserDelete) has_spouse_with(configure fn (UserQuery) UserQuery) UserDelete {
+	return q.where(user_has_spouse_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_pets keeps the rows where it has a `pets`.
+pub fn (q UserDelete) has_pets() UserDelete {
+	return q.where(user_has_pets())
+}
+
+// has_pets_with keeps the rows that have a `pets` that `configure` keeps.
+pub fn (q UserDelete) has_pets_with(configure fn (PetQuery) PetQuery) UserDelete {
+	return q.where(user_has_pets_with(...configure(q.graph.pets()).query.conds))
+}
+
+// has_groups keeps the rows where it has a `groups`.
+pub fn (q UserDelete) has_groups() UserDelete {
+	return q.where(user_has_groups())
+}
+
+// has_groups_with keeps the rows that have a `groups` that `configure` keeps.
+pub fn (q UserDelete) has_groups_with(configure fn (GroupQuery) GroupQuery) UserDelete {
+	return q.where(user_has_groups_with(...configure(q.graph.groups()).query.conds))
+}
+
+// has_following keeps the rows where it has a `following`.
+pub fn (q UserDelete) has_following() UserDelete {
+	return q.where(user_has_following())
+}
+
+// has_following_with keeps the rows that have a `following` that `configure` keeps.
+pub fn (q UserDelete) has_following_with(configure fn (UserQuery) UserQuery) UserDelete {
+	return q.where(user_has_following_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_followers keeps the rows where it has a `followers`.
+pub fn (q UserDelete) has_followers() UserDelete {
+	return q.where(user_has_followers())
+}
+
+// has_followers_with keeps the rows that have a `followers` that `configure` keeps.
+pub fn (q UserDelete) has_followers_with(configure fn (UserQuery) UserQuery) UserDelete {
+	return q.where(user_has_followers_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_friends keeps the rows where it has a `friends`.
+pub fn (q UserDelete) has_friends() UserDelete {
+	return q.where(user_has_friends())
+}
+
+// has_friends_with keeps the rows that have a `friends` that `configure` keeps.
+pub fn (q UserDelete) has_friends_with(configure fn (UserQuery) UserQuery) UserDelete {
+	return q.where(user_has_friends_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_devices keeps the rows where it has a `devices`.
+pub fn (q UserDelete) has_devices() UserDelete {
+	return q.where(user_has_devices())
+}
+
+// has_devices_with keeps the rows that have a `devices` that `configure` keeps.
+pub fn (q UserDelete) has_devices_with(configure fn (DeviceQuery) DeviceQuery) UserDelete {
+	return q.where(user_has_devices_with(...configure(q.graph.devices()).query.conds))
 }
 
 // exec deletes the rows, with their join table rows, in one transaction, and

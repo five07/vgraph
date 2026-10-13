@@ -909,9 +909,9 @@ fn card_where(w map[string]graphql.Value) ![]load.Cond {
 			'numberGTE' { conds << load.ge('number', v.as_string()) }
 			'numberLT' { conds << load.lt('number', v.as_string()) }
 			'numberLTE' { conds << load.le('number', v.as_string()) }
-			'numberContains' { conds << load.like('number', '%' + v.as_string() + '%') }
-			'numberHasPrefix' { conds << load.like('number', v.as_string() + '%') }
-			'numberHasSuffix' { conds << load.like('number', '%' + v.as_string()) }
+			'numberContains' { conds << load.contains('number', v.as_string()) }
+			'numberHasPrefix' { conds << load.has_prefix('number', v.as_string()) }
+			'numberHasSuffix' { conds << load.has_suffix('number', v.as_string()) }
 			'ownerID' { conds << load.eq('owner_id', gql_int_id(v)!) }
 			'ownerIDNEQ' { conds << load.ne('owner_id', gql_int_id(v)!) }
 			'ownerIDIn' { conds << load.in_ints('owner_id', gql_int_ids(v)!) }
@@ -1000,9 +1000,9 @@ fn category_where(w map[string]graphql.Value) ![]load.Cond {
 			'nameGTE' { conds << load.ge('name', v.as_string()) }
 			'nameLT' { conds << load.lt('name', v.as_string()) }
 			'nameLTE' { conds << load.le('name', v.as_string()) }
-			'nameContains' { conds << load.like('name', '%' + v.as_string() + '%') }
-			'nameHasPrefix' { conds << load.like('name', v.as_string() + '%') }
-			'nameHasSuffix' { conds << load.like('name', '%' + v.as_string()) }
+			'nameContains' { conds << load.contains('name', v.as_string()) }
+			'nameHasPrefix' { conds << load.has_prefix('name', v.as_string()) }
+			'nameHasSuffix' { conds << load.has_suffix('name', v.as_string()) }
 			'parentID' { conds << load.eq('parent_id', gql_int_id(v)!) }
 			'parentIDNEQ' { conds << load.ne('parent_id', gql_int_id(v)!) }
 			'parentIDIn' { conds << load.in_ints('parent_id', gql_int_ids(v)!) }
@@ -1095,9 +1095,9 @@ fn device_where(w map[string]graphql.Value) ![]load.Cond {
 			'nameGTE' { conds << load.ge('name', v.as_string()) }
 			'nameLT' { conds << load.lt('name', v.as_string()) }
 			'nameLTE' { conds << load.le('name', v.as_string()) }
-			'nameContains' { conds << load.like('name', '%' + v.as_string() + '%') }
-			'nameHasPrefix' { conds << load.like('name', v.as_string() + '%') }
-			'nameHasSuffix' { conds << load.like('name', '%' + v.as_string()) }
+			'nameContains' { conds << load.contains('name', v.as_string()) }
+			'nameHasPrefix' { conds << load.has_prefix('name', v.as_string()) }
+			'nameHasSuffix' { conds << load.has_suffix('name', v.as_string()) }
 			'ownerID' { conds << load.eq('owner_id', gql_int_id(v)!) }
 			'ownerIDNEQ' { conds << load.ne('owner_id', gql_int_id(v)!) }
 			'ownerIDIn' { conds << load.in_ints('owner_id', gql_int_ids(v)!) }
@@ -1182,9 +1182,9 @@ fn group_where(w map[string]graphql.Value) ![]load.Cond {
 			'nameGTE' { conds << load.ge('name', v.as_string()) }
 			'nameLT' { conds << load.lt('name', v.as_string()) }
 			'nameLTE' { conds << load.le('name', v.as_string()) }
-			'nameContains' { conds << load.like('name', '%' + v.as_string() + '%') }
-			'nameHasPrefix' { conds << load.like('name', v.as_string() + '%') }
-			'nameHasSuffix' { conds << load.like('name', '%' + v.as_string()) }
+			'nameContains' { conds << load.contains('name', v.as_string()) }
+			'nameHasPrefix' { conds << load.has_prefix('name', v.as_string()) }
+			'nameHasSuffix' { conds << load.has_suffix('name', v.as_string()) }
 			else {}
 		}
 	}
@@ -1453,9 +1453,9 @@ fn pet_where(w map[string]graphql.Value) ![]load.Cond {
 			'nameGTE' { conds << load.ge('name', v.as_string()) }
 			'nameLT' { conds << load.lt('name', v.as_string()) }
 			'nameLTE' { conds << load.le('name', v.as_string()) }
-			'nameContains' { conds << load.like('name', '%' + v.as_string() + '%') }
-			'nameHasPrefix' { conds << load.like('name', v.as_string() + '%') }
-			'nameHasSuffix' { conds << load.like('name', '%' + v.as_string()) }
+			'nameContains' { conds << load.contains('name', v.as_string()) }
+			'nameHasPrefix' { conds << load.has_prefix('name', v.as_string()) }
+			'nameHasSuffix' { conds << load.has_suffix('name', v.as_string()) }
 			'ownerID' { conds << load.eq('owner_id', gql_int_id(v)!) }
 			'ownerIDNEQ' { conds << load.ne('owner_id', gql_int_id(v)!) }
 			'ownerIDIn' { conds << load.in_ints('owner_id', gql_int_ids(v)!) }
@@ -1562,9 +1562,9 @@ fn user_where(w map[string]graphql.Value) ![]load.Cond {
 			'nameGTE' { conds << load.ge('name', v.as_string()) }
 			'nameLT' { conds << load.lt('name', v.as_string()) }
 			'nameLTE' { conds << load.le('name', v.as_string()) }
-			'nameContains' { conds << load.like('name', '%' + v.as_string() + '%') }
-			'nameHasPrefix' { conds << load.like('name', v.as_string() + '%') }
-			'nameHasSuffix' { conds << load.like('name', '%' + v.as_string()) }
+			'nameContains' { conds << load.contains('name', v.as_string()) }
+			'nameHasPrefix' { conds << load.has_prefix('name', v.as_string()) }
+			'nameHasSuffix' { conds << load.has_suffix('name', v.as_string()) }
 			'spouseID' { conds << load.eq('spouse_id', gql_int_id(v)!) }
 			'spouseIDNEQ' { conds << load.ne('spouse_id', gql_int_id(v)!) }
 			'spouseIDIn' { conds << load.in_ints('spouse_id', gql_int_ids(v)!) }

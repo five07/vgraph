@@ -486,79 +486,144 @@ pub fn (b CardUpdate) where(conds ...load.Cond) CardUpdate {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q CardUpdate) where_id(value int) CardUpdate {
-	return q.where(load.eq('id', value))
+	return q.where(card_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q CardUpdate) where_id_ne(value int) CardUpdate {
+	return q.where(card_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q CardUpdate) where_id_lt(value int) CardUpdate {
-	return q.where(load.lt('id', value))
+	return q.where(card_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q CardUpdate) where_id_le(value int) CardUpdate {
-	return q.where(load.le('id', value))
+	return q.where(card_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q CardUpdate) where_id_gt(value int) CardUpdate {
-	return q.where(load.gt('id', value))
+	return q.where(card_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q CardUpdate) where_id_ge(value int) CardUpdate {
-	return q.where(load.ge('id', value))
+	return q.where(card_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q CardUpdate) where_id_in(values []int) CardUpdate {
-	return q.where(load.in_ints('id', values))
+	return q.where(card_id_in(values))
 }
 
-// where_number keeps the rows whose `number` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q CardUpdate) where_id_not_in(values []int) CardUpdate {
+	return q.where(card_id_not_in(values))
+}
+
+// where_number keeps the rows where `number` is `value`.
 pub fn (q CardUpdate) where_number(value string) CardUpdate {
-	return q.where(load.eq('number', value))
+	return q.where(card_number_eq(value))
 }
 
-// where_number_in keeps the rows whose `number` is one of `values`.
+// where_number_ne keeps the rows where `number` is not `value`.
+pub fn (q CardUpdate) where_number_ne(value string) CardUpdate {
+	return q.where(card_number_ne(value))
+}
+
+// where_number_in keeps the rows where `number` is one of `values`.
 pub fn (q CardUpdate) where_number_in(values []string) CardUpdate {
-	return q.where(load.in_strings('number', values))
+	return q.where(card_number_in(values))
 }
 
-// where_number_like keeps the rows whose `number` matches the SQL LIKE `pattern`.
+// where_number_not_in keeps the rows where `number` is none of `values`.
+pub fn (q CardUpdate) where_number_not_in(values []string) CardUpdate {
+	return q.where(card_number_not_in(values))
+}
+
+// where_number_like keeps the rows where `number` matches the SQL LIKE `pattern`.
 pub fn (q CardUpdate) where_number_like(pattern string) CardUpdate {
-	return q.where(load.like('number', pattern))
+	return q.where(card_number_like(pattern))
 }
 
-// where_owner_id keeps the rows whose `owner_id` is `value`.
+// where_number_contains keeps the rows where `number` contains `value`.
+pub fn (q CardUpdate) where_number_contains(value string) CardUpdate {
+	return q.where(card_number_contains(value))
+}
+
+// where_number_has_prefix keeps the rows where `number` starts with `value`.
+pub fn (q CardUpdate) where_number_has_prefix(value string) CardUpdate {
+	return q.where(card_number_has_prefix(value))
+}
+
+// where_number_has_suffix keeps the rows where `number` ends with `value`.
+pub fn (q CardUpdate) where_number_has_suffix(value string) CardUpdate {
+	return q.where(card_number_has_suffix(value))
+}
+
+// where_number_equal_fold keeps the rows where `number` is `value`, ignoring case.
+pub fn (q CardUpdate) where_number_equal_fold(value string) CardUpdate {
+	return q.where(card_number_equal_fold(value))
+}
+
+// where_number_contains_fold keeps the rows where `number` contains `value`, ignoring case.
+pub fn (q CardUpdate) where_number_contains_fold(value string) CardUpdate {
+	return q.where(card_number_contains_fold(value))
+}
+
+// where_owner_id keeps the rows where `owner_id` is `value`.
 pub fn (q CardUpdate) where_owner_id(value int) CardUpdate {
-	return q.where(load.eq('owner_id', value))
+	return q.where(card_owner_id_eq(value))
 }
 
-// where_owner_id_lt keeps the rows whose `owner_id` comes before `value`.
+// where_owner_id_ne keeps the rows where `owner_id` is not `value`.
+pub fn (q CardUpdate) where_owner_id_ne(value int) CardUpdate {
+	return q.where(card_owner_id_ne(value))
+}
+
+// where_owner_id_lt keeps the rows where `owner_id` comes before `value`.
 pub fn (q CardUpdate) where_owner_id_lt(value int) CardUpdate {
-	return q.where(load.lt('owner_id', value))
+	return q.where(card_owner_id_lt(value))
 }
 
-// where_owner_id_le keeps the rows whose `owner_id` comes at or before `value`.
+// where_owner_id_le keeps the rows where `owner_id` comes at or before `value`.
 pub fn (q CardUpdate) where_owner_id_le(value int) CardUpdate {
-	return q.where(load.le('owner_id', value))
+	return q.where(card_owner_id_le(value))
 }
 
-// where_owner_id_gt keeps the rows whose `owner_id` comes after `value`.
+// where_owner_id_gt keeps the rows where `owner_id` comes after `value`.
 pub fn (q CardUpdate) where_owner_id_gt(value int) CardUpdate {
-	return q.where(load.gt('owner_id', value))
+	return q.where(card_owner_id_gt(value))
 }
 
-// where_owner_id_ge keeps the rows whose `owner_id` comes at or after `value`.
+// where_owner_id_ge keeps the rows where `owner_id` comes at or after `value`.
 pub fn (q CardUpdate) where_owner_id_ge(value int) CardUpdate {
-	return q.where(load.ge('owner_id', value))
+	return q.where(card_owner_id_ge(value))
 }
 
-// where_owner_id_in keeps the rows whose `owner_id` is one of `values`.
+// where_owner_id_in keeps the rows where `owner_id` is one of `values`.
 pub fn (q CardUpdate) where_owner_id_in(values []int) CardUpdate {
-	return q.where(load.in_ints('owner_id', values))
+	return q.where(card_owner_id_in(values))
+}
+
+// where_owner_id_not_in keeps the rows where `owner_id` is none of `values`.
+pub fn (q CardUpdate) where_owner_id_not_in(values []int) CardUpdate {
+	return q.where(card_owner_id_not_in(values))
+}
+
+// has_owner keeps the rows where it has a `owner`.
+pub fn (q CardUpdate) has_owner() CardUpdate {
+	return q.where(card_has_owner())
+}
+
+// has_owner_with keeps the rows that have a `owner` that `configure` keeps.
+pub fn (q CardUpdate) has_owner_with(configure fn (UserQuery) UserQuery) CardUpdate {
+	return q.where(card_has_owner_with(...configure(q.graph.users()).query.conds))
 }
 
 // set_number sets `number`.
@@ -655,79 +720,144 @@ pub fn (b CardDelete) where(conds ...load.Cond) CardDelete {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q CardDelete) where_id(value int) CardDelete {
-	return q.where(load.eq('id', value))
+	return q.where(card_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q CardDelete) where_id_ne(value int) CardDelete {
+	return q.where(card_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q CardDelete) where_id_lt(value int) CardDelete {
-	return q.where(load.lt('id', value))
+	return q.where(card_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q CardDelete) where_id_le(value int) CardDelete {
-	return q.where(load.le('id', value))
+	return q.where(card_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q CardDelete) where_id_gt(value int) CardDelete {
-	return q.where(load.gt('id', value))
+	return q.where(card_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q CardDelete) where_id_ge(value int) CardDelete {
-	return q.where(load.ge('id', value))
+	return q.where(card_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q CardDelete) where_id_in(values []int) CardDelete {
-	return q.where(load.in_ints('id', values))
+	return q.where(card_id_in(values))
 }
 
-// where_number keeps the rows whose `number` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q CardDelete) where_id_not_in(values []int) CardDelete {
+	return q.where(card_id_not_in(values))
+}
+
+// where_number keeps the rows where `number` is `value`.
 pub fn (q CardDelete) where_number(value string) CardDelete {
-	return q.where(load.eq('number', value))
+	return q.where(card_number_eq(value))
 }
 
-// where_number_in keeps the rows whose `number` is one of `values`.
+// where_number_ne keeps the rows where `number` is not `value`.
+pub fn (q CardDelete) where_number_ne(value string) CardDelete {
+	return q.where(card_number_ne(value))
+}
+
+// where_number_in keeps the rows where `number` is one of `values`.
 pub fn (q CardDelete) where_number_in(values []string) CardDelete {
-	return q.where(load.in_strings('number', values))
+	return q.where(card_number_in(values))
 }
 
-// where_number_like keeps the rows whose `number` matches the SQL LIKE `pattern`.
+// where_number_not_in keeps the rows where `number` is none of `values`.
+pub fn (q CardDelete) where_number_not_in(values []string) CardDelete {
+	return q.where(card_number_not_in(values))
+}
+
+// where_number_like keeps the rows where `number` matches the SQL LIKE `pattern`.
 pub fn (q CardDelete) where_number_like(pattern string) CardDelete {
-	return q.where(load.like('number', pattern))
+	return q.where(card_number_like(pattern))
 }
 
-// where_owner_id keeps the rows whose `owner_id` is `value`.
+// where_number_contains keeps the rows where `number` contains `value`.
+pub fn (q CardDelete) where_number_contains(value string) CardDelete {
+	return q.where(card_number_contains(value))
+}
+
+// where_number_has_prefix keeps the rows where `number` starts with `value`.
+pub fn (q CardDelete) where_number_has_prefix(value string) CardDelete {
+	return q.where(card_number_has_prefix(value))
+}
+
+// where_number_has_suffix keeps the rows where `number` ends with `value`.
+pub fn (q CardDelete) where_number_has_suffix(value string) CardDelete {
+	return q.where(card_number_has_suffix(value))
+}
+
+// where_number_equal_fold keeps the rows where `number` is `value`, ignoring case.
+pub fn (q CardDelete) where_number_equal_fold(value string) CardDelete {
+	return q.where(card_number_equal_fold(value))
+}
+
+// where_number_contains_fold keeps the rows where `number` contains `value`, ignoring case.
+pub fn (q CardDelete) where_number_contains_fold(value string) CardDelete {
+	return q.where(card_number_contains_fold(value))
+}
+
+// where_owner_id keeps the rows where `owner_id` is `value`.
 pub fn (q CardDelete) where_owner_id(value int) CardDelete {
-	return q.where(load.eq('owner_id', value))
+	return q.where(card_owner_id_eq(value))
 }
 
-// where_owner_id_lt keeps the rows whose `owner_id` comes before `value`.
+// where_owner_id_ne keeps the rows where `owner_id` is not `value`.
+pub fn (q CardDelete) where_owner_id_ne(value int) CardDelete {
+	return q.where(card_owner_id_ne(value))
+}
+
+// where_owner_id_lt keeps the rows where `owner_id` comes before `value`.
 pub fn (q CardDelete) where_owner_id_lt(value int) CardDelete {
-	return q.where(load.lt('owner_id', value))
+	return q.where(card_owner_id_lt(value))
 }
 
-// where_owner_id_le keeps the rows whose `owner_id` comes at or before `value`.
+// where_owner_id_le keeps the rows where `owner_id` comes at or before `value`.
 pub fn (q CardDelete) where_owner_id_le(value int) CardDelete {
-	return q.where(load.le('owner_id', value))
+	return q.where(card_owner_id_le(value))
 }
 
-// where_owner_id_gt keeps the rows whose `owner_id` comes after `value`.
+// where_owner_id_gt keeps the rows where `owner_id` comes after `value`.
 pub fn (q CardDelete) where_owner_id_gt(value int) CardDelete {
-	return q.where(load.gt('owner_id', value))
+	return q.where(card_owner_id_gt(value))
 }
 
-// where_owner_id_ge keeps the rows whose `owner_id` comes at or after `value`.
+// where_owner_id_ge keeps the rows where `owner_id` comes at or after `value`.
 pub fn (q CardDelete) where_owner_id_ge(value int) CardDelete {
-	return q.where(load.ge('owner_id', value))
+	return q.where(card_owner_id_ge(value))
 }
 
-// where_owner_id_in keeps the rows whose `owner_id` is one of `values`.
+// where_owner_id_in keeps the rows where `owner_id` is one of `values`.
 pub fn (q CardDelete) where_owner_id_in(values []int) CardDelete {
-	return q.where(load.in_ints('owner_id', values))
+	return q.where(card_owner_id_in(values))
+}
+
+// where_owner_id_not_in keeps the rows where `owner_id` is none of `values`.
+pub fn (q CardDelete) where_owner_id_not_in(values []int) CardDelete {
+	return q.where(card_owner_id_not_in(values))
+}
+
+// has_owner keeps the rows where it has a `owner`.
+pub fn (q CardDelete) has_owner() CardDelete {
+	return q.where(card_has_owner())
+}
+
+// has_owner_with keeps the rows that have a `owner` that `configure` keeps.
+pub fn (q CardDelete) has_owner_with(configure fn (UserQuery) UserQuery) CardDelete {
+	return q.where(card_has_owner_with(...configure(q.graph.users()).query.conds))
 }
 
 // exec deletes the rows, with their join table rows, in one transaction, and

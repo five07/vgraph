@@ -572,104 +572,154 @@ pub fn (b NodeUpdate) where(conds ...load.Cond) NodeUpdate {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q NodeUpdate) where_id(value int) NodeUpdate {
-	return q.where(load.eq('id', value))
+	return q.where(node_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q NodeUpdate) where_id_ne(value int) NodeUpdate {
+	return q.where(node_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q NodeUpdate) where_id_lt(value int) NodeUpdate {
-	return q.where(load.lt('id', value))
+	return q.where(node_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q NodeUpdate) where_id_le(value int) NodeUpdate {
-	return q.where(load.le('id', value))
+	return q.where(node_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q NodeUpdate) where_id_gt(value int) NodeUpdate {
-	return q.where(load.gt('id', value))
+	return q.where(node_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q NodeUpdate) where_id_ge(value int) NodeUpdate {
-	return q.where(load.ge('id', value))
+	return q.where(node_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q NodeUpdate) where_id_in(values []int) NodeUpdate {
-	return q.where(load.in_ints('id', values))
+	return q.where(node_id_in(values))
 }
 
-// where_value keeps the rows whose `value` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q NodeUpdate) where_id_not_in(values []int) NodeUpdate {
+	return q.where(node_id_not_in(values))
+}
+
+// where_value keeps the rows where `value` is `value`.
 pub fn (q NodeUpdate) where_value(value int) NodeUpdate {
-	return q.where(load.eq('value', value))
+	return q.where(node_value_eq(value))
 }
 
-// where_value_lt keeps the rows whose `value` comes before `value`.
+// where_value_ne keeps the rows where `value` is not `value`.
+pub fn (q NodeUpdate) where_value_ne(value int) NodeUpdate {
+	return q.where(node_value_ne(value))
+}
+
+// where_value_lt keeps the rows where `value` comes before `value`.
 pub fn (q NodeUpdate) where_value_lt(value int) NodeUpdate {
-	return q.where(load.lt('value', value))
+	return q.where(node_value_lt(value))
 }
 
-// where_value_le keeps the rows whose `value` comes at or before `value`.
+// where_value_le keeps the rows where `value` comes at or before `value`.
 pub fn (q NodeUpdate) where_value_le(value int) NodeUpdate {
-	return q.where(load.le('value', value))
+	return q.where(node_value_le(value))
 }
 
-// where_value_gt keeps the rows whose `value` comes after `value`.
+// where_value_gt keeps the rows where `value` comes after `value`.
 pub fn (q NodeUpdate) where_value_gt(value int) NodeUpdate {
-	return q.where(load.gt('value', value))
+	return q.where(node_value_gt(value))
 }
 
-// where_value_ge keeps the rows whose `value` comes at or after `value`.
+// where_value_ge keeps the rows where `value` comes at or after `value`.
 pub fn (q NodeUpdate) where_value_ge(value int) NodeUpdate {
-	return q.where(load.ge('value', value))
+	return q.where(node_value_ge(value))
 }
 
-// where_value_in keeps the rows whose `value` is one of `values`.
+// where_value_in keeps the rows where `value` is one of `values`.
 pub fn (q NodeUpdate) where_value_in(values []int) NodeUpdate {
-	return q.where(load.in_ints('value', values))
+	return q.where(node_value_in(values))
 }
 
-// where_next_id keeps the rows whose `next_id` is `value`.
+// where_value_not_in keeps the rows where `value` is none of `values`.
+pub fn (q NodeUpdate) where_value_not_in(values []int) NodeUpdate {
+	return q.where(node_value_not_in(values))
+}
+
+// where_next_id keeps the rows where `next_id` is `value`.
 pub fn (q NodeUpdate) where_next_id(value int) NodeUpdate {
-	return q.where(load.eq('next_id', value))
+	return q.where(node_next_id_eq(value))
 }
 
-// where_next_id_lt keeps the rows whose `next_id` comes before `value`.
+// where_next_id_ne keeps the rows where `next_id` is not `value`.
+pub fn (q NodeUpdate) where_next_id_ne(value int) NodeUpdate {
+	return q.where(node_next_id_ne(value))
+}
+
+// where_next_id_lt keeps the rows where `next_id` comes before `value`.
 pub fn (q NodeUpdate) where_next_id_lt(value int) NodeUpdate {
-	return q.where(load.lt('next_id', value))
+	return q.where(node_next_id_lt(value))
 }
 
-// where_next_id_le keeps the rows whose `next_id` comes at or before `value`.
+// where_next_id_le keeps the rows where `next_id` comes at or before `value`.
 pub fn (q NodeUpdate) where_next_id_le(value int) NodeUpdate {
-	return q.where(load.le('next_id', value))
+	return q.where(node_next_id_le(value))
 }
 
-// where_next_id_gt keeps the rows whose `next_id` comes after `value`.
+// where_next_id_gt keeps the rows where `next_id` comes after `value`.
 pub fn (q NodeUpdate) where_next_id_gt(value int) NodeUpdate {
-	return q.where(load.gt('next_id', value))
+	return q.where(node_next_id_gt(value))
 }
 
-// where_next_id_ge keeps the rows whose `next_id` comes at or after `value`.
+// where_next_id_ge keeps the rows where `next_id` comes at or after `value`.
 pub fn (q NodeUpdate) where_next_id_ge(value int) NodeUpdate {
-	return q.where(load.ge('next_id', value))
+	return q.where(node_next_id_ge(value))
 }
 
-// where_next_id_in keeps the rows whose `next_id` is one of `values`.
+// where_next_id_in keeps the rows where `next_id` is one of `values`.
 pub fn (q NodeUpdate) where_next_id_in(values []int) NodeUpdate {
-	return q.where(load.in_ints('next_id', values))
+	return q.where(node_next_id_in(values))
 }
 
-// where_next_id_is_null keeps the rows whose `next_id` is null.
+// where_next_id_not_in keeps the rows where `next_id` is none of `values`.
+pub fn (q NodeUpdate) where_next_id_not_in(values []int) NodeUpdate {
+	return q.where(node_next_id_not_in(values))
+}
+
+// where_next_id_is_null keeps the rows where `next_id` is null.
 pub fn (q NodeUpdate) where_next_id_is_null() NodeUpdate {
-	return q.where(load.is_null('next_id'))
+	return q.where(node_next_id_is_null())
 }
 
-// where_next_id_is_not_null keeps the rows whose `next_id` is not null.
+// where_next_id_is_not_null keeps the rows where `next_id` is not null.
 pub fn (q NodeUpdate) where_next_id_is_not_null() NodeUpdate {
-	return q.where(load.is_not_null('next_id'))
+	return q.where(node_next_id_is_not_null())
+}
+
+// has_next keeps the rows where it has a `next`.
+pub fn (q NodeUpdate) has_next() NodeUpdate {
+	return q.where(node_has_next())
+}
+
+// has_next_with keeps the rows that have a `next` that `configure` keeps.
+pub fn (q NodeUpdate) has_next_with(configure fn (NodeQuery) NodeQuery) NodeUpdate {
+	return q.where(node_has_next_with(...configure(q.graph.nodes()).query.conds))
+}
+
+// has_prev keeps the rows where it has a `prev`.
+pub fn (q NodeUpdate) has_prev() NodeUpdate {
+	return q.where(node_has_prev())
+}
+
+// has_prev_with keeps the rows that have a `prev` that `configure` keeps.
+pub fn (q NodeUpdate) has_prev_with(configure fn (NodeQuery) NodeQuery) NodeUpdate {
+	return q.where(node_has_prev_with(...configure(q.graph.nodes()).query.conds))
 }
 
 // set_value sets `value`.
@@ -826,104 +876,154 @@ pub fn (b NodeDelete) where(conds ...load.Cond) NodeDelete {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q NodeDelete) where_id(value int) NodeDelete {
-	return q.where(load.eq('id', value))
+	return q.where(node_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q NodeDelete) where_id_ne(value int) NodeDelete {
+	return q.where(node_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q NodeDelete) where_id_lt(value int) NodeDelete {
-	return q.where(load.lt('id', value))
+	return q.where(node_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q NodeDelete) where_id_le(value int) NodeDelete {
-	return q.where(load.le('id', value))
+	return q.where(node_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q NodeDelete) where_id_gt(value int) NodeDelete {
-	return q.where(load.gt('id', value))
+	return q.where(node_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q NodeDelete) where_id_ge(value int) NodeDelete {
-	return q.where(load.ge('id', value))
+	return q.where(node_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q NodeDelete) where_id_in(values []int) NodeDelete {
-	return q.where(load.in_ints('id', values))
+	return q.where(node_id_in(values))
 }
 
-// where_value keeps the rows whose `value` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q NodeDelete) where_id_not_in(values []int) NodeDelete {
+	return q.where(node_id_not_in(values))
+}
+
+// where_value keeps the rows where `value` is `value`.
 pub fn (q NodeDelete) where_value(value int) NodeDelete {
-	return q.where(load.eq('value', value))
+	return q.where(node_value_eq(value))
 }
 
-// where_value_lt keeps the rows whose `value` comes before `value`.
+// where_value_ne keeps the rows where `value` is not `value`.
+pub fn (q NodeDelete) where_value_ne(value int) NodeDelete {
+	return q.where(node_value_ne(value))
+}
+
+// where_value_lt keeps the rows where `value` comes before `value`.
 pub fn (q NodeDelete) where_value_lt(value int) NodeDelete {
-	return q.where(load.lt('value', value))
+	return q.where(node_value_lt(value))
 }
 
-// where_value_le keeps the rows whose `value` comes at or before `value`.
+// where_value_le keeps the rows where `value` comes at or before `value`.
 pub fn (q NodeDelete) where_value_le(value int) NodeDelete {
-	return q.where(load.le('value', value))
+	return q.where(node_value_le(value))
 }
 
-// where_value_gt keeps the rows whose `value` comes after `value`.
+// where_value_gt keeps the rows where `value` comes after `value`.
 pub fn (q NodeDelete) where_value_gt(value int) NodeDelete {
-	return q.where(load.gt('value', value))
+	return q.where(node_value_gt(value))
 }
 
-// where_value_ge keeps the rows whose `value` comes at or after `value`.
+// where_value_ge keeps the rows where `value` comes at or after `value`.
 pub fn (q NodeDelete) where_value_ge(value int) NodeDelete {
-	return q.where(load.ge('value', value))
+	return q.where(node_value_ge(value))
 }
 
-// where_value_in keeps the rows whose `value` is one of `values`.
+// where_value_in keeps the rows where `value` is one of `values`.
 pub fn (q NodeDelete) where_value_in(values []int) NodeDelete {
-	return q.where(load.in_ints('value', values))
+	return q.where(node_value_in(values))
 }
 
-// where_next_id keeps the rows whose `next_id` is `value`.
+// where_value_not_in keeps the rows where `value` is none of `values`.
+pub fn (q NodeDelete) where_value_not_in(values []int) NodeDelete {
+	return q.where(node_value_not_in(values))
+}
+
+// where_next_id keeps the rows where `next_id` is `value`.
 pub fn (q NodeDelete) where_next_id(value int) NodeDelete {
-	return q.where(load.eq('next_id', value))
+	return q.where(node_next_id_eq(value))
 }
 
-// where_next_id_lt keeps the rows whose `next_id` comes before `value`.
+// where_next_id_ne keeps the rows where `next_id` is not `value`.
+pub fn (q NodeDelete) where_next_id_ne(value int) NodeDelete {
+	return q.where(node_next_id_ne(value))
+}
+
+// where_next_id_lt keeps the rows where `next_id` comes before `value`.
 pub fn (q NodeDelete) where_next_id_lt(value int) NodeDelete {
-	return q.where(load.lt('next_id', value))
+	return q.where(node_next_id_lt(value))
 }
 
-// where_next_id_le keeps the rows whose `next_id` comes at or before `value`.
+// where_next_id_le keeps the rows where `next_id` comes at or before `value`.
 pub fn (q NodeDelete) where_next_id_le(value int) NodeDelete {
-	return q.where(load.le('next_id', value))
+	return q.where(node_next_id_le(value))
 }
 
-// where_next_id_gt keeps the rows whose `next_id` comes after `value`.
+// where_next_id_gt keeps the rows where `next_id` comes after `value`.
 pub fn (q NodeDelete) where_next_id_gt(value int) NodeDelete {
-	return q.where(load.gt('next_id', value))
+	return q.where(node_next_id_gt(value))
 }
 
-// where_next_id_ge keeps the rows whose `next_id` comes at or after `value`.
+// where_next_id_ge keeps the rows where `next_id` comes at or after `value`.
 pub fn (q NodeDelete) where_next_id_ge(value int) NodeDelete {
-	return q.where(load.ge('next_id', value))
+	return q.where(node_next_id_ge(value))
 }
 
-// where_next_id_in keeps the rows whose `next_id` is one of `values`.
+// where_next_id_in keeps the rows where `next_id` is one of `values`.
 pub fn (q NodeDelete) where_next_id_in(values []int) NodeDelete {
-	return q.where(load.in_ints('next_id', values))
+	return q.where(node_next_id_in(values))
 }
 
-// where_next_id_is_null keeps the rows whose `next_id` is null.
+// where_next_id_not_in keeps the rows where `next_id` is none of `values`.
+pub fn (q NodeDelete) where_next_id_not_in(values []int) NodeDelete {
+	return q.where(node_next_id_not_in(values))
+}
+
+// where_next_id_is_null keeps the rows where `next_id` is null.
 pub fn (q NodeDelete) where_next_id_is_null() NodeDelete {
-	return q.where(load.is_null('next_id'))
+	return q.where(node_next_id_is_null())
 }
 
-// where_next_id_is_not_null keeps the rows whose `next_id` is not null.
+// where_next_id_is_not_null keeps the rows where `next_id` is not null.
 pub fn (q NodeDelete) where_next_id_is_not_null() NodeDelete {
-	return q.where(load.is_not_null('next_id'))
+	return q.where(node_next_id_is_not_null())
+}
+
+// has_next keeps the rows where it has a `next`.
+pub fn (q NodeDelete) has_next() NodeDelete {
+	return q.where(node_has_next())
+}
+
+// has_next_with keeps the rows that have a `next` that `configure` keeps.
+pub fn (q NodeDelete) has_next_with(configure fn (NodeQuery) NodeQuery) NodeDelete {
+	return q.where(node_has_next_with(...configure(q.graph.nodes()).query.conds))
+}
+
+// has_prev keeps the rows where it has a `prev`.
+pub fn (q NodeDelete) has_prev() NodeDelete {
+	return q.where(node_has_prev())
+}
+
+// has_prev_with keeps the rows that have a `prev` that `configure` keeps.
+pub fn (q NodeDelete) has_prev_with(configure fn (NodeQuery) NodeQuery) NodeDelete {
+	return q.where(node_has_prev_with(...configure(q.graph.nodes()).query.conds))
 }
 
 // exec deletes the rows, with their join table rows, in one transaction, and

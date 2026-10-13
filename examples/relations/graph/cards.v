@@ -20,6 +20,8 @@ pub struct CardNode {
 pub mut:
 	card  models.Card
 	owner ?&UserNode // set by `with_owner()`
+	// loaded: the edges the query loaded
+	loaded []string
 }
 
 // cards starts a query of `cards`.
@@ -70,145 +72,612 @@ pub fn (q CardQuery) count() !int {
 	return load.count_where[models.Card](q.graph.client.conn, q.graph.client.prepare_query('cards', q.query)!)
 }
 
-// where_id keeps the rows whose `id` is `value`.
-pub fn (q CardQuery) where_id(value int) CardQuery {
-	return q.where(load.eq('id', value))
+// card_id_eq returns the condition that `id` is `value`.
+pub fn card_id_eq(value int) load.Cond {
+	return load.eq('id', value)
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
-pub fn (q CardQuery) where_id_lt(value int) CardQuery {
-	return q.where(load.lt('id', value))
+// card_id_ne returns the condition that `id` is not `value`.
+pub fn card_id_ne(value int) load.Cond {
+	return load.ne('id', value)
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
-pub fn (q CardQuery) where_id_le(value int) CardQuery {
-	return q.where(load.le('id', value))
+// card_id_lt returns the condition that `id` comes before `value`.
+pub fn card_id_lt(value int) load.Cond {
+	return load.lt('id', value)
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
-pub fn (q CardQuery) where_id_gt(value int) CardQuery {
-	return q.where(load.gt('id', value))
+// card_id_le returns the condition that `id` comes at or before `value`.
+pub fn card_id_le(value int) load.Cond {
+	return load.le('id', value)
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
-pub fn (q CardQuery) where_id_ge(value int) CardQuery {
-	return q.where(load.ge('id', value))
+// card_id_gt returns the condition that `id` comes after `value`.
+pub fn card_id_gt(value int) load.Cond {
+	return load.gt('id', value)
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
-pub fn (q CardQuery) where_id_in(values []int) CardQuery {
-	return q.where(load.in_ints('id', values))
+// card_id_ge returns the condition that `id` comes at or after `value`.
+pub fn card_id_ge(value int) load.Cond {
+	return load.ge('id', value)
 }
 
-// order_by_id orders the rows by `id`, ascending.
+// card_id_in returns the condition that `id` is one of `values`.
+pub fn card_id_in(values []int) load.Cond {
+	return load.in_ints('id', values)
+}
+
+// card_id_not_in returns the condition that `id` is none of `values`.
+pub fn card_id_not_in(values []int) load.Cond {
+	return load.not_in_ints('id', values)
+}
+
+// card_number_eq returns the condition that `number` is `value`.
+pub fn card_number_eq(value string) load.Cond {
+	return load.eq('number', value)
+}
+
+// card_number_ne returns the condition that `number` is not `value`.
+pub fn card_number_ne(value string) load.Cond {
+	return load.ne('number', value)
+}
+
+// card_number_in returns the condition that `number` is one of `values`.
+pub fn card_number_in(values []string) load.Cond {
+	return load.in_strings('number', values)
+}
+
+// card_number_not_in returns the condition that `number` is none of `values`.
+pub fn card_number_not_in(values []string) load.Cond {
+	return load.not_in_strings('number', values)
+}
+
+// card_number_like returns the condition that `number` matches the SQL LIKE `pattern`.
+pub fn card_number_like(pattern string) load.Cond {
+	return load.like('number', pattern)
+}
+
+// card_number_contains returns the condition that `number` contains `value`.
+pub fn card_number_contains(value string) load.Cond {
+	return load.contains('number', value)
+}
+
+// card_number_has_prefix returns the condition that `number` starts with `value`.
+pub fn card_number_has_prefix(value string) load.Cond {
+	return load.has_prefix('number', value)
+}
+
+// card_number_has_suffix returns the condition that `number` ends with `value`.
+pub fn card_number_has_suffix(value string) load.Cond {
+	return load.has_suffix('number', value)
+}
+
+// card_number_equal_fold returns the condition that `number` is `value`, ignoring case.
+pub fn card_number_equal_fold(value string) load.Cond {
+	return load.equal_fold('number', value)
+}
+
+// card_number_contains_fold returns the condition that `number` contains `value`, ignoring case.
+pub fn card_number_contains_fold(value string) load.Cond {
+	return load.contains_fold('number', value)
+}
+
+// card_owner_id_eq returns the condition that `owner_id` is `value`.
+pub fn card_owner_id_eq(value int) load.Cond {
+	return load.eq('owner_id', value)
+}
+
+// card_owner_id_ne returns the condition that `owner_id` is not `value`.
+pub fn card_owner_id_ne(value int) load.Cond {
+	return load.ne('owner_id', value)
+}
+
+// card_owner_id_lt returns the condition that `owner_id` comes before `value`.
+pub fn card_owner_id_lt(value int) load.Cond {
+	return load.lt('owner_id', value)
+}
+
+// card_owner_id_le returns the condition that `owner_id` comes at or before `value`.
+pub fn card_owner_id_le(value int) load.Cond {
+	return load.le('owner_id', value)
+}
+
+// card_owner_id_gt returns the condition that `owner_id` comes after `value`.
+pub fn card_owner_id_gt(value int) load.Cond {
+	return load.gt('owner_id', value)
+}
+
+// card_owner_id_ge returns the condition that `owner_id` comes at or after `value`.
+pub fn card_owner_id_ge(value int) load.Cond {
+	return load.ge('owner_id', value)
+}
+
+// card_owner_id_in returns the condition that `owner_id` is one of `values`.
+pub fn card_owner_id_in(values []int) load.Cond {
+	return load.in_ints('owner_id', values)
+}
+
+// card_owner_id_not_in returns the condition that `owner_id` is none of `values`.
+pub fn card_owner_id_not_in(values []int) load.Cond {
+	return load.not_in_ints('owner_id', values)
+}
+
+// card_has_owner returns the condition that it has a `owner`.
+pub fn card_has_owner() load.Cond {
+	return load.in_sub('owner_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} })
+}
+
+// card_has_owner_with returns the condition that it has a `owner` that matches `conds`.
+pub fn card_has_owner_with(conds ...load.Cond) load.Cond {
+	return load.in_sub('owner_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds })
+}
+
+// order_by_id orders the rows by `id`, ascending, after the orders
+// given before.
 pub fn (q CardQuery) order_by_id() CardQuery {
-	mut next := q
-	next.query = load.Query{
-		...q.query
-		order: 'id'
-		desc:  false
-	}
-	return next
+	return q.order_by(load.asc('id'))
 }
 
-// order_by_id_desc orders the rows by `id`, descending.
+// order_by_id_desc orders the rows by `id`, descending, after the
+// orders given before.
 pub fn (q CardQuery) order_by_id_desc() CardQuery {
-	mut next := q
-	next.query = load.Query{
-		...q.query
-		order: 'id'
-		desc:  true
-	}
-	return next
+	return q.order_by(load.desc('id'))
 }
 
-// where_number keeps the rows whose `number` is `value`.
-pub fn (q CardQuery) where_number(value string) CardQuery {
-	return q.where(load.eq('number', value))
-}
-
-// where_number_in keeps the rows whose `number` is one of `values`.
-pub fn (q CardQuery) where_number_in(values []string) CardQuery {
-	return q.where(load.in_strings('number', values))
-}
-
-// where_number_like keeps the rows whose `number` matches the SQL LIKE `pattern`.
-pub fn (q CardQuery) where_number_like(pattern string) CardQuery {
-	return q.where(load.like('number', pattern))
-}
-
-// order_by_number orders the rows by `number`, ascending.
+// order_by_number orders the rows by `number`, ascending, after the orders
+// given before.
 pub fn (q CardQuery) order_by_number() CardQuery {
-	mut next := q
-	next.query = load.Query{
-		...q.query
-		order: 'number'
-		desc:  false
-	}
-	return next
+	return q.order_by(load.asc('number'))
 }
 
-// order_by_number_desc orders the rows by `number`, descending.
+// order_by_number_desc orders the rows by `number`, descending, after the
+// orders given before.
 pub fn (q CardQuery) order_by_number_desc() CardQuery {
-	mut next := q
-	next.query = load.Query{
-		...q.query
-		order: 'number'
-		desc:  true
-	}
-	return next
+	return q.order_by(load.desc('number'))
 }
 
-// where_owner_id keeps the rows whose `owner_id` is `value`.
-pub fn (q CardQuery) where_owner_id(value int) CardQuery {
-	return q.where(load.eq('owner_id', value))
-}
-
-// where_owner_id_lt keeps the rows whose `owner_id` comes before `value`.
-pub fn (q CardQuery) where_owner_id_lt(value int) CardQuery {
-	return q.where(load.lt('owner_id', value))
-}
-
-// where_owner_id_le keeps the rows whose `owner_id` comes at or before `value`.
-pub fn (q CardQuery) where_owner_id_le(value int) CardQuery {
-	return q.where(load.le('owner_id', value))
-}
-
-// where_owner_id_gt keeps the rows whose `owner_id` comes after `value`.
-pub fn (q CardQuery) where_owner_id_gt(value int) CardQuery {
-	return q.where(load.gt('owner_id', value))
-}
-
-// where_owner_id_ge keeps the rows whose `owner_id` comes at or after `value`.
-pub fn (q CardQuery) where_owner_id_ge(value int) CardQuery {
-	return q.where(load.ge('owner_id', value))
-}
-
-// where_owner_id_in keeps the rows whose `owner_id` is one of `values`.
-pub fn (q CardQuery) where_owner_id_in(values []int) CardQuery {
-	return q.where(load.in_ints('owner_id', values))
-}
-
-// order_by_owner_id orders the rows by `owner_id`, ascending.
+// order_by_owner_id orders the rows by `owner_id`, ascending, after the orders
+// given before.
 pub fn (q CardQuery) order_by_owner_id() CardQuery {
+	return q.order_by(load.asc('owner_id'))
+}
+
+// order_by_owner_id_desc orders the rows by `owner_id`, descending, after the
+// orders given before.
+pub fn (q CardQuery) order_by_owner_id_desc() CardQuery {
+	return q.order_by(load.desc('owner_id'))
+}
+
+// where_id keeps the rows where `id` is `value`.
+pub fn (q CardQuery) where_id(value int) CardQuery {
+	return q.where(card_id_eq(value))
+}
+
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q CardQuery) where_id_ne(value int) CardQuery {
+	return q.where(card_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
+pub fn (q CardQuery) where_id_lt(value int) CardQuery {
+	return q.where(card_id_lt(value))
+}
+
+// where_id_le keeps the rows where `id` comes at or before `value`.
+pub fn (q CardQuery) where_id_le(value int) CardQuery {
+	return q.where(card_id_le(value))
+}
+
+// where_id_gt keeps the rows where `id` comes after `value`.
+pub fn (q CardQuery) where_id_gt(value int) CardQuery {
+	return q.where(card_id_gt(value))
+}
+
+// where_id_ge keeps the rows where `id` comes at or after `value`.
+pub fn (q CardQuery) where_id_ge(value int) CardQuery {
+	return q.where(card_id_ge(value))
+}
+
+// where_id_in keeps the rows where `id` is one of `values`.
+pub fn (q CardQuery) where_id_in(values []int) CardQuery {
+	return q.where(card_id_in(values))
+}
+
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q CardQuery) where_id_not_in(values []int) CardQuery {
+	return q.where(card_id_not_in(values))
+}
+
+// where_number keeps the rows where `number` is `value`.
+pub fn (q CardQuery) where_number(value string) CardQuery {
+	return q.where(card_number_eq(value))
+}
+
+// where_number_ne keeps the rows where `number` is not `value`.
+pub fn (q CardQuery) where_number_ne(value string) CardQuery {
+	return q.where(card_number_ne(value))
+}
+
+// where_number_in keeps the rows where `number` is one of `values`.
+pub fn (q CardQuery) where_number_in(values []string) CardQuery {
+	return q.where(card_number_in(values))
+}
+
+// where_number_not_in keeps the rows where `number` is none of `values`.
+pub fn (q CardQuery) where_number_not_in(values []string) CardQuery {
+	return q.where(card_number_not_in(values))
+}
+
+// where_number_like keeps the rows where `number` matches the SQL LIKE `pattern`.
+pub fn (q CardQuery) where_number_like(pattern string) CardQuery {
+	return q.where(card_number_like(pattern))
+}
+
+// where_number_contains keeps the rows where `number` contains `value`.
+pub fn (q CardQuery) where_number_contains(value string) CardQuery {
+	return q.where(card_number_contains(value))
+}
+
+// where_number_has_prefix keeps the rows where `number` starts with `value`.
+pub fn (q CardQuery) where_number_has_prefix(value string) CardQuery {
+	return q.where(card_number_has_prefix(value))
+}
+
+// where_number_has_suffix keeps the rows where `number` ends with `value`.
+pub fn (q CardQuery) where_number_has_suffix(value string) CardQuery {
+	return q.where(card_number_has_suffix(value))
+}
+
+// where_number_equal_fold keeps the rows where `number` is `value`, ignoring case.
+pub fn (q CardQuery) where_number_equal_fold(value string) CardQuery {
+	return q.where(card_number_equal_fold(value))
+}
+
+// where_number_contains_fold keeps the rows where `number` contains `value`, ignoring case.
+pub fn (q CardQuery) where_number_contains_fold(value string) CardQuery {
+	return q.where(card_number_contains_fold(value))
+}
+
+// where_owner_id keeps the rows where `owner_id` is `value`.
+pub fn (q CardQuery) where_owner_id(value int) CardQuery {
+	return q.where(card_owner_id_eq(value))
+}
+
+// where_owner_id_ne keeps the rows where `owner_id` is not `value`.
+pub fn (q CardQuery) where_owner_id_ne(value int) CardQuery {
+	return q.where(card_owner_id_ne(value))
+}
+
+// where_owner_id_lt keeps the rows where `owner_id` comes before `value`.
+pub fn (q CardQuery) where_owner_id_lt(value int) CardQuery {
+	return q.where(card_owner_id_lt(value))
+}
+
+// where_owner_id_le keeps the rows where `owner_id` comes at or before `value`.
+pub fn (q CardQuery) where_owner_id_le(value int) CardQuery {
+	return q.where(card_owner_id_le(value))
+}
+
+// where_owner_id_gt keeps the rows where `owner_id` comes after `value`.
+pub fn (q CardQuery) where_owner_id_gt(value int) CardQuery {
+	return q.where(card_owner_id_gt(value))
+}
+
+// where_owner_id_ge keeps the rows where `owner_id` comes at or after `value`.
+pub fn (q CardQuery) where_owner_id_ge(value int) CardQuery {
+	return q.where(card_owner_id_ge(value))
+}
+
+// where_owner_id_in keeps the rows where `owner_id` is one of `values`.
+pub fn (q CardQuery) where_owner_id_in(values []int) CardQuery {
+	return q.where(card_owner_id_in(values))
+}
+
+// where_owner_id_not_in keeps the rows where `owner_id` is none of `values`.
+pub fn (q CardQuery) where_owner_id_not_in(values []int) CardQuery {
+	return q.where(card_owner_id_not_in(values))
+}
+
+// has_owner keeps the rows where it has a `owner`.
+pub fn (q CardQuery) has_owner() CardQuery {
+	return q.where(card_has_owner())
+}
+
+// has_owner_with keeps the rows that have a `owner` that `configure` keeps.
+pub fn (q CardQuery) has_owner_with(configure fn (UserQuery) UserQuery) CardQuery {
+	return q.where(card_has_owner_with(...configure(q.graph.users()).query.conds))
+}
+
+// query_owner starts a query of the `owner` of the rows that match this
+// query's conditions; its order, limit and offset don't apply.
+pub fn (q CardQuery) query_owner() UserQuery {
+	return q.graph.users().where(load.in_sub('id', load.Sub{ table: 'cards', column: 'owner_id', kind: .int, conds: q.query.conds }))
+}
+
+// only returns the one matching row, with the requested edges: a
+// `NotFoundError` when there is none, a `NotSingularError` when there are more.
+pub fn (q CardQuery) only() !CardNode {
+	nodes := q.limit(2).all()!
+	if nodes.len == 0 {
+		return NotFoundError{
+			table: 'cards'
+		}
+	}
+	if nodes.len > 1 {
+		return NotSingularError{
+			table: 'cards'
+		}
+	}
+	return nodes[0]
+}
+
+// ids returns the keys of the matching rows, in order, and no edges.
+pub fn (q CardQuery) ids() ![]int {
+	keys := load.select_keys_where(q.graph.client.conn, 'cards', 'id', .int, q.graph.client.prepare_query('cards', q.query)!, true)!
+	return keys.map(it.int())
+}
+
+// first_id returns the key of the first matching row, or a `NotFoundError`.
+pub fn (q CardQuery) first_id() !int {
+	ids := q.limit(1).ids()!
+	if ids.len == 0 {
+		return NotFoundError{
+			table: 'cards'
+		}
+	}
+	return ids[0]
+}
+
+// only_id returns the key of the one matching row: a `NotFoundError` when
+// there is none, a `NotSingularError` when there are more.
+pub fn (q CardQuery) only_id() !int {
+	ids := q.limit(2).ids()!
+	if ids.len == 0 {
+		return NotFoundError{
+			table: 'cards'
+		}
+	}
+	if ids.len > 1 {
+		return NotSingularError{
+			table: 'cards'
+		}
+	}
+	return ids[0]
+}
+
+// exist reports whether any row matches.
+pub fn (q CardQuery) exist() !bool {
+	return q.limit(1).ids()!.len > 0
+}
+
+// select reads only `columns`, and the key, of the rows; the others keep their
+// zero values. An edge load needs the columns it follows.
+pub fn (q CardQuery) select(columns ...string) CardQuery {
+	mut all := columns.clone()
+	if 'id' !in all {
+		all << 'id'
+	}
 	mut next := q
 	next.query = load.Query{
 		...q.query
-		order: 'owner_id'
-		desc:  false
+		columns: all
 	}
 	return next
 }
 
-// order_by_owner_id_desc orders the rows by `owner_id`, descending.
-pub fn (q CardQuery) order_by_owner_id_desc() CardQuery {
+// unique makes `scan` read each distinct row once.
+pub fn (q CardQuery) unique() CardQuery {
 	mut next := q
 	next.query = load.Query{
 		...q.query
-		order: 'owner_id'
-		desc:  true
+		distinct: true
 	}
 	return next
+}
+
+// scan reads the matching rows into `T`, the app's struct for some of the
+// columns, by column name.
+pub fn (q CardQuery) scan[T]() ![]T {
+	return load.select_into[T](q.graph.client.conn, 'cards', 'id', .int, q.graph.client.prepare_query('cards', q.query)!)
+}
+
+// order_by orders the rows by `orders` too, after the orders given before,
+// such as `vgraph.desc('id').nulls_last()`.
+pub fn (q CardQuery) order_by(orders ...load.Order) CardQuery {
+	mut all := q.query.orders.clone()
+	all << orders
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		orders: all
+	}
+	return next
+}
+
+// for_update locks the matching rows (FOR UPDATE) until the transaction ends.
+// It runs in `tx`, on PostgreSQL.
+pub fn (q CardQuery) for_update() CardQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		lock: load.Lock{
+			...q.query.lock
+			mode: .update
+		}
+	}
+	return next
+}
+
+// for_share locks the matching rows (FOR SHARE) until the transaction ends.
+// It runs in `tx`, on PostgreSQL.
+pub fn (q CardQuery) for_share() CardQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		lock: load.Lock{
+			...q.query.lock
+			mode: .share
+		}
+	}
+	return next
+}
+
+// no_wait: a lock fails at once on a row another transaction locked.
+pub fn (q CardQuery) no_wait() CardQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		lock: load.Lock{
+			...q.query.lock
+			no_wait: true
+		}
+	}
+	return next
+}
+
+// skip_locked: a lock leaves out the rows other transactions locked.
+pub fn (q CardQuery) skip_locked() CardQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		lock: load.Lock{
+			...q.query.lock
+			skip_locked: true
+		}
+	}
+	return next
+}
+
+// sum_id returns the sum of `id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q CardQuery) sum_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'cards', 'id', q.graph.client.prepare_query('cards', q.query)!, .sum, 'id')
+}
+
+// min_id returns the min of `id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q CardQuery) min_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'cards', 'id', q.graph.client.prepare_query('cards', q.query)!, .min, 'id')
+}
+
+// max_id returns the max of `id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q CardQuery) max_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'cards', 'id', q.graph.client.prepare_query('cards', q.query)!, .max, 'id')
+}
+
+// mean_id returns the mean of `id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q CardQuery) mean_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'cards', 'id', q.graph.client.prepare_query('cards', q.query)!, .avg, 'id')
+}
+
+// sum_owner_id returns the sum of `owner_id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q CardQuery) sum_owner_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'cards', 'id', q.graph.client.prepare_query('cards', q.query)!, .sum, 'owner_id')
+}
+
+// min_owner_id returns the min of `owner_id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q CardQuery) min_owner_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'cards', 'id', q.graph.client.prepare_query('cards', q.query)!, .min, 'owner_id')
+}
+
+// max_owner_id returns the max of `owner_id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q CardQuery) max_owner_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'cards', 'id', q.graph.client.prepare_query('cards', q.query)!, .max, 'owner_id')
+}
+
+// mean_owner_id returns the mean of `owner_id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q CardQuery) mean_owner_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'cards', 'id', q.graph.client.prepare_query('cards', q.query)!, .avg, 'owner_id')
+}
+
+// CardGroupBy groups the rows of a `CardQuery`. Start one with `group_by`.
+pub struct CardGroupBy {
+	query CardQuery
+pub:
+	columns    []string
+	aggregates []load.Aggregate
+}
+
+// group_by groups the matching rows by `columns`. It needs a vgraph driver.
+pub fn (q CardQuery) group_by(columns ...string) CardGroupBy {
+	return CardGroupBy{
+		query:   q
+		columns: columns
+	}
+}
+
+// aggregate adds what each group gets, such as `vgraph.count()` or
+// `vgraph.sum('views')`.
+pub fn (g CardGroupBy) aggregate(aggregates ...load.Aggregate) CardGroupBy {
+	mut all := g.aggregates.clone()
+	all << aggregates
+	return CardGroupBy{
+		...g
+		aggregates: all
+	}
+}
+
+// all returns the groups, ordered by their columns.
+pub fn (g CardGroupBy) all() ![]load.Group {
+	q := g.query
+	return load.group_where(q.graph.client.conn, 'cards', q.graph.client.prepare_query('cards', q.query)!, g.columns.map(load.GroupColumn{
+		name: it
+		typ:  card_column_type(it)
+	}), g.aggregates)
+}
+
+// scan reads the groups into `T`, by name: its fields named after the grouped
+// columns and the aggregates (`count`, `sum_views`).
+pub fn (g CardGroupBy) scan[T]() ![]T {
+	return load.scan_groups[T](g.all()!)
+}
+
+// card_column_type returns the V type of a column of `cards`.
+fn card_column_type(column string) string {
+	return match column {
+		'id' { 'int' }
+		'number' { 'string' }
+		'owner_id' { 'int' }
+		else { '' }
+	}
+}
+
+// order_by_owner_name orders the rows by the `name` of their `owner`.
+pub fn (q CardQuery) order_by_owner_name() CardQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."name" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."owner_id")'
+	})
+}
+
+// order_by_owner_name_desc orders the rows by the `name` of their
+// `owner`, descending.
+pub fn (q CardQuery) order_by_owner_name_desc() CardQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."name" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."owner_id")'
+		desc: true
+	})
+}
+
+// order_by_owner_spouse_id orders the rows by the `spouse_id` of their `owner`.
+pub fn (q CardQuery) order_by_owner_spouse_id() CardQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."spouse_id" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."owner_id")'
+	})
+}
+
+// order_by_owner_spouse_id_desc orders the rows by the `spouse_id` of their
+// `owner`, descending.
+pub fn (q CardQuery) order_by_owner_spouse_id_desc() CardQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."spouse_id" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."owner_id")'
+		desc: true
+	})
 }
 
 // with_owner loads each row's `owner` (many_to_one `users`) with it, in one
@@ -246,31 +715,61 @@ pub fn (q CardQuery) nodes(rows []models.Card) ![]CardNode {
 		card:  it
 	})
 	if q.with_owner {
-		mut sub := q.graph.users()
-		for configure in q.owner_fns {
-			sub = configure(sub)
-		}
-		mut keys := []string{}
-		for row in rows {
-			keys << row.owner_id.str()
-		}
-		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
-			load.unique(keys),
-			query: q.graph.client.prepare_query('users', sub.query)!
-		)!)!
-		mut by_key := map[string]&UserNode{}
-		for target in targets {
-			by_key[target.user.id.str()] = &UserNode{
-				...target
-			}
-		}
+		found := q.load_owner(rows, q.owner_fns)!
 		for mut node in nodes {
-			if target := by_key[node.card.owner_id.str()] {
-				node.owner = target
+			// at most one each: the first, in the order of the query
+			list := found[node.card.id.str()] or { [] }
+			if list.len > 0 {
+				node.owner = &UserNode{
+					...list[0]
+				}
 			}
+			node.loaded << 'owner'
 		}
 	}
 	return nodes
+}
+
+// load_owner loads the `owner` of `rows`, keyed by each row's key.
+fn (q CardQuery) load_owner(rows []models.Card, fns []fn (UserQuery) UserQuery) !map[string][]UserNode {
+	mut sub := q.graph.users()
+	for configure in fns {
+		sub = configure(sub)
+	}
+	mut keys := []string{}
+	for row in rows {
+		keys << row.owner_id.str()
+	}
+	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id', load.unique(keys),
+		query: q.graph.client.prepare_query('users', sub.query)!
+	)!)!
+	mut by_key := map[string]UserNode{}
+	for target in targets {
+		by_key[target.user.id.str()] = target
+	}
+	mut found := map[string][]UserNode{}
+	for row in rows {
+		if target := by_key[row.owner_id.str()] {
+			found[row.id.str()] = [target]
+		}
+	}
+	return found
+}
+
+// owner_or_err returns the `owner`: a `NotLoadedError` when the query didn't
+// load it, a `NotFoundError` when the row has none.
+pub fn (n CardNode) owner_or_err() !&UserNode {
+	if 'owner' !in n.loaded {
+		return NotLoadedError{
+			edge: 'cards.owner'
+		}
+	}
+	if target := n.owner {
+		return target
+	}
+	return NotFoundError{
+		table: 'users'
+	}
 }
 
 // query_owner starts a query of this row's `owner`, which matches

@@ -9,20 +9,26 @@ import models
 pub struct GroupQuery {
 	graph Graph
 mut:
-	query        load.Query
-	with_users   bool
-	users_fns    []fn (UserQuery) UserQuery
-	with_devices bool
-	devices_fns  []fn (DeviceQuery) DeviceQuery
+	query         load.Query
+	with_users    bool
+	users_fns     []fn (UserQuery) UserQuery
+	named_users   map[string][]fn (UserQuery) UserQuery
+	with_devices  bool
+	devices_fns   []fn (DeviceQuery) DeviceQuery
+	named_devices map[string][]fn (DeviceQuery) DeviceQuery
 }
 
 // GroupNode is a `groups` row, with the edges its query loaded.
 pub struct GroupNode {
 	graph Graph
 pub mut:
-	group   models.Group
-	users   []UserNode   // set by `with_users()`
-	devices []DeviceNode // set by `with_devices()`
+	group         models.Group
+	users         []UserNode              // set by `with_users()`
+	named_users   map[string][]UserNode   // set by `with_named_users()`
+	devices       []DeviceNode            // set by `with_devices()`
+	named_devices map[string][]DeviceNode // set by `with_named_devices()`
+	// loaded: the edges the query loaded
+	loaded []string
 }
 
 // groups starts a query of `groups`.
@@ -73,92 +79,540 @@ pub fn (q GroupQuery) count() !int {
 	return load.count_where[models.Group](q.graph.client.conn, q.graph.client.prepare_query('groups', q.query)!)
 }
 
-// where_id keeps the rows whose `id` is `value`.
-pub fn (q GroupQuery) where_id(value int) GroupQuery {
-	return q.where(load.eq('id', value))
+// group_id_eq returns the condition that `id` is `value`.
+pub fn group_id_eq(value int) load.Cond {
+	return load.eq('id', value)
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
-pub fn (q GroupQuery) where_id_lt(value int) GroupQuery {
-	return q.where(load.lt('id', value))
+// group_id_ne returns the condition that `id` is not `value`.
+pub fn group_id_ne(value int) load.Cond {
+	return load.ne('id', value)
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
-pub fn (q GroupQuery) where_id_le(value int) GroupQuery {
-	return q.where(load.le('id', value))
+// group_id_lt returns the condition that `id` comes before `value`.
+pub fn group_id_lt(value int) load.Cond {
+	return load.lt('id', value)
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
-pub fn (q GroupQuery) where_id_gt(value int) GroupQuery {
-	return q.where(load.gt('id', value))
+// group_id_le returns the condition that `id` comes at or before `value`.
+pub fn group_id_le(value int) load.Cond {
+	return load.le('id', value)
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
-pub fn (q GroupQuery) where_id_ge(value int) GroupQuery {
-	return q.where(load.ge('id', value))
+// group_id_gt returns the condition that `id` comes after `value`.
+pub fn group_id_gt(value int) load.Cond {
+	return load.gt('id', value)
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
-pub fn (q GroupQuery) where_id_in(values []int) GroupQuery {
-	return q.where(load.in_ints('id', values))
+// group_id_ge returns the condition that `id` comes at or after `value`.
+pub fn group_id_ge(value int) load.Cond {
+	return load.ge('id', value)
 }
 
-// order_by_id orders the rows by `id`, ascending.
+// group_id_in returns the condition that `id` is one of `values`.
+pub fn group_id_in(values []int) load.Cond {
+	return load.in_ints('id', values)
+}
+
+// group_id_not_in returns the condition that `id` is none of `values`.
+pub fn group_id_not_in(values []int) load.Cond {
+	return load.not_in_ints('id', values)
+}
+
+// group_name_eq returns the condition that `name` is `value`.
+pub fn group_name_eq(value string) load.Cond {
+	return load.eq('name', value)
+}
+
+// group_name_ne returns the condition that `name` is not `value`.
+pub fn group_name_ne(value string) load.Cond {
+	return load.ne('name', value)
+}
+
+// group_name_in returns the condition that `name` is one of `values`.
+pub fn group_name_in(values []string) load.Cond {
+	return load.in_strings('name', values)
+}
+
+// group_name_not_in returns the condition that `name` is none of `values`.
+pub fn group_name_not_in(values []string) load.Cond {
+	return load.not_in_strings('name', values)
+}
+
+// group_name_like returns the condition that `name` matches the SQL LIKE `pattern`.
+pub fn group_name_like(pattern string) load.Cond {
+	return load.like('name', pattern)
+}
+
+// group_name_contains returns the condition that `name` contains `value`.
+pub fn group_name_contains(value string) load.Cond {
+	return load.contains('name', value)
+}
+
+// group_name_has_prefix returns the condition that `name` starts with `value`.
+pub fn group_name_has_prefix(value string) load.Cond {
+	return load.has_prefix('name', value)
+}
+
+// group_name_has_suffix returns the condition that `name` ends with `value`.
+pub fn group_name_has_suffix(value string) load.Cond {
+	return load.has_suffix('name', value)
+}
+
+// group_name_equal_fold returns the condition that `name` is `value`, ignoring case.
+pub fn group_name_equal_fold(value string) load.Cond {
+	return load.equal_fold('name', value)
+}
+
+// group_name_contains_fold returns the condition that `name` contains `value`, ignoring case.
+pub fn group_name_contains_fold(value string) load.Cond {
+	return load.contains_fold('name', value)
+}
+
+// group_has_users returns the condition that it has a `users`.
+pub fn group_has_users() load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'group_users', column: 'group_id', kind: .int, conds: [load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} })] })
+}
+
+// group_has_users_with returns the condition that it has a `users` that matches `conds`.
+pub fn group_has_users_with(conds ...load.Cond) load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'group_users', column: 'group_id', kind: .int, conds: [load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds })] })
+}
+
+// group_has_devices returns the condition that it has a `devices`.
+pub fn group_has_devices() load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'device_groups', column: 'group_id', kind: .int, conds: [load.in_sub('device_id', load.Sub{ table: 'devices', column: 'id', kind: .string, conds: []load.Cond{} })] })
+}
+
+// group_has_devices_with returns the condition that it has a `devices` that matches `conds`.
+pub fn group_has_devices_with(conds ...load.Cond) load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'device_groups', column: 'group_id', kind: .int, conds: [load.in_sub('device_id', load.Sub{ table: 'devices', column: 'id', kind: .string, conds: conds })] })
+}
+
+// order_by_id orders the rows by `id`, ascending, after the orders
+// given before.
 pub fn (q GroupQuery) order_by_id() GroupQuery {
-	mut next := q
-	next.query = load.Query{
-		...q.query
-		order: 'id'
-		desc:  false
-	}
-	return next
+	return q.order_by(load.asc('id'))
 }
 
-// order_by_id_desc orders the rows by `id`, descending.
+// order_by_id_desc orders the rows by `id`, descending, after the
+// orders given before.
 pub fn (q GroupQuery) order_by_id_desc() GroupQuery {
-	mut next := q
-	next.query = load.Query{
-		...q.query
-		order: 'id'
-		desc:  true
-	}
-	return next
+	return q.order_by(load.desc('id'))
 }
 
-// where_name keeps the rows whose `name` is `value`.
-pub fn (q GroupQuery) where_name(value string) GroupQuery {
-	return q.where(load.eq('name', value))
-}
-
-// where_name_in keeps the rows whose `name` is one of `values`.
-pub fn (q GroupQuery) where_name_in(values []string) GroupQuery {
-	return q.where(load.in_strings('name', values))
-}
-
-// where_name_like keeps the rows whose `name` matches the SQL LIKE `pattern`.
-pub fn (q GroupQuery) where_name_like(pattern string) GroupQuery {
-	return q.where(load.like('name', pattern))
-}
-
-// order_by_name orders the rows by `name`, ascending.
+// order_by_name orders the rows by `name`, ascending, after the orders
+// given before.
 pub fn (q GroupQuery) order_by_name() GroupQuery {
+	return q.order_by(load.asc('name'))
+}
+
+// order_by_name_desc orders the rows by `name`, descending, after the
+// orders given before.
+pub fn (q GroupQuery) order_by_name_desc() GroupQuery {
+	return q.order_by(load.desc('name'))
+}
+
+// where_id keeps the rows where `id` is `value`.
+pub fn (q GroupQuery) where_id(value int) GroupQuery {
+	return q.where(group_id_eq(value))
+}
+
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q GroupQuery) where_id_ne(value int) GroupQuery {
+	return q.where(group_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
+pub fn (q GroupQuery) where_id_lt(value int) GroupQuery {
+	return q.where(group_id_lt(value))
+}
+
+// where_id_le keeps the rows where `id` comes at or before `value`.
+pub fn (q GroupQuery) where_id_le(value int) GroupQuery {
+	return q.where(group_id_le(value))
+}
+
+// where_id_gt keeps the rows where `id` comes after `value`.
+pub fn (q GroupQuery) where_id_gt(value int) GroupQuery {
+	return q.where(group_id_gt(value))
+}
+
+// where_id_ge keeps the rows where `id` comes at or after `value`.
+pub fn (q GroupQuery) where_id_ge(value int) GroupQuery {
+	return q.where(group_id_ge(value))
+}
+
+// where_id_in keeps the rows where `id` is one of `values`.
+pub fn (q GroupQuery) where_id_in(values []int) GroupQuery {
+	return q.where(group_id_in(values))
+}
+
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q GroupQuery) where_id_not_in(values []int) GroupQuery {
+	return q.where(group_id_not_in(values))
+}
+
+// where_name keeps the rows where `name` is `value`.
+pub fn (q GroupQuery) where_name(value string) GroupQuery {
+	return q.where(group_name_eq(value))
+}
+
+// where_name_ne keeps the rows where `name` is not `value`.
+pub fn (q GroupQuery) where_name_ne(value string) GroupQuery {
+	return q.where(group_name_ne(value))
+}
+
+// where_name_in keeps the rows where `name` is one of `values`.
+pub fn (q GroupQuery) where_name_in(values []string) GroupQuery {
+	return q.where(group_name_in(values))
+}
+
+// where_name_not_in keeps the rows where `name` is none of `values`.
+pub fn (q GroupQuery) where_name_not_in(values []string) GroupQuery {
+	return q.where(group_name_not_in(values))
+}
+
+// where_name_like keeps the rows where `name` matches the SQL LIKE `pattern`.
+pub fn (q GroupQuery) where_name_like(pattern string) GroupQuery {
+	return q.where(group_name_like(pattern))
+}
+
+// where_name_contains keeps the rows where `name` contains `value`.
+pub fn (q GroupQuery) where_name_contains(value string) GroupQuery {
+	return q.where(group_name_contains(value))
+}
+
+// where_name_has_prefix keeps the rows where `name` starts with `value`.
+pub fn (q GroupQuery) where_name_has_prefix(value string) GroupQuery {
+	return q.where(group_name_has_prefix(value))
+}
+
+// where_name_has_suffix keeps the rows where `name` ends with `value`.
+pub fn (q GroupQuery) where_name_has_suffix(value string) GroupQuery {
+	return q.where(group_name_has_suffix(value))
+}
+
+// where_name_equal_fold keeps the rows where `name` is `value`, ignoring case.
+pub fn (q GroupQuery) where_name_equal_fold(value string) GroupQuery {
+	return q.where(group_name_equal_fold(value))
+}
+
+// where_name_contains_fold keeps the rows where `name` contains `value`, ignoring case.
+pub fn (q GroupQuery) where_name_contains_fold(value string) GroupQuery {
+	return q.where(group_name_contains_fold(value))
+}
+
+// has_users keeps the rows where it has a `users`.
+pub fn (q GroupQuery) has_users() GroupQuery {
+	return q.where(group_has_users())
+}
+
+// has_users_with keeps the rows that have a `users` that `configure` keeps.
+pub fn (q GroupQuery) has_users_with(configure fn (UserQuery) UserQuery) GroupQuery {
+	return q.where(group_has_users_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_devices keeps the rows where it has a `devices`.
+pub fn (q GroupQuery) has_devices() GroupQuery {
+	return q.where(group_has_devices())
+}
+
+// has_devices_with keeps the rows that have a `devices` that `configure` keeps.
+pub fn (q GroupQuery) has_devices_with(configure fn (DeviceQuery) DeviceQuery) GroupQuery {
+	return q.where(group_has_devices_with(...configure(q.graph.devices()).query.conds))
+}
+
+// query_users starts a query of the `users` of the rows that match this
+// query's conditions; its order, limit and offset don't apply.
+pub fn (q GroupQuery) query_users() UserQuery {
+	return q.graph.users().where(load.in_sub('id', load.Sub{ table: 'group_users', column: 'user_id', kind: .int, conds: [load.in_sub('group_id', load.Sub{ table: 'groups', column: 'id', kind: .int, conds: q.query.conds })] }))
+}
+
+// query_devices starts a query of the `devices` of the rows that match this
+// query's conditions; its order, limit and offset don't apply.
+pub fn (q GroupQuery) query_devices() DeviceQuery {
+	return q.graph.devices().where(load.in_sub('id', load.Sub{ table: 'device_groups', column: 'device_id', kind: .string, conds: [load.in_sub('group_id', load.Sub{ table: 'groups', column: 'id', kind: .int, conds: q.query.conds })] }))
+}
+
+// only returns the one matching row, with the requested edges: a
+// `NotFoundError` when there is none, a `NotSingularError` when there are more.
+pub fn (q GroupQuery) only() !GroupNode {
+	nodes := q.limit(2).all()!
+	if nodes.len == 0 {
+		return NotFoundError{
+			table: 'groups'
+		}
+	}
+	if nodes.len > 1 {
+		return NotSingularError{
+			table: 'groups'
+		}
+	}
+	return nodes[0]
+}
+
+// ids returns the keys of the matching rows, in order, and no edges.
+pub fn (q GroupQuery) ids() ![]int {
+	keys := load.select_keys_where(q.graph.client.conn, 'groups', 'id', .int, q.graph.client.prepare_query('groups', q.query)!, true)!
+	return keys.map(it.int())
+}
+
+// first_id returns the key of the first matching row, or a `NotFoundError`.
+pub fn (q GroupQuery) first_id() !int {
+	ids := q.limit(1).ids()!
+	if ids.len == 0 {
+		return NotFoundError{
+			table: 'groups'
+		}
+	}
+	return ids[0]
+}
+
+// only_id returns the key of the one matching row: a `NotFoundError` when
+// there is none, a `NotSingularError` when there are more.
+pub fn (q GroupQuery) only_id() !int {
+	ids := q.limit(2).ids()!
+	if ids.len == 0 {
+		return NotFoundError{
+			table: 'groups'
+		}
+	}
+	if ids.len > 1 {
+		return NotSingularError{
+			table: 'groups'
+		}
+	}
+	return ids[0]
+}
+
+// exist reports whether any row matches.
+pub fn (q GroupQuery) exist() !bool {
+	return q.limit(1).ids()!.len > 0
+}
+
+// select reads only `columns`, and the key, of the rows; the others keep their
+// zero values. An edge load needs the columns it follows.
+pub fn (q GroupQuery) select(columns ...string) GroupQuery {
+	mut all := columns.clone()
+	if 'id' !in all {
+		all << 'id'
+	}
 	mut next := q
 	next.query = load.Query{
 		...q.query
-		order: 'name'
-		desc:  false
+		columns: all
 	}
 	return next
 }
 
-// order_by_name_desc orders the rows by `name`, descending.
-pub fn (q GroupQuery) order_by_name_desc() GroupQuery {
+// unique makes `scan` read each distinct row once.
+pub fn (q GroupQuery) unique() GroupQuery {
 	mut next := q
 	next.query = load.Query{
 		...q.query
-		order: 'name'
-		desc:  true
+		distinct: true
 	}
+	return next
+}
+
+// scan reads the matching rows into `T`, the app's struct for some of the
+// columns, by column name.
+pub fn (q GroupQuery) scan[T]() ![]T {
+	return load.select_into[T](q.graph.client.conn, 'groups', 'id', .int, q.graph.client.prepare_query('groups', q.query)!)
+}
+
+// order_by orders the rows by `orders` too, after the orders given before,
+// such as `vgraph.desc('id').nulls_last()`.
+pub fn (q GroupQuery) order_by(orders ...load.Order) GroupQuery {
+	mut all := q.query.orders.clone()
+	all << orders
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		orders: all
+	}
+	return next
+}
+
+// for_update locks the matching rows (FOR UPDATE) until the transaction ends.
+// It runs in `tx`, on PostgreSQL.
+pub fn (q GroupQuery) for_update() GroupQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		lock: load.Lock{
+			...q.query.lock
+			mode: .update
+		}
+	}
+	return next
+}
+
+// for_share locks the matching rows (FOR SHARE) until the transaction ends.
+// It runs in `tx`, on PostgreSQL.
+pub fn (q GroupQuery) for_share() GroupQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		lock: load.Lock{
+			...q.query.lock
+			mode: .share
+		}
+	}
+	return next
+}
+
+// no_wait: a lock fails at once on a row another transaction locked.
+pub fn (q GroupQuery) no_wait() GroupQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		lock: load.Lock{
+			...q.query.lock
+			no_wait: true
+		}
+	}
+	return next
+}
+
+// skip_locked: a lock leaves out the rows other transactions locked.
+pub fn (q GroupQuery) skip_locked() GroupQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		lock: load.Lock{
+			...q.query.lock
+			skip_locked: true
+		}
+	}
+	return next
+}
+
+// sum_id returns the sum of `id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q GroupQuery) sum_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'groups', 'id', q.graph.client.prepare_query('groups', q.query)!, .sum, 'id')
+}
+
+// min_id returns the min of `id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q GroupQuery) min_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'groups', 'id', q.graph.client.prepare_query('groups', q.query)!, .min, 'id')
+}
+
+// max_id returns the max of `id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q GroupQuery) max_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'groups', 'id', q.graph.client.prepare_query('groups', q.query)!, .max, 'id')
+}
+
+// mean_id returns the mean of `id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q GroupQuery) mean_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'groups', 'id', q.graph.client.prepare_query('groups', q.query)!, .avg, 'id')
+}
+
+// GroupGroupBy groups the rows of a `GroupQuery`. Start one with `group_by`.
+pub struct GroupGroupBy {
+	query GroupQuery
+pub:
+	columns    []string
+	aggregates []load.Aggregate
+}
+
+// group_by groups the matching rows by `columns`. It needs a vgraph driver.
+pub fn (q GroupQuery) group_by(columns ...string) GroupGroupBy {
+	return GroupGroupBy{
+		query:   q
+		columns: columns
+	}
+}
+
+// aggregate adds what each group gets, such as `vgraph.count()` or
+// `vgraph.sum('views')`.
+pub fn (g GroupGroupBy) aggregate(aggregates ...load.Aggregate) GroupGroupBy {
+	mut all := g.aggregates.clone()
+	all << aggregates
+	return GroupGroupBy{
+		...g
+		aggregates: all
+	}
+}
+
+// all returns the groups, ordered by their columns.
+pub fn (g GroupGroupBy) all() ![]load.Group {
+	q := g.query
+	return load.group_where(q.graph.client.conn, 'groups', q.graph.client.prepare_query('groups', q.query)!, g.columns.map(load.GroupColumn{
+		name: it
+		typ:  group_column_type(it)
+	}), g.aggregates)
+}
+
+// scan reads the groups into `T`, by name: its fields named after the grouped
+// columns and the aggregates (`count`, `sum_views`).
+pub fn (g GroupGroupBy) scan[T]() ![]T {
+	return load.scan_groups[T](g.all()!)
+}
+
+// group_column_type returns the V type of a column of `groups`.
+fn group_column_type(column string) string {
+	return match column {
+		'id' { 'int' }
+		'name' { 'string' }
+		else { '' }
+	}
+}
+
+// order_by_users_count orders the rows by their number of `users`.
+pub fn (q GroupQuery) order_by_users_count() GroupQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "group_users" AS "t1" WHERE "t1"."group_id" = "t0"."id")'
+	})
+}
+
+// order_by_users_count_desc orders the rows by their number of `users`, most
+// first.
+pub fn (q GroupQuery) order_by_users_count_desc() GroupQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "group_users" AS "t1" WHERE "t1"."group_id" = "t0"."id")'
+		desc: true
+	})
+}
+
+// with_named_users loads `users` as `configure` says into
+// `named_users[name]`, besides any other load of it.
+pub fn (q GroupQuery) with_named_users(name string, configure ...fn (UserQuery) UserQuery) GroupQuery {
+	mut next := q
+	mut named := q.named_users.clone()
+	named[name] = configure
+	next.named_users = named
+	return next
+}
+
+// order_by_devices_count orders the rows by their number of `devices`.
+pub fn (q GroupQuery) order_by_devices_count() GroupQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "device_groups" AS "t1" WHERE "t1"."group_id" = "t0"."id")'
+	})
+}
+
+// order_by_devices_count_desc orders the rows by their number of `devices`, most
+// first.
+pub fn (q GroupQuery) order_by_devices_count_desc() GroupQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "device_groups" AS "t1" WHERE "t1"."group_id" = "t0"."id")'
+		desc: true
+	})
+}
+
+// with_named_devices loads `devices` as `configure` says into
+// `named_devices[name]`, besides any other load of it.
+pub fn (q GroupQuery) with_named_devices(name string, configure ...fn (DeviceQuery) DeviceQuery) GroupQuery {
+	mut next := q
+	mut named := q.named_devices.clone()
+	named[name] = configure
+	next.named_devices = named
 	return next
 }
 
@@ -206,58 +660,106 @@ pub fn (q GroupQuery) nodes(rows []models.Group) ![]GroupNode {
 		group: it
 	})
 	if q.with_users {
-		mut sub := q.graph.users()
-		for configure in q.users_fns {
-			sub = configure(sub)
-		}
-		pairs := load.link_pairs(q.graph.client.conn, 'group_users', 'group_id',
-			'user_id', rows.map(it.id.str()), .int, .int)!
-		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
-			load.unique(pairs.map(it[1])),
-			query: q.graph.client.prepare_query('users', sub.query)!
-		)!)!
-		// each parent's targets in the order of the query
-		mut parents_of := map[string][]string{}
-		for pair in pairs {
-			parents_of[pair[1]] << pair[0]
-		}
-		mut linked := map[string][]UserNode{}
-		for target in targets {
-			for parent in parents_of[target.user.id.str()] or { [] } {
-				linked[parent] << target
-			}
-		}
+		found := q.load_users(rows, q.users_fns)!
 		for mut node in nodes {
-			node.users = linked[node.group.id.str()] or { [] }
+			node.users = found[node.group.id.str()] or { [] }
+			node.loaded << 'users'
+		}
+	}
+	for name, fns in q.named_users {
+		found := q.load_users(rows, fns)!
+		for mut node in nodes {
+			node.named_users[name] = found[node.group.id.str()] or { [] }
 		}
 	}
 	if q.with_devices {
-		mut sub := q.graph.devices()
-		for configure in q.devices_fns {
-			sub = configure(sub)
-		}
-		pairs := load.link_pairs(q.graph.client.conn, 'device_groups', 'group_id',
-			'device_id', rows.map(it.id.str()), .int, .string)!
-		targets := sub.nodes(load.select_in[models.Device](q.graph.client.conn, 'id',
-			load.unique(pairs.map(it[1])),
-			query: q.graph.client.prepare_query('devices', sub.query)!
-		)!)!
-		// each parent's targets in the order of the query
-		mut parents_of := map[string][]string{}
-		for pair in pairs {
-			parents_of[pair[1]] << pair[0]
-		}
-		mut linked := map[string][]DeviceNode{}
-		for target in targets {
-			for parent in parents_of[target.device.id.str()] or { [] } {
-				linked[parent] << target
-			}
-		}
+		found := q.load_devices(rows, q.devices_fns)!
 		for mut node in nodes {
-			node.devices = linked[node.group.id.str()] or { [] }
+			node.devices = found[node.group.id.str()] or { [] }
+			node.loaded << 'devices'
+		}
+	}
+	for name, fns in q.named_devices {
+		found := q.load_devices(rows, fns)!
+		for mut node in nodes {
+			node.named_devices[name] = found[node.group.id.str()] or { [] }
 		}
 	}
 	return nodes
+}
+
+// load_users loads the `users` of `rows`, keyed by each row's key.
+fn (q GroupQuery) load_users(rows []models.Group, fns []fn (UserQuery) UserQuery) !map[string][]UserNode {
+	mut sub := q.graph.users()
+	for configure in fns {
+		sub = configure(sub)
+	}
+	pairs := load.link_pairs(q.graph.client.conn, 'group_users', 'group_id',
+		'user_id', rows.map(it.id.str()), .int, .int)!
+	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
+		load.unique(pairs.map(it[1])),
+		query: q.graph.client.prepare_query('users', sub.query)!
+	)!)!
+	// each parent's targets in the order of the query
+	mut parents_of := map[string][]string{}
+	for pair in pairs {
+		parents_of[pair[1]] << pair[0]
+	}
+	mut linked := map[string][]UserNode{}
+	for target in targets {
+		for parent in parents_of[target.user.id.str()] or { [] } {
+			linked[parent] << target
+		}
+	}
+	return linked
+}
+
+// users_or_err returns the `users`, or a `NotLoadedError` when the query
+// didn't load them.
+pub fn (n GroupNode) users_or_err() ![]UserNode {
+	if 'users' !in n.loaded {
+		return NotLoadedError{
+			edge: 'groups.users'
+		}
+	}
+	return n.users
+}
+
+// load_devices loads the `devices` of `rows`, keyed by each row's key.
+fn (q GroupQuery) load_devices(rows []models.Group, fns []fn (DeviceQuery) DeviceQuery) !map[string][]DeviceNode {
+	mut sub := q.graph.devices()
+	for configure in fns {
+		sub = configure(sub)
+	}
+	pairs := load.link_pairs(q.graph.client.conn, 'device_groups', 'group_id',
+		'device_id', rows.map(it.id.str()), .int, .string)!
+	targets := sub.nodes(load.select_in[models.Device](q.graph.client.conn, 'id',
+		load.unique(pairs.map(it[1])),
+		query: q.graph.client.prepare_query('devices', sub.query)!
+	)!)!
+	// each parent's targets in the order of the query
+	mut parents_of := map[string][]string{}
+	for pair in pairs {
+		parents_of[pair[1]] << pair[0]
+	}
+	mut linked := map[string][]DeviceNode{}
+	for target in targets {
+		for parent in parents_of[target.device.id.str()] or { [] } {
+			linked[parent] << target
+		}
+	}
+	return linked
+}
+
+// devices_or_err returns the `devices`, or a `NotLoadedError` when the query
+// didn't load them.
+pub fn (n GroupNode) devices_or_err() ![]DeviceNode {
+	if 'devices' !in n.loaded {
+		return NotLoadedError{
+			edge: 'groups.devices'
+		}
+	}
+	return n.devices
 }
 
 // query_users starts a query of this row's `users`. It reads the join

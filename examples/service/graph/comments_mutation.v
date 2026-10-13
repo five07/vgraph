@@ -960,264 +960,474 @@ pub fn (b CommentUpdate) where(conds ...load.Cond) CommentUpdate {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q CommentUpdate) where_id(value int) CommentUpdate {
-	return q.where(load.eq('id', value))
+	return q.where(comment_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q CommentUpdate) where_id_ne(value int) CommentUpdate {
+	return q.where(comment_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q CommentUpdate) where_id_lt(value int) CommentUpdate {
-	return q.where(load.lt('id', value))
+	return q.where(comment_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q CommentUpdate) where_id_le(value int) CommentUpdate {
-	return q.where(load.le('id', value))
+	return q.where(comment_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q CommentUpdate) where_id_gt(value int) CommentUpdate {
-	return q.where(load.gt('id', value))
+	return q.where(comment_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q CommentUpdate) where_id_ge(value int) CommentUpdate {
-	return q.where(load.ge('id', value))
+	return q.where(comment_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q CommentUpdate) where_id_in(values []int) CommentUpdate {
-	return q.where(load.in_ints('id', values))
+	return q.where(comment_id_in(values))
 }
 
-// where_slug keeps the rows whose `slug` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q CommentUpdate) where_id_not_in(values []int) CommentUpdate {
+	return q.where(comment_id_not_in(values))
+}
+
+// where_slug keeps the rows where `slug` is `value`.
 pub fn (q CommentUpdate) where_slug(value string) CommentUpdate {
-	return q.where(load.eq('slug', value))
+	return q.where(comment_slug_eq(value))
 }
 
-// where_slug_in keeps the rows whose `slug` is one of `values`.
+// where_slug_ne keeps the rows where `slug` is not `value`.
+pub fn (q CommentUpdate) where_slug_ne(value string) CommentUpdate {
+	return q.where(comment_slug_ne(value))
+}
+
+// where_slug_in keeps the rows where `slug` is one of `values`.
 pub fn (q CommentUpdate) where_slug_in(values []string) CommentUpdate {
-	return q.where(load.in_strings('slug', values))
+	return q.where(comment_slug_in(values))
 }
 
-// where_slug_like keeps the rows whose `slug` matches the SQL LIKE `pattern`.
+// where_slug_not_in keeps the rows where `slug` is none of `values`.
+pub fn (q CommentUpdate) where_slug_not_in(values []string) CommentUpdate {
+	return q.where(comment_slug_not_in(values))
+}
+
+// where_slug_like keeps the rows where `slug` matches the SQL LIKE `pattern`.
 pub fn (q CommentUpdate) where_slug_like(pattern string) CommentUpdate {
-	return q.where(load.like('slug', pattern))
+	return q.where(comment_slug_like(pattern))
 }
 
-// where_user_id keeps the rows whose `user_id` is `value`.
+// where_slug_contains keeps the rows where `slug` contains `value`.
+pub fn (q CommentUpdate) where_slug_contains(value string) CommentUpdate {
+	return q.where(comment_slug_contains(value))
+}
+
+// where_slug_has_prefix keeps the rows where `slug` starts with `value`.
+pub fn (q CommentUpdate) where_slug_has_prefix(value string) CommentUpdate {
+	return q.where(comment_slug_has_prefix(value))
+}
+
+// where_slug_has_suffix keeps the rows where `slug` ends with `value`.
+pub fn (q CommentUpdate) where_slug_has_suffix(value string) CommentUpdate {
+	return q.where(comment_slug_has_suffix(value))
+}
+
+// where_slug_equal_fold keeps the rows where `slug` is `value`, ignoring case.
+pub fn (q CommentUpdate) where_slug_equal_fold(value string) CommentUpdate {
+	return q.where(comment_slug_equal_fold(value))
+}
+
+// where_slug_contains_fold keeps the rows where `slug` contains `value`, ignoring case.
+pub fn (q CommentUpdate) where_slug_contains_fold(value string) CommentUpdate {
+	return q.where(comment_slug_contains_fold(value))
+}
+
+// where_user_id keeps the rows where `user_id` is `value`.
 pub fn (q CommentUpdate) where_user_id(value int) CommentUpdate {
-	return q.where(load.eq('user_id', value))
+	return q.where(comment_user_id_eq(value))
 }
 
-// where_user_id_lt keeps the rows whose `user_id` comes before `value`.
+// where_user_id_ne keeps the rows where `user_id` is not `value`.
+pub fn (q CommentUpdate) where_user_id_ne(value int) CommentUpdate {
+	return q.where(comment_user_id_ne(value))
+}
+
+// where_user_id_lt keeps the rows where `user_id` comes before `value`.
 pub fn (q CommentUpdate) where_user_id_lt(value int) CommentUpdate {
-	return q.where(load.lt('user_id', value))
+	return q.where(comment_user_id_lt(value))
 }
 
-// where_user_id_le keeps the rows whose `user_id` comes at or before `value`.
+// where_user_id_le keeps the rows where `user_id` comes at or before `value`.
 pub fn (q CommentUpdate) where_user_id_le(value int) CommentUpdate {
-	return q.where(load.le('user_id', value))
+	return q.where(comment_user_id_le(value))
 }
 
-// where_user_id_gt keeps the rows whose `user_id` comes after `value`.
+// where_user_id_gt keeps the rows where `user_id` comes after `value`.
 pub fn (q CommentUpdate) where_user_id_gt(value int) CommentUpdate {
-	return q.where(load.gt('user_id', value))
+	return q.where(comment_user_id_gt(value))
 }
 
-// where_user_id_ge keeps the rows whose `user_id` comes at or after `value`.
+// where_user_id_ge keeps the rows where `user_id` comes at or after `value`.
 pub fn (q CommentUpdate) where_user_id_ge(value int) CommentUpdate {
-	return q.where(load.ge('user_id', value))
+	return q.where(comment_user_id_ge(value))
 }
 
-// where_user_id_in keeps the rows whose `user_id` is one of `values`.
+// where_user_id_in keeps the rows where `user_id` is one of `values`.
 pub fn (q CommentUpdate) where_user_id_in(values []int) CommentUpdate {
-	return q.where(load.in_ints('user_id', values))
+	return q.where(comment_user_id_in(values))
 }
 
-// where_owner_type keeps the rows whose `owner_type` is `value`.
+// where_user_id_not_in keeps the rows where `user_id` is none of `values`.
+pub fn (q CommentUpdate) where_user_id_not_in(values []int) CommentUpdate {
+	return q.where(comment_user_id_not_in(values))
+}
+
+// where_owner_type keeps the rows where `owner_type` is `value`.
 pub fn (q CommentUpdate) where_owner_type(value string) CommentUpdate {
-	return q.where(load.eq('owner_type', value))
+	return q.where(comment_owner_type_eq(value))
 }
 
-// where_owner_type_in keeps the rows whose `owner_type` is one of `values`.
+// where_owner_type_ne keeps the rows where `owner_type` is not `value`.
+pub fn (q CommentUpdate) where_owner_type_ne(value string) CommentUpdate {
+	return q.where(comment_owner_type_ne(value))
+}
+
+// where_owner_type_in keeps the rows where `owner_type` is one of `values`.
 pub fn (q CommentUpdate) where_owner_type_in(values []string) CommentUpdate {
-	return q.where(load.in_strings('owner_type', values))
+	return q.where(comment_owner_type_in(values))
 }
 
-// where_owner_type_like keeps the rows whose `owner_type` matches the SQL LIKE `pattern`.
+// where_owner_type_not_in keeps the rows where `owner_type` is none of `values`.
+pub fn (q CommentUpdate) where_owner_type_not_in(values []string) CommentUpdate {
+	return q.where(comment_owner_type_not_in(values))
+}
+
+// where_owner_type_like keeps the rows where `owner_type` matches the SQL LIKE `pattern`.
 pub fn (q CommentUpdate) where_owner_type_like(pattern string) CommentUpdate {
-	return q.where(load.like('owner_type', pattern))
+	return q.where(comment_owner_type_like(pattern))
 }
 
-// where_owner_id keeps the rows whose `owner_id` is `value`.
+// where_owner_type_contains keeps the rows where `owner_type` contains `value`.
+pub fn (q CommentUpdate) where_owner_type_contains(value string) CommentUpdate {
+	return q.where(comment_owner_type_contains(value))
+}
+
+// where_owner_type_has_prefix keeps the rows where `owner_type` starts with `value`.
+pub fn (q CommentUpdate) where_owner_type_has_prefix(value string) CommentUpdate {
+	return q.where(comment_owner_type_has_prefix(value))
+}
+
+// where_owner_type_has_suffix keeps the rows where `owner_type` ends with `value`.
+pub fn (q CommentUpdate) where_owner_type_has_suffix(value string) CommentUpdate {
+	return q.where(comment_owner_type_has_suffix(value))
+}
+
+// where_owner_type_equal_fold keeps the rows where `owner_type` is `value`, ignoring case.
+pub fn (q CommentUpdate) where_owner_type_equal_fold(value string) CommentUpdate {
+	return q.where(comment_owner_type_equal_fold(value))
+}
+
+// where_owner_type_contains_fold keeps the rows where `owner_type` contains `value`, ignoring case.
+pub fn (q CommentUpdate) where_owner_type_contains_fold(value string) CommentUpdate {
+	return q.where(comment_owner_type_contains_fold(value))
+}
+
+// where_owner_id keeps the rows where `owner_id` is `value`.
 pub fn (q CommentUpdate) where_owner_id(value int) CommentUpdate {
-	return q.where(load.eq('owner_id', value))
+	return q.where(comment_owner_id_eq(value))
 }
 
-// where_owner_id_lt keeps the rows whose `owner_id` comes before `value`.
+// where_owner_id_ne keeps the rows where `owner_id` is not `value`.
+pub fn (q CommentUpdate) where_owner_id_ne(value int) CommentUpdate {
+	return q.where(comment_owner_id_ne(value))
+}
+
+// where_owner_id_lt keeps the rows where `owner_id` comes before `value`.
 pub fn (q CommentUpdate) where_owner_id_lt(value int) CommentUpdate {
-	return q.where(load.lt('owner_id', value))
+	return q.where(comment_owner_id_lt(value))
 }
 
-// where_owner_id_le keeps the rows whose `owner_id` comes at or before `value`.
+// where_owner_id_le keeps the rows where `owner_id` comes at or before `value`.
 pub fn (q CommentUpdate) where_owner_id_le(value int) CommentUpdate {
-	return q.where(load.le('owner_id', value))
+	return q.where(comment_owner_id_le(value))
 }
 
-// where_owner_id_gt keeps the rows whose `owner_id` comes after `value`.
+// where_owner_id_gt keeps the rows where `owner_id` comes after `value`.
 pub fn (q CommentUpdate) where_owner_id_gt(value int) CommentUpdate {
-	return q.where(load.gt('owner_id', value))
+	return q.where(comment_owner_id_gt(value))
 }
 
-// where_owner_id_ge keeps the rows whose `owner_id` comes at or after `value`.
+// where_owner_id_ge keeps the rows where `owner_id` comes at or after `value`.
 pub fn (q CommentUpdate) where_owner_id_ge(value int) CommentUpdate {
-	return q.where(load.ge('owner_id', value))
+	return q.where(comment_owner_id_ge(value))
 }
 
-// where_owner_id_in keeps the rows whose `owner_id` is one of `values`.
+// where_owner_id_in keeps the rows where `owner_id` is one of `values`.
 pub fn (q CommentUpdate) where_owner_id_in(values []int) CommentUpdate {
-	return q.where(load.in_ints('owner_id', values))
+	return q.where(comment_owner_id_in(values))
 }
 
-// where_parent_id keeps the rows whose `parent_id` is `value`.
+// where_owner_id_not_in keeps the rows where `owner_id` is none of `values`.
+pub fn (q CommentUpdate) where_owner_id_not_in(values []int) CommentUpdate {
+	return q.where(comment_owner_id_not_in(values))
+}
+
+// where_parent_id keeps the rows where `parent_id` is `value`.
 pub fn (q CommentUpdate) where_parent_id(value int) CommentUpdate {
-	return q.where(load.eq('parent_id', value))
+	return q.where(comment_parent_id_eq(value))
 }
 
-// where_parent_id_lt keeps the rows whose `parent_id` comes before `value`.
+// where_parent_id_ne keeps the rows where `parent_id` is not `value`.
+pub fn (q CommentUpdate) where_parent_id_ne(value int) CommentUpdate {
+	return q.where(comment_parent_id_ne(value))
+}
+
+// where_parent_id_lt keeps the rows where `parent_id` comes before `value`.
 pub fn (q CommentUpdate) where_parent_id_lt(value int) CommentUpdate {
-	return q.where(load.lt('parent_id', value))
+	return q.where(comment_parent_id_lt(value))
 }
 
-// where_parent_id_le keeps the rows whose `parent_id` comes at or before `value`.
+// where_parent_id_le keeps the rows where `parent_id` comes at or before `value`.
 pub fn (q CommentUpdate) where_parent_id_le(value int) CommentUpdate {
-	return q.where(load.le('parent_id', value))
+	return q.where(comment_parent_id_le(value))
 }
 
-// where_parent_id_gt keeps the rows whose `parent_id` comes after `value`.
+// where_parent_id_gt keeps the rows where `parent_id` comes after `value`.
 pub fn (q CommentUpdate) where_parent_id_gt(value int) CommentUpdate {
-	return q.where(load.gt('parent_id', value))
+	return q.where(comment_parent_id_gt(value))
 }
 
-// where_parent_id_ge keeps the rows whose `parent_id` comes at or after `value`.
+// where_parent_id_ge keeps the rows where `parent_id` comes at or after `value`.
 pub fn (q CommentUpdate) where_parent_id_ge(value int) CommentUpdate {
-	return q.where(load.ge('parent_id', value))
+	return q.where(comment_parent_id_ge(value))
 }
 
-// where_parent_id_in keeps the rows whose `parent_id` is one of `values`.
+// where_parent_id_in keeps the rows where `parent_id` is one of `values`.
 pub fn (q CommentUpdate) where_parent_id_in(values []int) CommentUpdate {
-	return q.where(load.in_ints('parent_id', values))
+	return q.where(comment_parent_id_in(values))
 }
 
-// where_parent_id_is_null keeps the rows whose `parent_id` is null.
+// where_parent_id_not_in keeps the rows where `parent_id` is none of `values`.
+pub fn (q CommentUpdate) where_parent_id_not_in(values []int) CommentUpdate {
+	return q.where(comment_parent_id_not_in(values))
+}
+
+// where_parent_id_is_null keeps the rows where `parent_id` is null.
 pub fn (q CommentUpdate) where_parent_id_is_null() CommentUpdate {
-	return q.where(load.is_null('parent_id'))
+	return q.where(comment_parent_id_is_null())
 }
 
-// where_parent_id_is_not_null keeps the rows whose `parent_id` is not null.
+// where_parent_id_is_not_null keeps the rows where `parent_id` is not null.
 pub fn (q CommentUpdate) where_parent_id_is_not_null() CommentUpdate {
-	return q.where(load.is_not_null('parent_id'))
+	return q.where(comment_parent_id_is_not_null())
 }
 
-// where_body keeps the rows whose `body` is `value`.
+// where_body keeps the rows where `body` is `value`.
 pub fn (q CommentUpdate) where_body(value string) CommentUpdate {
-	return q.where(load.eq('body', value))
+	return q.where(comment_body_eq(value))
 }
 
-// where_body_in keeps the rows whose `body` is one of `values`.
+// where_body_ne keeps the rows where `body` is not `value`.
+pub fn (q CommentUpdate) where_body_ne(value string) CommentUpdate {
+	return q.where(comment_body_ne(value))
+}
+
+// where_body_in keeps the rows where `body` is one of `values`.
 pub fn (q CommentUpdate) where_body_in(values []string) CommentUpdate {
-	return q.where(load.in_strings('body', values))
+	return q.where(comment_body_in(values))
 }
 
-// where_body_like keeps the rows whose `body` matches the SQL LIKE `pattern`.
+// where_body_not_in keeps the rows where `body` is none of `values`.
+pub fn (q CommentUpdate) where_body_not_in(values []string) CommentUpdate {
+	return q.where(comment_body_not_in(values))
+}
+
+// where_body_like keeps the rows where `body` matches the SQL LIKE `pattern`.
 pub fn (q CommentUpdate) where_body_like(pattern string) CommentUpdate {
-	return q.where(load.like('body', pattern))
+	return q.where(comment_body_like(pattern))
 }
 
-// where_created_at keeps the rows whose `created_at` is `value`.
+// where_body_contains keeps the rows where `body` contains `value`.
+pub fn (q CommentUpdate) where_body_contains(value string) CommentUpdate {
+	return q.where(comment_body_contains(value))
+}
+
+// where_body_has_prefix keeps the rows where `body` starts with `value`.
+pub fn (q CommentUpdate) where_body_has_prefix(value string) CommentUpdate {
+	return q.where(comment_body_has_prefix(value))
+}
+
+// where_body_has_suffix keeps the rows where `body` ends with `value`.
+pub fn (q CommentUpdate) where_body_has_suffix(value string) CommentUpdate {
+	return q.where(comment_body_has_suffix(value))
+}
+
+// where_body_equal_fold keeps the rows where `body` is `value`, ignoring case.
+pub fn (q CommentUpdate) where_body_equal_fold(value string) CommentUpdate {
+	return q.where(comment_body_equal_fold(value))
+}
+
+// where_body_contains_fold keeps the rows where `body` contains `value`, ignoring case.
+pub fn (q CommentUpdate) where_body_contains_fold(value string) CommentUpdate {
+	return q.where(comment_body_contains_fold(value))
+}
+
+// where_created_at keeps the rows where `created_at` is `value`.
 pub fn (q CommentUpdate) where_created_at(value time.Time) CommentUpdate {
-	return q.where(load.eq('created_at', value))
+	return q.where(comment_created_at_eq(value))
 }
 
-// where_created_at_lt keeps the rows whose `created_at` comes before `value`.
+// where_created_at_ne keeps the rows where `created_at` is not `value`.
+pub fn (q CommentUpdate) where_created_at_ne(value time.Time) CommentUpdate {
+	return q.where(comment_created_at_ne(value))
+}
+
+// where_created_at_lt keeps the rows where `created_at` comes before `value`.
 pub fn (q CommentUpdate) where_created_at_lt(value time.Time) CommentUpdate {
-	return q.where(load.lt('created_at', value))
+	return q.where(comment_created_at_lt(value))
 }
 
-// where_created_at_le keeps the rows whose `created_at` comes at or before `value`.
+// where_created_at_le keeps the rows where `created_at` comes at or before `value`.
 pub fn (q CommentUpdate) where_created_at_le(value time.Time) CommentUpdate {
-	return q.where(load.le('created_at', value))
+	return q.where(comment_created_at_le(value))
 }
 
-// where_created_at_gt keeps the rows whose `created_at` comes after `value`.
+// where_created_at_gt keeps the rows where `created_at` comes after `value`.
 pub fn (q CommentUpdate) where_created_at_gt(value time.Time) CommentUpdate {
-	return q.where(load.gt('created_at', value))
+	return q.where(comment_created_at_gt(value))
 }
 
-// where_created_at_ge keeps the rows whose `created_at` comes at or after `value`.
+// where_created_at_ge keeps the rows where `created_at` comes at or after `value`.
 pub fn (q CommentUpdate) where_created_at_ge(value time.Time) CommentUpdate {
-	return q.where(load.ge('created_at', value))
+	return q.where(comment_created_at_ge(value))
 }
 
-// where_updated_at keeps the rows whose `updated_at` is `value`.
+// where_updated_at keeps the rows where `updated_at` is `value`.
 pub fn (q CommentUpdate) where_updated_at(value time.Time) CommentUpdate {
-	return q.where(load.eq('updated_at', value))
+	return q.where(comment_updated_at_eq(value))
 }
 
-// where_updated_at_lt keeps the rows whose `updated_at` comes before `value`.
+// where_updated_at_ne keeps the rows where `updated_at` is not `value`.
+pub fn (q CommentUpdate) where_updated_at_ne(value time.Time) CommentUpdate {
+	return q.where(comment_updated_at_ne(value))
+}
+
+// where_updated_at_lt keeps the rows where `updated_at` comes before `value`.
 pub fn (q CommentUpdate) where_updated_at_lt(value time.Time) CommentUpdate {
-	return q.where(load.lt('updated_at', value))
+	return q.where(comment_updated_at_lt(value))
 }
 
-// where_updated_at_le keeps the rows whose `updated_at` comes at or before `value`.
+// where_updated_at_le keeps the rows where `updated_at` comes at or before `value`.
 pub fn (q CommentUpdate) where_updated_at_le(value time.Time) CommentUpdate {
-	return q.where(load.le('updated_at', value))
+	return q.where(comment_updated_at_le(value))
 }
 
-// where_updated_at_gt keeps the rows whose `updated_at` comes after `value`.
+// where_updated_at_gt keeps the rows where `updated_at` comes after `value`.
 pub fn (q CommentUpdate) where_updated_at_gt(value time.Time) CommentUpdate {
-	return q.where(load.gt('updated_at', value))
+	return q.where(comment_updated_at_gt(value))
 }
 
-// where_updated_at_ge keeps the rows whose `updated_at` comes at or after `value`.
+// where_updated_at_ge keeps the rows where `updated_at` comes at or after `value`.
 pub fn (q CommentUpdate) where_updated_at_ge(value time.Time) CommentUpdate {
-	return q.where(load.ge('updated_at', value))
+	return q.where(comment_updated_at_ge(value))
 }
 
-// where_deleted_at keeps the rows whose `deleted_at` is `value`.
+// where_deleted_at keeps the rows where `deleted_at` is `value`.
 pub fn (q CommentUpdate) where_deleted_at(value time.Time) CommentUpdate {
-	return q.where(load.eq('deleted_at', value))
+	return q.where(comment_deleted_at_eq(value))
 }
 
-// where_deleted_at_lt keeps the rows whose `deleted_at` comes before `value`.
+// where_deleted_at_ne keeps the rows where `deleted_at` is not `value`.
+pub fn (q CommentUpdate) where_deleted_at_ne(value time.Time) CommentUpdate {
+	return q.where(comment_deleted_at_ne(value))
+}
+
+// where_deleted_at_lt keeps the rows where `deleted_at` comes before `value`.
 pub fn (q CommentUpdate) where_deleted_at_lt(value time.Time) CommentUpdate {
-	return q.where(load.lt('deleted_at', value))
+	return q.where(comment_deleted_at_lt(value))
 }
 
-// where_deleted_at_le keeps the rows whose `deleted_at` comes at or before `value`.
+// where_deleted_at_le keeps the rows where `deleted_at` comes at or before `value`.
 pub fn (q CommentUpdate) where_deleted_at_le(value time.Time) CommentUpdate {
-	return q.where(load.le('deleted_at', value))
+	return q.where(comment_deleted_at_le(value))
 }
 
-// where_deleted_at_gt keeps the rows whose `deleted_at` comes after `value`.
+// where_deleted_at_gt keeps the rows where `deleted_at` comes after `value`.
 pub fn (q CommentUpdate) where_deleted_at_gt(value time.Time) CommentUpdate {
-	return q.where(load.gt('deleted_at', value))
+	return q.where(comment_deleted_at_gt(value))
 }
 
-// where_deleted_at_ge keeps the rows whose `deleted_at` comes at or after `value`.
+// where_deleted_at_ge keeps the rows where `deleted_at` comes at or after `value`.
 pub fn (q CommentUpdate) where_deleted_at_ge(value time.Time) CommentUpdate {
-	return q.where(load.ge('deleted_at', value))
+	return q.where(comment_deleted_at_ge(value))
 }
 
-// where_deleted_at_is_null keeps the rows whose `deleted_at` is null.
+// where_deleted_at_is_null keeps the rows where `deleted_at` is null.
 pub fn (q CommentUpdate) where_deleted_at_is_null() CommentUpdate {
-	return q.where(load.is_null('deleted_at'))
+	return q.where(comment_deleted_at_is_null())
 }
 
-// where_deleted_at_is_not_null keeps the rows whose `deleted_at` is not null.
+// where_deleted_at_is_not_null keeps the rows where `deleted_at` is not null.
 pub fn (q CommentUpdate) where_deleted_at_is_not_null() CommentUpdate {
-	return q.where(load.is_not_null('deleted_at'))
+	return q.where(comment_deleted_at_is_not_null())
+}
+
+// has_author keeps the rows where it has a `author`.
+pub fn (q CommentUpdate) has_author() CommentUpdate {
+	return q.where(comment_has_author())
+}
+
+// has_author_with keeps the rows that have a `author` that `configure` keeps.
+pub fn (q CommentUpdate) has_author_with(configure fn (UserQuery) UserQuery) CommentUpdate {
+	return q.where(comment_has_author_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_parent keeps the rows where it has a `parent`.
+pub fn (q CommentUpdate) has_parent() CommentUpdate {
+	return q.where(comment_has_parent())
+}
+
+// has_parent_with keeps the rows that have a `parent` that `configure` keeps.
+pub fn (q CommentUpdate) has_parent_with(configure fn (CommentQuery) CommentQuery) CommentUpdate {
+	return q.where(comment_has_parent_with(...configure(q.graph.comments()).query.conds))
+}
+
+// has_article keeps the rows where it has a `article`.
+pub fn (q CommentUpdate) has_article() CommentUpdate {
+	return q.where(comment_has_article())
+}
+
+// has_article_with keeps the rows that have a `article` that `configure` keeps.
+pub fn (q CommentUpdate) has_article_with(configure fn (ArticleQuery) ArticleQuery) CommentUpdate {
+	return q.where(comment_has_article_with(...configure(q.graph.articles()).query.conds))
+}
+
+// has_post keeps the rows where it has a `post`.
+pub fn (q CommentUpdate) has_post() CommentUpdate {
+	return q.where(comment_has_post())
+}
+
+// has_post_with keeps the rows that have a `post` that `configure` keeps.
+pub fn (q CommentUpdate) has_post_with(configure fn (PostQuery) PostQuery) CommentUpdate {
+	return q.where(comment_has_post_with(...configure(q.graph.posts()).query.conds))
+}
+
+// has_replies keeps the rows where it has a `replies`.
+pub fn (q CommentUpdate) has_replies() CommentUpdate {
+	return q.where(comment_has_replies())
+}
+
+// has_replies_with keeps the rows that have a `replies` that `configure` keeps.
+pub fn (q CommentUpdate) has_replies_with(configure fn (CommentQuery) CommentQuery) CommentUpdate {
+	return q.where(comment_has_replies_with(...configure(q.graph.comments()).query.conds))
 }
 
 // set_slug sets `slug`.
@@ -1506,264 +1716,474 @@ pub fn (b CommentDelete) where(conds ...load.Cond) CommentDelete {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q CommentDelete) where_id(value int) CommentDelete {
-	return q.where(load.eq('id', value))
+	return q.where(comment_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q CommentDelete) where_id_ne(value int) CommentDelete {
+	return q.where(comment_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q CommentDelete) where_id_lt(value int) CommentDelete {
-	return q.where(load.lt('id', value))
+	return q.where(comment_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q CommentDelete) where_id_le(value int) CommentDelete {
-	return q.where(load.le('id', value))
+	return q.where(comment_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q CommentDelete) where_id_gt(value int) CommentDelete {
-	return q.where(load.gt('id', value))
+	return q.where(comment_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q CommentDelete) where_id_ge(value int) CommentDelete {
-	return q.where(load.ge('id', value))
+	return q.where(comment_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q CommentDelete) where_id_in(values []int) CommentDelete {
-	return q.where(load.in_ints('id', values))
+	return q.where(comment_id_in(values))
 }
 
-// where_slug keeps the rows whose `slug` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q CommentDelete) where_id_not_in(values []int) CommentDelete {
+	return q.where(comment_id_not_in(values))
+}
+
+// where_slug keeps the rows where `slug` is `value`.
 pub fn (q CommentDelete) where_slug(value string) CommentDelete {
-	return q.where(load.eq('slug', value))
+	return q.where(comment_slug_eq(value))
 }
 
-// where_slug_in keeps the rows whose `slug` is one of `values`.
+// where_slug_ne keeps the rows where `slug` is not `value`.
+pub fn (q CommentDelete) where_slug_ne(value string) CommentDelete {
+	return q.where(comment_slug_ne(value))
+}
+
+// where_slug_in keeps the rows where `slug` is one of `values`.
 pub fn (q CommentDelete) where_slug_in(values []string) CommentDelete {
-	return q.where(load.in_strings('slug', values))
+	return q.where(comment_slug_in(values))
 }
 
-// where_slug_like keeps the rows whose `slug` matches the SQL LIKE `pattern`.
+// where_slug_not_in keeps the rows where `slug` is none of `values`.
+pub fn (q CommentDelete) where_slug_not_in(values []string) CommentDelete {
+	return q.where(comment_slug_not_in(values))
+}
+
+// where_slug_like keeps the rows where `slug` matches the SQL LIKE `pattern`.
 pub fn (q CommentDelete) where_slug_like(pattern string) CommentDelete {
-	return q.where(load.like('slug', pattern))
+	return q.where(comment_slug_like(pattern))
 }
 
-// where_user_id keeps the rows whose `user_id` is `value`.
+// where_slug_contains keeps the rows where `slug` contains `value`.
+pub fn (q CommentDelete) where_slug_contains(value string) CommentDelete {
+	return q.where(comment_slug_contains(value))
+}
+
+// where_slug_has_prefix keeps the rows where `slug` starts with `value`.
+pub fn (q CommentDelete) where_slug_has_prefix(value string) CommentDelete {
+	return q.where(comment_slug_has_prefix(value))
+}
+
+// where_slug_has_suffix keeps the rows where `slug` ends with `value`.
+pub fn (q CommentDelete) where_slug_has_suffix(value string) CommentDelete {
+	return q.where(comment_slug_has_suffix(value))
+}
+
+// where_slug_equal_fold keeps the rows where `slug` is `value`, ignoring case.
+pub fn (q CommentDelete) where_slug_equal_fold(value string) CommentDelete {
+	return q.where(comment_slug_equal_fold(value))
+}
+
+// where_slug_contains_fold keeps the rows where `slug` contains `value`, ignoring case.
+pub fn (q CommentDelete) where_slug_contains_fold(value string) CommentDelete {
+	return q.where(comment_slug_contains_fold(value))
+}
+
+// where_user_id keeps the rows where `user_id` is `value`.
 pub fn (q CommentDelete) where_user_id(value int) CommentDelete {
-	return q.where(load.eq('user_id', value))
+	return q.where(comment_user_id_eq(value))
 }
 
-// where_user_id_lt keeps the rows whose `user_id` comes before `value`.
+// where_user_id_ne keeps the rows where `user_id` is not `value`.
+pub fn (q CommentDelete) where_user_id_ne(value int) CommentDelete {
+	return q.where(comment_user_id_ne(value))
+}
+
+// where_user_id_lt keeps the rows where `user_id` comes before `value`.
 pub fn (q CommentDelete) where_user_id_lt(value int) CommentDelete {
-	return q.where(load.lt('user_id', value))
+	return q.where(comment_user_id_lt(value))
 }
 
-// where_user_id_le keeps the rows whose `user_id` comes at or before `value`.
+// where_user_id_le keeps the rows where `user_id` comes at or before `value`.
 pub fn (q CommentDelete) where_user_id_le(value int) CommentDelete {
-	return q.where(load.le('user_id', value))
+	return q.where(comment_user_id_le(value))
 }
 
-// where_user_id_gt keeps the rows whose `user_id` comes after `value`.
+// where_user_id_gt keeps the rows where `user_id` comes after `value`.
 pub fn (q CommentDelete) where_user_id_gt(value int) CommentDelete {
-	return q.where(load.gt('user_id', value))
+	return q.where(comment_user_id_gt(value))
 }
 
-// where_user_id_ge keeps the rows whose `user_id` comes at or after `value`.
+// where_user_id_ge keeps the rows where `user_id` comes at or after `value`.
 pub fn (q CommentDelete) where_user_id_ge(value int) CommentDelete {
-	return q.where(load.ge('user_id', value))
+	return q.where(comment_user_id_ge(value))
 }
 
-// where_user_id_in keeps the rows whose `user_id` is one of `values`.
+// where_user_id_in keeps the rows where `user_id` is one of `values`.
 pub fn (q CommentDelete) where_user_id_in(values []int) CommentDelete {
-	return q.where(load.in_ints('user_id', values))
+	return q.where(comment_user_id_in(values))
 }
 
-// where_owner_type keeps the rows whose `owner_type` is `value`.
+// where_user_id_not_in keeps the rows where `user_id` is none of `values`.
+pub fn (q CommentDelete) where_user_id_not_in(values []int) CommentDelete {
+	return q.where(comment_user_id_not_in(values))
+}
+
+// where_owner_type keeps the rows where `owner_type` is `value`.
 pub fn (q CommentDelete) where_owner_type(value string) CommentDelete {
-	return q.where(load.eq('owner_type', value))
+	return q.where(comment_owner_type_eq(value))
 }
 
-// where_owner_type_in keeps the rows whose `owner_type` is one of `values`.
+// where_owner_type_ne keeps the rows where `owner_type` is not `value`.
+pub fn (q CommentDelete) where_owner_type_ne(value string) CommentDelete {
+	return q.where(comment_owner_type_ne(value))
+}
+
+// where_owner_type_in keeps the rows where `owner_type` is one of `values`.
 pub fn (q CommentDelete) where_owner_type_in(values []string) CommentDelete {
-	return q.where(load.in_strings('owner_type', values))
+	return q.where(comment_owner_type_in(values))
 }
 
-// where_owner_type_like keeps the rows whose `owner_type` matches the SQL LIKE `pattern`.
+// where_owner_type_not_in keeps the rows where `owner_type` is none of `values`.
+pub fn (q CommentDelete) where_owner_type_not_in(values []string) CommentDelete {
+	return q.where(comment_owner_type_not_in(values))
+}
+
+// where_owner_type_like keeps the rows where `owner_type` matches the SQL LIKE `pattern`.
 pub fn (q CommentDelete) where_owner_type_like(pattern string) CommentDelete {
-	return q.where(load.like('owner_type', pattern))
+	return q.where(comment_owner_type_like(pattern))
 }
 
-// where_owner_id keeps the rows whose `owner_id` is `value`.
+// where_owner_type_contains keeps the rows where `owner_type` contains `value`.
+pub fn (q CommentDelete) where_owner_type_contains(value string) CommentDelete {
+	return q.where(comment_owner_type_contains(value))
+}
+
+// where_owner_type_has_prefix keeps the rows where `owner_type` starts with `value`.
+pub fn (q CommentDelete) where_owner_type_has_prefix(value string) CommentDelete {
+	return q.where(comment_owner_type_has_prefix(value))
+}
+
+// where_owner_type_has_suffix keeps the rows where `owner_type` ends with `value`.
+pub fn (q CommentDelete) where_owner_type_has_suffix(value string) CommentDelete {
+	return q.where(comment_owner_type_has_suffix(value))
+}
+
+// where_owner_type_equal_fold keeps the rows where `owner_type` is `value`, ignoring case.
+pub fn (q CommentDelete) where_owner_type_equal_fold(value string) CommentDelete {
+	return q.where(comment_owner_type_equal_fold(value))
+}
+
+// where_owner_type_contains_fold keeps the rows where `owner_type` contains `value`, ignoring case.
+pub fn (q CommentDelete) where_owner_type_contains_fold(value string) CommentDelete {
+	return q.where(comment_owner_type_contains_fold(value))
+}
+
+// where_owner_id keeps the rows where `owner_id` is `value`.
 pub fn (q CommentDelete) where_owner_id(value int) CommentDelete {
-	return q.where(load.eq('owner_id', value))
+	return q.where(comment_owner_id_eq(value))
 }
 
-// where_owner_id_lt keeps the rows whose `owner_id` comes before `value`.
+// where_owner_id_ne keeps the rows where `owner_id` is not `value`.
+pub fn (q CommentDelete) where_owner_id_ne(value int) CommentDelete {
+	return q.where(comment_owner_id_ne(value))
+}
+
+// where_owner_id_lt keeps the rows where `owner_id` comes before `value`.
 pub fn (q CommentDelete) where_owner_id_lt(value int) CommentDelete {
-	return q.where(load.lt('owner_id', value))
+	return q.where(comment_owner_id_lt(value))
 }
 
-// where_owner_id_le keeps the rows whose `owner_id` comes at or before `value`.
+// where_owner_id_le keeps the rows where `owner_id` comes at or before `value`.
 pub fn (q CommentDelete) where_owner_id_le(value int) CommentDelete {
-	return q.where(load.le('owner_id', value))
+	return q.where(comment_owner_id_le(value))
 }
 
-// where_owner_id_gt keeps the rows whose `owner_id` comes after `value`.
+// where_owner_id_gt keeps the rows where `owner_id` comes after `value`.
 pub fn (q CommentDelete) where_owner_id_gt(value int) CommentDelete {
-	return q.where(load.gt('owner_id', value))
+	return q.where(comment_owner_id_gt(value))
 }
 
-// where_owner_id_ge keeps the rows whose `owner_id` comes at or after `value`.
+// where_owner_id_ge keeps the rows where `owner_id` comes at or after `value`.
 pub fn (q CommentDelete) where_owner_id_ge(value int) CommentDelete {
-	return q.where(load.ge('owner_id', value))
+	return q.where(comment_owner_id_ge(value))
 }
 
-// where_owner_id_in keeps the rows whose `owner_id` is one of `values`.
+// where_owner_id_in keeps the rows where `owner_id` is one of `values`.
 pub fn (q CommentDelete) where_owner_id_in(values []int) CommentDelete {
-	return q.where(load.in_ints('owner_id', values))
+	return q.where(comment_owner_id_in(values))
 }
 
-// where_parent_id keeps the rows whose `parent_id` is `value`.
+// where_owner_id_not_in keeps the rows where `owner_id` is none of `values`.
+pub fn (q CommentDelete) where_owner_id_not_in(values []int) CommentDelete {
+	return q.where(comment_owner_id_not_in(values))
+}
+
+// where_parent_id keeps the rows where `parent_id` is `value`.
 pub fn (q CommentDelete) where_parent_id(value int) CommentDelete {
-	return q.where(load.eq('parent_id', value))
+	return q.where(comment_parent_id_eq(value))
 }
 
-// where_parent_id_lt keeps the rows whose `parent_id` comes before `value`.
+// where_parent_id_ne keeps the rows where `parent_id` is not `value`.
+pub fn (q CommentDelete) where_parent_id_ne(value int) CommentDelete {
+	return q.where(comment_parent_id_ne(value))
+}
+
+// where_parent_id_lt keeps the rows where `parent_id` comes before `value`.
 pub fn (q CommentDelete) where_parent_id_lt(value int) CommentDelete {
-	return q.where(load.lt('parent_id', value))
+	return q.where(comment_parent_id_lt(value))
 }
 
-// where_parent_id_le keeps the rows whose `parent_id` comes at or before `value`.
+// where_parent_id_le keeps the rows where `parent_id` comes at or before `value`.
 pub fn (q CommentDelete) where_parent_id_le(value int) CommentDelete {
-	return q.where(load.le('parent_id', value))
+	return q.where(comment_parent_id_le(value))
 }
 
-// where_parent_id_gt keeps the rows whose `parent_id` comes after `value`.
+// where_parent_id_gt keeps the rows where `parent_id` comes after `value`.
 pub fn (q CommentDelete) where_parent_id_gt(value int) CommentDelete {
-	return q.where(load.gt('parent_id', value))
+	return q.where(comment_parent_id_gt(value))
 }
 
-// where_parent_id_ge keeps the rows whose `parent_id` comes at or after `value`.
+// where_parent_id_ge keeps the rows where `parent_id` comes at or after `value`.
 pub fn (q CommentDelete) where_parent_id_ge(value int) CommentDelete {
-	return q.where(load.ge('parent_id', value))
+	return q.where(comment_parent_id_ge(value))
 }
 
-// where_parent_id_in keeps the rows whose `parent_id` is one of `values`.
+// where_parent_id_in keeps the rows where `parent_id` is one of `values`.
 pub fn (q CommentDelete) where_parent_id_in(values []int) CommentDelete {
-	return q.where(load.in_ints('parent_id', values))
+	return q.where(comment_parent_id_in(values))
 }
 
-// where_parent_id_is_null keeps the rows whose `parent_id` is null.
+// where_parent_id_not_in keeps the rows where `parent_id` is none of `values`.
+pub fn (q CommentDelete) where_parent_id_not_in(values []int) CommentDelete {
+	return q.where(comment_parent_id_not_in(values))
+}
+
+// where_parent_id_is_null keeps the rows where `parent_id` is null.
 pub fn (q CommentDelete) where_parent_id_is_null() CommentDelete {
-	return q.where(load.is_null('parent_id'))
+	return q.where(comment_parent_id_is_null())
 }
 
-// where_parent_id_is_not_null keeps the rows whose `parent_id` is not null.
+// where_parent_id_is_not_null keeps the rows where `parent_id` is not null.
 pub fn (q CommentDelete) where_parent_id_is_not_null() CommentDelete {
-	return q.where(load.is_not_null('parent_id'))
+	return q.where(comment_parent_id_is_not_null())
 }
 
-// where_body keeps the rows whose `body` is `value`.
+// where_body keeps the rows where `body` is `value`.
 pub fn (q CommentDelete) where_body(value string) CommentDelete {
-	return q.where(load.eq('body', value))
+	return q.where(comment_body_eq(value))
 }
 
-// where_body_in keeps the rows whose `body` is one of `values`.
+// where_body_ne keeps the rows where `body` is not `value`.
+pub fn (q CommentDelete) where_body_ne(value string) CommentDelete {
+	return q.where(comment_body_ne(value))
+}
+
+// where_body_in keeps the rows where `body` is one of `values`.
 pub fn (q CommentDelete) where_body_in(values []string) CommentDelete {
-	return q.where(load.in_strings('body', values))
+	return q.where(comment_body_in(values))
 }
 
-// where_body_like keeps the rows whose `body` matches the SQL LIKE `pattern`.
+// where_body_not_in keeps the rows where `body` is none of `values`.
+pub fn (q CommentDelete) where_body_not_in(values []string) CommentDelete {
+	return q.where(comment_body_not_in(values))
+}
+
+// where_body_like keeps the rows where `body` matches the SQL LIKE `pattern`.
 pub fn (q CommentDelete) where_body_like(pattern string) CommentDelete {
-	return q.where(load.like('body', pattern))
+	return q.where(comment_body_like(pattern))
 }
 
-// where_created_at keeps the rows whose `created_at` is `value`.
+// where_body_contains keeps the rows where `body` contains `value`.
+pub fn (q CommentDelete) where_body_contains(value string) CommentDelete {
+	return q.where(comment_body_contains(value))
+}
+
+// where_body_has_prefix keeps the rows where `body` starts with `value`.
+pub fn (q CommentDelete) where_body_has_prefix(value string) CommentDelete {
+	return q.where(comment_body_has_prefix(value))
+}
+
+// where_body_has_suffix keeps the rows where `body` ends with `value`.
+pub fn (q CommentDelete) where_body_has_suffix(value string) CommentDelete {
+	return q.where(comment_body_has_suffix(value))
+}
+
+// where_body_equal_fold keeps the rows where `body` is `value`, ignoring case.
+pub fn (q CommentDelete) where_body_equal_fold(value string) CommentDelete {
+	return q.where(comment_body_equal_fold(value))
+}
+
+// where_body_contains_fold keeps the rows where `body` contains `value`, ignoring case.
+pub fn (q CommentDelete) where_body_contains_fold(value string) CommentDelete {
+	return q.where(comment_body_contains_fold(value))
+}
+
+// where_created_at keeps the rows where `created_at` is `value`.
 pub fn (q CommentDelete) where_created_at(value time.Time) CommentDelete {
-	return q.where(load.eq('created_at', value))
+	return q.where(comment_created_at_eq(value))
 }
 
-// where_created_at_lt keeps the rows whose `created_at` comes before `value`.
+// where_created_at_ne keeps the rows where `created_at` is not `value`.
+pub fn (q CommentDelete) where_created_at_ne(value time.Time) CommentDelete {
+	return q.where(comment_created_at_ne(value))
+}
+
+// where_created_at_lt keeps the rows where `created_at` comes before `value`.
 pub fn (q CommentDelete) where_created_at_lt(value time.Time) CommentDelete {
-	return q.where(load.lt('created_at', value))
+	return q.where(comment_created_at_lt(value))
 }
 
-// where_created_at_le keeps the rows whose `created_at` comes at or before `value`.
+// where_created_at_le keeps the rows where `created_at` comes at or before `value`.
 pub fn (q CommentDelete) where_created_at_le(value time.Time) CommentDelete {
-	return q.where(load.le('created_at', value))
+	return q.where(comment_created_at_le(value))
 }
 
-// where_created_at_gt keeps the rows whose `created_at` comes after `value`.
+// where_created_at_gt keeps the rows where `created_at` comes after `value`.
 pub fn (q CommentDelete) where_created_at_gt(value time.Time) CommentDelete {
-	return q.where(load.gt('created_at', value))
+	return q.where(comment_created_at_gt(value))
 }
 
-// where_created_at_ge keeps the rows whose `created_at` comes at or after `value`.
+// where_created_at_ge keeps the rows where `created_at` comes at or after `value`.
 pub fn (q CommentDelete) where_created_at_ge(value time.Time) CommentDelete {
-	return q.where(load.ge('created_at', value))
+	return q.where(comment_created_at_ge(value))
 }
 
-// where_updated_at keeps the rows whose `updated_at` is `value`.
+// where_updated_at keeps the rows where `updated_at` is `value`.
 pub fn (q CommentDelete) where_updated_at(value time.Time) CommentDelete {
-	return q.where(load.eq('updated_at', value))
+	return q.where(comment_updated_at_eq(value))
 }
 
-// where_updated_at_lt keeps the rows whose `updated_at` comes before `value`.
+// where_updated_at_ne keeps the rows where `updated_at` is not `value`.
+pub fn (q CommentDelete) where_updated_at_ne(value time.Time) CommentDelete {
+	return q.where(comment_updated_at_ne(value))
+}
+
+// where_updated_at_lt keeps the rows where `updated_at` comes before `value`.
 pub fn (q CommentDelete) where_updated_at_lt(value time.Time) CommentDelete {
-	return q.where(load.lt('updated_at', value))
+	return q.where(comment_updated_at_lt(value))
 }
 
-// where_updated_at_le keeps the rows whose `updated_at` comes at or before `value`.
+// where_updated_at_le keeps the rows where `updated_at` comes at or before `value`.
 pub fn (q CommentDelete) where_updated_at_le(value time.Time) CommentDelete {
-	return q.where(load.le('updated_at', value))
+	return q.where(comment_updated_at_le(value))
 }
 
-// where_updated_at_gt keeps the rows whose `updated_at` comes after `value`.
+// where_updated_at_gt keeps the rows where `updated_at` comes after `value`.
 pub fn (q CommentDelete) where_updated_at_gt(value time.Time) CommentDelete {
-	return q.where(load.gt('updated_at', value))
+	return q.where(comment_updated_at_gt(value))
 }
 
-// where_updated_at_ge keeps the rows whose `updated_at` comes at or after `value`.
+// where_updated_at_ge keeps the rows where `updated_at` comes at or after `value`.
 pub fn (q CommentDelete) where_updated_at_ge(value time.Time) CommentDelete {
-	return q.where(load.ge('updated_at', value))
+	return q.where(comment_updated_at_ge(value))
 }
 
-// where_deleted_at keeps the rows whose `deleted_at` is `value`.
+// where_deleted_at keeps the rows where `deleted_at` is `value`.
 pub fn (q CommentDelete) where_deleted_at(value time.Time) CommentDelete {
-	return q.where(load.eq('deleted_at', value))
+	return q.where(comment_deleted_at_eq(value))
 }
 
-// where_deleted_at_lt keeps the rows whose `deleted_at` comes before `value`.
+// where_deleted_at_ne keeps the rows where `deleted_at` is not `value`.
+pub fn (q CommentDelete) where_deleted_at_ne(value time.Time) CommentDelete {
+	return q.where(comment_deleted_at_ne(value))
+}
+
+// where_deleted_at_lt keeps the rows where `deleted_at` comes before `value`.
 pub fn (q CommentDelete) where_deleted_at_lt(value time.Time) CommentDelete {
-	return q.where(load.lt('deleted_at', value))
+	return q.where(comment_deleted_at_lt(value))
 }
 
-// where_deleted_at_le keeps the rows whose `deleted_at` comes at or before `value`.
+// where_deleted_at_le keeps the rows where `deleted_at` comes at or before `value`.
 pub fn (q CommentDelete) where_deleted_at_le(value time.Time) CommentDelete {
-	return q.where(load.le('deleted_at', value))
+	return q.where(comment_deleted_at_le(value))
 }
 
-// where_deleted_at_gt keeps the rows whose `deleted_at` comes after `value`.
+// where_deleted_at_gt keeps the rows where `deleted_at` comes after `value`.
 pub fn (q CommentDelete) where_deleted_at_gt(value time.Time) CommentDelete {
-	return q.where(load.gt('deleted_at', value))
+	return q.where(comment_deleted_at_gt(value))
 }
 
-// where_deleted_at_ge keeps the rows whose `deleted_at` comes at or after `value`.
+// where_deleted_at_ge keeps the rows where `deleted_at` comes at or after `value`.
 pub fn (q CommentDelete) where_deleted_at_ge(value time.Time) CommentDelete {
-	return q.where(load.ge('deleted_at', value))
+	return q.where(comment_deleted_at_ge(value))
 }
 
-// where_deleted_at_is_null keeps the rows whose `deleted_at` is null.
+// where_deleted_at_is_null keeps the rows where `deleted_at` is null.
 pub fn (q CommentDelete) where_deleted_at_is_null() CommentDelete {
-	return q.where(load.is_null('deleted_at'))
+	return q.where(comment_deleted_at_is_null())
 }
 
-// where_deleted_at_is_not_null keeps the rows whose `deleted_at` is not null.
+// where_deleted_at_is_not_null keeps the rows where `deleted_at` is not null.
 pub fn (q CommentDelete) where_deleted_at_is_not_null() CommentDelete {
-	return q.where(load.is_not_null('deleted_at'))
+	return q.where(comment_deleted_at_is_not_null())
+}
+
+// has_author keeps the rows where it has a `author`.
+pub fn (q CommentDelete) has_author() CommentDelete {
+	return q.where(comment_has_author())
+}
+
+// has_author_with keeps the rows that have a `author` that `configure` keeps.
+pub fn (q CommentDelete) has_author_with(configure fn (UserQuery) UserQuery) CommentDelete {
+	return q.where(comment_has_author_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_parent keeps the rows where it has a `parent`.
+pub fn (q CommentDelete) has_parent() CommentDelete {
+	return q.where(comment_has_parent())
+}
+
+// has_parent_with keeps the rows that have a `parent` that `configure` keeps.
+pub fn (q CommentDelete) has_parent_with(configure fn (CommentQuery) CommentQuery) CommentDelete {
+	return q.where(comment_has_parent_with(...configure(q.graph.comments()).query.conds))
+}
+
+// has_article keeps the rows where it has a `article`.
+pub fn (q CommentDelete) has_article() CommentDelete {
+	return q.where(comment_has_article())
+}
+
+// has_article_with keeps the rows that have a `article` that `configure` keeps.
+pub fn (q CommentDelete) has_article_with(configure fn (ArticleQuery) ArticleQuery) CommentDelete {
+	return q.where(comment_has_article_with(...configure(q.graph.articles()).query.conds))
+}
+
+// has_post keeps the rows where it has a `post`.
+pub fn (q CommentDelete) has_post() CommentDelete {
+	return q.where(comment_has_post())
+}
+
+// has_post_with keeps the rows that have a `post` that `configure` keeps.
+pub fn (q CommentDelete) has_post_with(configure fn (PostQuery) PostQuery) CommentDelete {
+	return q.where(comment_has_post_with(...configure(q.graph.posts()).query.conds))
+}
+
+// has_replies keeps the rows where it has a `replies`.
+pub fn (q CommentDelete) has_replies() CommentDelete {
+	return q.where(comment_has_replies())
+}
+
+// has_replies_with keeps the rows that have a `replies` that `configure` keeps.
+pub fn (q CommentDelete) has_replies_with(configure fn (CommentQuery) CommentQuery) CommentDelete {
+	return q.where(comment_has_replies_with(...configure(q.graph.comments()).query.conds))
 }
 
 // exec deletes the rows, with their join table rows, in one transaction, and

@@ -1015,9 +1015,9 @@ fn article_where(w map[string]graphql.Value) ![]load.Cond {
 			'slugGTE' { conds << load.ge('slug', v.as_string()) }
 			'slugLT' { conds << load.lt('slug', v.as_string()) }
 			'slugLTE' { conds << load.le('slug', v.as_string()) }
-			'slugContains' { conds << load.like('slug', '%' + v.as_string() + '%') }
-			'slugHasPrefix' { conds << load.like('slug', v.as_string() + '%') }
-			'slugHasSuffix' { conds << load.like('slug', '%' + v.as_string()) }
+			'slugContains' { conds << load.contains('slug', v.as_string()) }
+			'slugHasPrefix' { conds << load.has_prefix('slug', v.as_string()) }
+			'slugHasSuffix' { conds << load.has_suffix('slug', v.as_string()) }
 			'userID' { conds << load.eq('user_id', gql_int_id(v)!) }
 			'userIDNEQ' { conds << load.ne('user_id', gql_int_id(v)!) }
 			'userIDIn' { conds << load.in_ints('user_id', gql_int_ids(v)!) }
@@ -1030,9 +1030,9 @@ fn article_where(w map[string]graphql.Value) ![]load.Cond {
 			'titleGTE' { conds << load.ge('title', v.as_string()) }
 			'titleLT' { conds << load.lt('title', v.as_string()) }
 			'titleLTE' { conds << load.le('title', v.as_string()) }
-			'titleContains' { conds << load.like('title', '%' + v.as_string() + '%') }
-			'titleHasPrefix' { conds << load.like('title', v.as_string() + '%') }
-			'titleHasSuffix' { conds << load.like('title', '%' + v.as_string()) }
+			'titleContains' { conds << load.contains('title', v.as_string()) }
+			'titleHasPrefix' { conds << load.has_prefix('title', v.as_string()) }
+			'titleHasSuffix' { conds << load.has_suffix('title', v.as_string()) }
 			'summary' { conds << load.eq('summary', v.as_string()) }
 			'summaryNEQ' { conds << load.ne('summary', v.as_string()) }
 			'summaryIn' { conds << load.in_strings('summary', gql_strings(v)) }
@@ -1041,9 +1041,9 @@ fn article_where(w map[string]graphql.Value) ![]load.Cond {
 			'summaryGTE' { conds << load.ge('summary', v.as_string()) }
 			'summaryLT' { conds << load.lt('summary', v.as_string()) }
 			'summaryLTE' { conds << load.le('summary', v.as_string()) }
-			'summaryContains' { conds << load.like('summary', '%' + v.as_string() + '%') }
-			'summaryHasPrefix' { conds << load.like('summary', v.as_string() + '%') }
-			'summaryHasSuffix' { conds << load.like('summary', '%' + v.as_string()) }
+			'summaryContains' { conds << load.contains('summary', v.as_string()) }
+			'summaryHasPrefix' { conds << load.has_prefix('summary', v.as_string()) }
+			'summaryHasSuffix' { conds << load.has_suffix('summary', v.as_string()) }
 			'body' { conds << load.eq('body', v.as_string()) }
 			'bodyNEQ' { conds << load.ne('body', v.as_string()) }
 			'bodyIn' { conds << load.in_strings('body', gql_strings(v)) }
@@ -1052,9 +1052,9 @@ fn article_where(w map[string]graphql.Value) ![]load.Cond {
 			'bodyGTE' { conds << load.ge('body', v.as_string()) }
 			'bodyLT' { conds << load.lt('body', v.as_string()) }
 			'bodyLTE' { conds << load.le('body', v.as_string()) }
-			'bodyContains' { conds << load.like('body', '%' + v.as_string() + '%') }
-			'bodyHasPrefix' { conds << load.like('body', v.as_string() + '%') }
-			'bodyHasSuffix' { conds << load.like('body', '%' + v.as_string()) }
+			'bodyContains' { conds << load.contains('body', v.as_string()) }
+			'bodyHasPrefix' { conds << load.has_prefix('body', v.as_string()) }
+			'bodyHasSuffix' { conds << load.has_suffix('body', v.as_string()) }
 			'publishedAt' { conds << load.eq('published_at', gql_time(v)!) }
 			'publishedAtNEQ' { conds << load.ne('published_at', gql_time(v)!) }
 			'publishedAtGT' { conds << load.gt('published_at', gql_time(v)!) }
@@ -1191,9 +1191,9 @@ fn comment_where(w map[string]graphql.Value) ![]load.Cond {
 			'slugGTE' { conds << load.ge('slug', v.as_string()) }
 			'slugLT' { conds << load.lt('slug', v.as_string()) }
 			'slugLTE' { conds << load.le('slug', v.as_string()) }
-			'slugContains' { conds << load.like('slug', '%' + v.as_string() + '%') }
-			'slugHasPrefix' { conds << load.like('slug', v.as_string() + '%') }
-			'slugHasSuffix' { conds << load.like('slug', '%' + v.as_string()) }
+			'slugContains' { conds << load.contains('slug', v.as_string()) }
+			'slugHasPrefix' { conds << load.has_prefix('slug', v.as_string()) }
+			'slugHasSuffix' { conds << load.has_suffix('slug', v.as_string()) }
 			'userID' { conds << load.eq('user_id', gql_int_id(v)!) }
 			'userIDNEQ' { conds << load.ne('user_id', gql_int_id(v)!) }
 			'userIDIn' { conds << load.in_ints('user_id', gql_int_ids(v)!) }
@@ -1206,9 +1206,9 @@ fn comment_where(w map[string]graphql.Value) ![]load.Cond {
 			'ownerTypeGTE' { conds << load.ge('owner_type', v.as_string()) }
 			'ownerTypeLT' { conds << load.lt('owner_type', v.as_string()) }
 			'ownerTypeLTE' { conds << load.le('owner_type', v.as_string()) }
-			'ownerTypeContains' { conds << load.like('owner_type', '%' + v.as_string() + '%') }
-			'ownerTypeHasPrefix' { conds << load.like('owner_type', v.as_string() + '%') }
-			'ownerTypeHasSuffix' { conds << load.like('owner_type', '%' + v.as_string()) }
+			'ownerTypeContains' { conds << load.contains('owner_type', v.as_string()) }
+			'ownerTypeHasPrefix' { conds << load.has_prefix('owner_type', v.as_string()) }
+			'ownerTypeHasSuffix' { conds << load.has_suffix('owner_type', v.as_string()) }
 			'ownerID' { conds << load.eq('owner_id', gql_int_id(v)!) }
 			'ownerIDNEQ' { conds << load.ne('owner_id', gql_int_id(v)!) }
 			'ownerIDIn' { conds << load.in_ints('owner_id', gql_int_ids(v)!) }
@@ -1231,9 +1231,9 @@ fn comment_where(w map[string]graphql.Value) ![]load.Cond {
 			'bodyGTE' { conds << load.ge('body', v.as_string()) }
 			'bodyLT' { conds << load.lt('body', v.as_string()) }
 			'bodyLTE' { conds << load.le('body', v.as_string()) }
-			'bodyContains' { conds << load.like('body', '%' + v.as_string() + '%') }
-			'bodyHasPrefix' { conds << load.like('body', v.as_string() + '%') }
-			'bodyHasSuffix' { conds << load.like('body', '%' + v.as_string()) }
+			'bodyContains' { conds << load.contains('body', v.as_string()) }
+			'bodyHasPrefix' { conds << load.has_prefix('body', v.as_string()) }
+			'bodyHasSuffix' { conds << load.has_suffix('body', v.as_string()) }
 			'createdAt' { conds << load.eq('created_at', gql_time(v)!) }
 			'createdAtNEQ' { conds << load.ne('created_at', gql_time(v)!) }
 			'createdAtGT' { conds << load.gt('created_at', gql_time(v)!) }
@@ -1350,9 +1350,9 @@ fn post_where(w map[string]graphql.Value) ![]load.Cond {
 			'slugGTE' { conds << load.ge('slug', v.as_string()) }
 			'slugLT' { conds << load.lt('slug', v.as_string()) }
 			'slugLTE' { conds << load.le('slug', v.as_string()) }
-			'slugContains' { conds << load.like('slug', '%' + v.as_string() + '%') }
-			'slugHasPrefix' { conds << load.like('slug', v.as_string() + '%') }
-			'slugHasSuffix' { conds << load.like('slug', '%' + v.as_string()) }
+			'slugContains' { conds << load.contains('slug', v.as_string()) }
+			'slugHasPrefix' { conds << load.has_prefix('slug', v.as_string()) }
+			'slugHasSuffix' { conds << load.has_suffix('slug', v.as_string()) }
 			'userID' { conds << load.eq('user_id', gql_int_id(v)!) }
 			'userIDNEQ' { conds << load.ne('user_id', gql_int_id(v)!) }
 			'userIDIn' { conds << load.in_ints('user_id', gql_int_ids(v)!) }
@@ -1365,9 +1365,9 @@ fn post_where(w map[string]graphql.Value) ![]load.Cond {
 			'bodyGTE' { conds << load.ge('body', v.as_string()) }
 			'bodyLT' { conds << load.lt('body', v.as_string()) }
 			'bodyLTE' { conds << load.le('body', v.as_string()) }
-			'bodyContains' { conds << load.like('body', '%' + v.as_string() + '%') }
-			'bodyHasPrefix' { conds << load.like('body', v.as_string() + '%') }
-			'bodyHasSuffix' { conds << load.like('body', '%' + v.as_string()) }
+			'bodyContains' { conds << load.contains('body', v.as_string()) }
+			'bodyHasPrefix' { conds << load.has_prefix('body', v.as_string()) }
+			'bodyHasSuffix' { conds << load.has_suffix('body', v.as_string()) }
 			'createdAt' { conds << load.eq('created_at', gql_time(v)!) }
 			'createdAtNEQ' { conds << load.ne('created_at', gql_time(v)!) }
 			'createdAtGT' { conds << load.gt('created_at', gql_time(v)!) }
@@ -1484,9 +1484,9 @@ fn user_where(w map[string]graphql.Value) ![]load.Cond {
 			'slugGTE' { conds << load.ge('slug', v.as_string()) }
 			'slugLT' { conds << load.lt('slug', v.as_string()) }
 			'slugLTE' { conds << load.le('slug', v.as_string()) }
-			'slugContains' { conds << load.like('slug', '%' + v.as_string() + '%') }
-			'slugHasPrefix' { conds << load.like('slug', v.as_string() + '%') }
-			'slugHasSuffix' { conds << load.like('slug', '%' + v.as_string()) }
+			'slugContains' { conds << load.contains('slug', v.as_string()) }
+			'slugHasPrefix' { conds << load.has_prefix('slug', v.as_string()) }
+			'slugHasSuffix' { conds << load.has_suffix('slug', v.as_string()) }
 			'name' { conds << load.eq('name', v.as_string()) }
 			'nameNEQ' { conds << load.ne('name', v.as_string()) }
 			'nameIn' { conds << load.in_strings('name', gql_strings(v)) }
@@ -1495,9 +1495,9 @@ fn user_where(w map[string]graphql.Value) ![]load.Cond {
 			'nameGTE' { conds << load.ge('name', v.as_string()) }
 			'nameLT' { conds << load.lt('name', v.as_string()) }
 			'nameLTE' { conds << load.le('name', v.as_string()) }
-			'nameContains' { conds << load.like('name', '%' + v.as_string() + '%') }
-			'nameHasPrefix' { conds << load.like('name', v.as_string() + '%') }
-			'nameHasSuffix' { conds << load.like('name', '%' + v.as_string()) }
+			'nameContains' { conds << load.contains('name', v.as_string()) }
+			'nameHasPrefix' { conds << load.has_prefix('name', v.as_string()) }
+			'nameHasSuffix' { conds << load.has_suffix('name', v.as_string()) }
 			'email' { conds << load.eq('email', v.as_string()) }
 			'emailNEQ' { conds << load.ne('email', v.as_string()) }
 			'emailIn' { conds << load.in_strings('email', gql_strings(v)) }
@@ -1506,9 +1506,9 @@ fn user_where(w map[string]graphql.Value) ![]load.Cond {
 			'emailGTE' { conds << load.ge('email', v.as_string()) }
 			'emailLT' { conds << load.lt('email', v.as_string()) }
 			'emailLTE' { conds << load.le('email', v.as_string()) }
-			'emailContains' { conds << load.like('email', '%' + v.as_string() + '%') }
-			'emailHasPrefix' { conds << load.like('email', v.as_string() + '%') }
-			'emailHasSuffix' { conds << load.like('email', '%' + v.as_string()) }
+			'emailContains' { conds << load.contains('email', v.as_string()) }
+			'emailHasPrefix' { conds << load.has_prefix('email', v.as_string()) }
+			'emailHasSuffix' { conds << load.has_suffix('email', v.as_string()) }
 			'createdAt' { conds << load.eq('created_at', gql_time(v)!) }
 			'createdAtNEQ' { conds << load.ne('created_at', gql_time(v)!) }
 			'createdAtGT' { conds << load.gt('created_at', gql_time(v)!) }

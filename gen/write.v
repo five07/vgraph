@@ -73,7 +73,7 @@ fn check_names(info Info) ! {
 		return error('table `${t.name}`: `Graph.${t.name}` is taken; rename the table')
 	}
 	for edge in t.edges {
-		if edge.name in ['graph', 'update', info.field()] {
+		if edge.name in ['graph', 'update', 'loaded', info.field()] {
 			return error('`${t.name}.${edge.name}`: `${info.node()}.${edge.name}` is taken; rename the edge')
 		}
 	}
@@ -86,6 +86,7 @@ fn graph_file(out_module string, entities []Entity) string {
 	b.writeln('import orm')
 	b.writeln('import five07.vgraph')
 	b.writeln('import five07.vgraph.graphql')
+	b.writeln('import five07.vgraph.load')
 	for path in imports_of(entities) {
 		b.writeln('import ${import_line(path)}')
 	}
@@ -197,6 +198,39 @@ pub:
 // msg names the table that had no matching row.
 pub fn (e NotFoundError) msg() string {
 	return "no `\${e.table}` row matches"
+}
+
+// NotSingularError is the error of `only()` and `only_id()` when more than one
+// row matches.
+pub struct NotSingularError {
+	Error
+pub:
+	table string
+}
+
+// msg names the table that had more than one matching row.
+pub fn (e NotSingularError) msg() string {
+	return "more than one `\${e.table}` row matches"
+}
+
+// NotLoadedError is the error of a node\'s `<edge>_or_err()` when its query
+// didn\'t load the edge.
+pub struct NotLoadedError {
+	Error
+pub:
+	edge string
+}
+
+// msg names the edge that wasn\'t loaded.
+pub fn (e NotLoadedError) msg() string {
+	return "`\${e.edge}` wasn\'t loaded: ask for it with `with_<edge>`"
+}
+
+// with_conds returns `conds` and `more`, for a subquery\'s conditions.
+fn with_conds(conds []load.Cond, more ...load.Cond) []load.Cond {
+	mut all := conds.clone()
+	all << more
+	return all
 }')
 	return b.str()
 }
@@ -241,6 +275,9 @@ mut:
 	for i, edge in t.edges {
 		b.writeln('	with_${edge.name} bool
 	${edge.name}_fns []fn (${targets[i].query()}) ${targets[i].query()}')
+		if edge.kind in ['one_to_many', 'many_to_many'] {
+			b.writeln('	named_${edge.name} map[string][]fn (${targets[i].query()}) ${targets[i].query()}')
+		}
 	}
 	b.writeln('}')
 
@@ -258,8 +295,13 @@ pub mut:
 			'[]${targets[i].node()}'
 		}
 		b.writeln('	${edge.name} ${typ} // set by `with_${edge.name}()`')
+		if edge.kind in ['one_to_many', 'many_to_many'] {
+			b.writeln('	named_${edge.name} map[string][]${targets[i].node()} // set by `with_named_${edge.name}()`')
+		}
 	}
-	b.writeln('}')
+	b.writeln('	// loaded: the edges the query loaded
+	loaded []string
+}')
 
 	b.writeln('
 // ${t.name} starts a query of `${t.name}`.
@@ -309,7 +351,10 @@ pub fn (q ${q}) offset(count int) ${q} {
 pub fn (q ${q}) count() !int {
 	return load.count_where[${info.typ()}](q.graph.client.conn, q.graph.client.prepare_query(\'${t.name}\', q.query)!)
 }')
-	write_predicates(mut b, t, q, true)
+	preds := predicates(info, infos)!
+	write_pred_functions(mut b, preds)
+	write_order_methods(mut b, t, q)
+	write_query_api(mut b, info, infos, preds)!
 	for i, edge in t.edges {
 		target := targets[i]
 		b.writeln('
@@ -339,107 +384,33 @@ pub fn (q ${q}) first() !${n} {
 		}
 	}
 	return nodes[0]
-}
-
-// nodes loads the requested edges onto `rows`, which the caller already has: one
-// query per edge, however many rows there are.
-pub fn (q ${q}) nodes(rows []${info.typ()}) ![]${n} {
-	mut nodes := rows.map(${n}{
-		graph: q.graph
-		${info.field()}: it
-	})')
-	for i, edge in t.edges {
-		write_edge_load(mut b, info, edge, targets[i])!
-	}
-	b.writeln('	return nodes\n}')
+}')
+	write_nodes(mut b, info, infos)!
+	write_edge_methods(mut b, info, infos)!
 	for i, edge in t.edges {
 		write_traversal(mut b, info, edge, targets[i])!
 	}
 	return b.str()
 }
 
-// write_predicates writes the predicate methods of the builder `q`, which has
-// a `where(conds ...load.Cond)` method, and with `orders` its order methods.
-fn write_predicates(mut b strings.Builder, t Table, q string, orders bool) {
+// write_order_methods writes `order_by_<field>` and `order_by_<field>_desc`
+// for each column of `t`, which add an order column.
+fn write_order_methods(mut b strings.Builder, t Table, q string) {
 	for c in t.columns {
-		base := c.typ.trim_left('?')
-		if base !in ['int', 'i64', 'f64', 'bool', 'string', 'time.Time'] {
+		if c.typ.trim_left('?') !in ['int', 'i64', 'f64', 'bool', 'string', 'time.Time'] {
 			continue
 		}
 		b.writeln('
-// where_${c.field} keeps the rows whose `${c.name}` is `value`.
-pub fn (q ${q}) where_${c.field}(value ${base}) ${q} {
-	return q.where(load.eq(\'${c.name}\', value))
-}')
-		if base in ['int', 'i64', 'f64', 'time.Time'] {
-			for op, words in {
-				'lt': 'before'
-				'le': 'at or before'
-				'gt': 'after'
-				'ge': 'at or after'
-			} {
-				b.writeln('
-// where_${c.field}_${op} keeps the rows whose `${c.name}` comes ${words} `value`.
-pub fn (q ${q}) where_${c.field}_${op}(value ${base}) ${q} {
-	return q.where(load.${op}(\'${c.name}\', value))
-}')
-			}
-		}
-		if base in ['int', 'i64', 'string'] {
-			fn_name := match base {
-				'int' { 'in_ints' }
-				'i64' { 'in_i64s' }
-				else { 'in_strings' }
-			}
-			b.writeln('
-// where_${c.field}_in keeps the rows whose `${c.name}` is one of `values`.
-pub fn (q ${q}) where_${c.field}_in(values []${base}) ${q} {
-	return q.where(load.${fn_name}(\'${c.name}\', values))
-}')
-		}
-		if base == 'string' {
-			b.writeln('
-// where_${c.field}_like keeps the rows whose `${c.name}` matches the SQL LIKE `pattern`.
-pub fn (q ${q}) where_${c.field}_like(pattern string) ${q} {
-	return q.where(load.like(\'${c.name}\', pattern))
-}')
-		}
-		if c.nullable {
-			b.writeln('
-// where_${c.field}_is_null keeps the rows whose `${c.name}` is null.
-pub fn (q ${q}) where_${c.field}_is_null() ${q} {
-	return q.where(load.is_null(\'${c.name}\'))
-}
-
-// where_${c.field}_is_not_null keeps the rows whose `${c.name}` is not null.
-pub fn (q ${q}) where_${c.field}_is_not_null() ${q} {
-	return q.where(load.is_not_null(\'${c.name}\'))
-}')
-		}
-		if !orders {
-			continue
-		}
-		b.writeln('
-// order_by_${c.field} orders the rows by `${c.name}`, ascending.
+// order_by_${c.field} orders the rows by `${c.name}`, ascending, after the orders
+// given before.
 pub fn (q ${q}) order_by_${c.field}() ${q} {
-	mut next := q
-	next.query = load.Query{
-		...q.query
-		order: \'${c.name}\'
-		desc:  false
-	}
-	return next
+	return q.order_by(load.asc(\'${c.name}\'))
 }
 
-// order_by_${c.field}_desc orders the rows by `${c.name}`, descending.
+// order_by_${c.field}_desc orders the rows by `${c.name}`, descending, after the
+// orders given before.
 pub fn (q ${q}) order_by_${c.field}_desc() ${q} {
-	mut next := q
-	next.query = load.Query{
-		...q.query
-		order: \'${c.name}\'
-		desc:  true
-	}
-	return next
+	return q.order_by(load.desc(\'${c.name}\'))
 }')
 	}
 }
@@ -466,120 +437,6 @@ fn type_check(row string, info Info, edge Edge) !string {
 	}
 	field := info.table.column(edge.type_col)!.field
 	return "${row}.${field} == '${edge.type_val}'"
-}
-
-fn write_edge_load(mut b strings.Builder, info Info, edge Edge, target Info) ! {
-	t := info.table
-	key := info.key_field()!
-	b.writeln('	if q.with_${edge.name} {
-		mut sub := q.graph.${target.table.name}()
-		for configure in q.${edge.name}_fns {
-			sub = configure(sub)
-		}')
-	match edge.kind {
-		'one_to_many', 'one_to_one' {
-			fk := target.table.column(edge.column)!
-			b.writeln("		children := sub.nodes(load.select_in[${target.typ()}](q.graph.client.conn, '${edge.column}',
-			rows.map(it.${key}.str()), ${filters(edge, true)})!)!
-		mut by_parent := map[string][]${target.node()}{}
-		for child in children {")
-			if fk.nullable {
-				b.writeln('			if parent := child.${target.field()}.${fk.field} {
-				by_parent[parent.str()] << child
-			}')
-			} else {
-				b.writeln('			by_parent[child.${target.field()}.${fk.field}.str()] << child')
-			}
-			if edge.kind == 'one_to_one' {
-				b.writeln('		}
-		// at most one each: the first, in the order of the query
-		for mut node in nodes {
-			if found := by_parent[node.${info.field()}.${key}.str()] {
-				node.${edge.name} = &${target.node()}{
-					...found[0]
-				}
-			}
-		}')
-			} else {
-				b.writeln('		}
-		for mut node in nodes {
-			node.${edge.name} = by_parent[node.${info.field()}.${key}.str()] or { [] }
-		}')
-			}
-		}
-		'many_to_one' {
-			fk := t.column(edge.column)!
-			target_key := target.key_field()!
-			check := type_check('row', info, edge)!
-			b.writeln('		mut keys := []string{}
-		for row in rows {')
-			if check != '' {
-				b.writeln('			if !(${check}) {
-				continue
-			}')
-			}
-			if fk.nullable {
-				b.writeln('			if key := row.${fk.field} {
-				keys << key.str()
-			}')
-			} else {
-				b.writeln('			keys << row.${fk.field}.str()')
-			}
-			b.writeln("		}
-		targets := sub.nodes(load.select_in[${target.typ()}](q.graph.client.conn, '${target.table.key}',
-			load.unique(keys), ${filters(edge, false)})!)!
-		mut by_key := map[string]&${target.node()}{}
-		for target in targets {
-			by_key[target.${target.field()}.${target_key}.str()] = &${target.node()}{
-				...target
-			}
-		}
-		for mut node in nodes {")
-			node_check := type_check('node.${info.field()}', info, edge)!
-			if node_check != '' {
-				b.writeln('			if !(${node_check}) {
-				continue
-			}')
-			}
-			if fk.nullable {
-				b.writeln('			if key := node.${info.field()}.${fk.field} {
-				if target := by_key[key.str()] {
-					node.${edge.name} = target
-				}
-			}')
-			} else {
-				b.writeln('			if target := by_key[node.${info.field()}.${fk.field}.str()] {
-				node.${edge.name} = target
-			}')
-			}
-			b.writeln('		}')
-		}
-		'many_to_many' {
-			target_key := target.key_field()!
-			b.writeln("		pairs := load.link_pairs(q.graph.client.conn, '${edge.through}', '${edge.column}',
-			'${edge.through_to}', rows.map(it.${key}.str()), .${info.key_type()!}, .${target.key_type()!})!
-		targets := sub.nodes(load.select_in[${target.typ()}](q.graph.client.conn, '${target.table.key}',
-			load.unique(pairs.map(it[1])), ${filters(edge, true)})!)!
-		// each parent's targets in the order of the query
-		mut parents_of := map[string][]string{}
-		for pair in pairs {
-			parents_of[pair[1]] << pair[0]
-		}
-		mut linked := map[string][]${target.node()}{}
-		for target in targets {
-			for parent in parents_of[target.${target.field()}.${target_key}.str()] or { [] } {
-				linked[parent] << target
-			}
-		}
-		for mut node in nodes {
-			node.${edge.name} = linked[node.${info.field()}.${key}.str()] or { [] }
-		}")
-		}
-		else {
-			return error('`${t.name}.${edge.name}`: unknown edge kind `${edge.kind}`')
-		}
-	}
-	b.writeln('	}')
 }
 
 fn write_traversal(mut b strings.Builder, info Info, edge Edge, target Info) ! {

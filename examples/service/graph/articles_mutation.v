@@ -872,244 +872,444 @@ pub fn (b ArticleUpdate) where(conds ...load.Cond) ArticleUpdate {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q ArticleUpdate) where_id(value int) ArticleUpdate {
-	return q.where(load.eq('id', value))
+	return q.where(article_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q ArticleUpdate) where_id_ne(value int) ArticleUpdate {
+	return q.where(article_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q ArticleUpdate) where_id_lt(value int) ArticleUpdate {
-	return q.where(load.lt('id', value))
+	return q.where(article_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q ArticleUpdate) where_id_le(value int) ArticleUpdate {
-	return q.where(load.le('id', value))
+	return q.where(article_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q ArticleUpdate) where_id_gt(value int) ArticleUpdate {
-	return q.where(load.gt('id', value))
+	return q.where(article_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q ArticleUpdate) where_id_ge(value int) ArticleUpdate {
-	return q.where(load.ge('id', value))
+	return q.where(article_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q ArticleUpdate) where_id_in(values []int) ArticleUpdate {
-	return q.where(load.in_ints('id', values))
+	return q.where(article_id_in(values))
 }
 
-// where_slug keeps the rows whose `slug` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q ArticleUpdate) where_id_not_in(values []int) ArticleUpdate {
+	return q.where(article_id_not_in(values))
+}
+
+// where_slug keeps the rows where `slug` is `value`.
 pub fn (q ArticleUpdate) where_slug(value string) ArticleUpdate {
-	return q.where(load.eq('slug', value))
+	return q.where(article_slug_eq(value))
 }
 
-// where_slug_in keeps the rows whose `slug` is one of `values`.
+// where_slug_ne keeps the rows where `slug` is not `value`.
+pub fn (q ArticleUpdate) where_slug_ne(value string) ArticleUpdate {
+	return q.where(article_slug_ne(value))
+}
+
+// where_slug_in keeps the rows where `slug` is one of `values`.
 pub fn (q ArticleUpdate) where_slug_in(values []string) ArticleUpdate {
-	return q.where(load.in_strings('slug', values))
+	return q.where(article_slug_in(values))
 }
 
-// where_slug_like keeps the rows whose `slug` matches the SQL LIKE `pattern`.
+// where_slug_not_in keeps the rows where `slug` is none of `values`.
+pub fn (q ArticleUpdate) where_slug_not_in(values []string) ArticleUpdate {
+	return q.where(article_slug_not_in(values))
+}
+
+// where_slug_like keeps the rows where `slug` matches the SQL LIKE `pattern`.
 pub fn (q ArticleUpdate) where_slug_like(pattern string) ArticleUpdate {
-	return q.where(load.like('slug', pattern))
+	return q.where(article_slug_like(pattern))
 }
 
-// where_user_id keeps the rows whose `user_id` is `value`.
+// where_slug_contains keeps the rows where `slug` contains `value`.
+pub fn (q ArticleUpdate) where_slug_contains(value string) ArticleUpdate {
+	return q.where(article_slug_contains(value))
+}
+
+// where_slug_has_prefix keeps the rows where `slug` starts with `value`.
+pub fn (q ArticleUpdate) where_slug_has_prefix(value string) ArticleUpdate {
+	return q.where(article_slug_has_prefix(value))
+}
+
+// where_slug_has_suffix keeps the rows where `slug` ends with `value`.
+pub fn (q ArticleUpdate) where_slug_has_suffix(value string) ArticleUpdate {
+	return q.where(article_slug_has_suffix(value))
+}
+
+// where_slug_equal_fold keeps the rows where `slug` is `value`, ignoring case.
+pub fn (q ArticleUpdate) where_slug_equal_fold(value string) ArticleUpdate {
+	return q.where(article_slug_equal_fold(value))
+}
+
+// where_slug_contains_fold keeps the rows where `slug` contains `value`, ignoring case.
+pub fn (q ArticleUpdate) where_slug_contains_fold(value string) ArticleUpdate {
+	return q.where(article_slug_contains_fold(value))
+}
+
+// where_user_id keeps the rows where `user_id` is `value`.
 pub fn (q ArticleUpdate) where_user_id(value int) ArticleUpdate {
-	return q.where(load.eq('user_id', value))
+	return q.where(article_user_id_eq(value))
 }
 
-// where_user_id_lt keeps the rows whose `user_id` comes before `value`.
+// where_user_id_ne keeps the rows where `user_id` is not `value`.
+pub fn (q ArticleUpdate) where_user_id_ne(value int) ArticleUpdate {
+	return q.where(article_user_id_ne(value))
+}
+
+// where_user_id_lt keeps the rows where `user_id` comes before `value`.
 pub fn (q ArticleUpdate) where_user_id_lt(value int) ArticleUpdate {
-	return q.where(load.lt('user_id', value))
+	return q.where(article_user_id_lt(value))
 }
 
-// where_user_id_le keeps the rows whose `user_id` comes at or before `value`.
+// where_user_id_le keeps the rows where `user_id` comes at or before `value`.
 pub fn (q ArticleUpdate) where_user_id_le(value int) ArticleUpdate {
-	return q.where(load.le('user_id', value))
+	return q.where(article_user_id_le(value))
 }
 
-// where_user_id_gt keeps the rows whose `user_id` comes after `value`.
+// where_user_id_gt keeps the rows where `user_id` comes after `value`.
 pub fn (q ArticleUpdate) where_user_id_gt(value int) ArticleUpdate {
-	return q.where(load.gt('user_id', value))
+	return q.where(article_user_id_gt(value))
 }
 
-// where_user_id_ge keeps the rows whose `user_id` comes at or after `value`.
+// where_user_id_ge keeps the rows where `user_id` comes at or after `value`.
 pub fn (q ArticleUpdate) where_user_id_ge(value int) ArticleUpdate {
-	return q.where(load.ge('user_id', value))
+	return q.where(article_user_id_ge(value))
 }
 
-// where_user_id_in keeps the rows whose `user_id` is one of `values`.
+// where_user_id_in keeps the rows where `user_id` is one of `values`.
 pub fn (q ArticleUpdate) where_user_id_in(values []int) ArticleUpdate {
-	return q.where(load.in_ints('user_id', values))
+	return q.where(article_user_id_in(values))
 }
 
-// where_title keeps the rows whose `title` is `value`.
+// where_user_id_not_in keeps the rows where `user_id` is none of `values`.
+pub fn (q ArticleUpdate) where_user_id_not_in(values []int) ArticleUpdate {
+	return q.where(article_user_id_not_in(values))
+}
+
+// where_title keeps the rows where `title` is `value`.
 pub fn (q ArticleUpdate) where_title(value string) ArticleUpdate {
-	return q.where(load.eq('title', value))
+	return q.where(article_title_eq(value))
 }
 
-// where_title_in keeps the rows whose `title` is one of `values`.
+// where_title_ne keeps the rows where `title` is not `value`.
+pub fn (q ArticleUpdate) where_title_ne(value string) ArticleUpdate {
+	return q.where(article_title_ne(value))
+}
+
+// where_title_in keeps the rows where `title` is one of `values`.
 pub fn (q ArticleUpdate) where_title_in(values []string) ArticleUpdate {
-	return q.where(load.in_strings('title', values))
+	return q.where(article_title_in(values))
 }
 
-// where_title_like keeps the rows whose `title` matches the SQL LIKE `pattern`.
+// where_title_not_in keeps the rows where `title` is none of `values`.
+pub fn (q ArticleUpdate) where_title_not_in(values []string) ArticleUpdate {
+	return q.where(article_title_not_in(values))
+}
+
+// where_title_like keeps the rows where `title` matches the SQL LIKE `pattern`.
 pub fn (q ArticleUpdate) where_title_like(pattern string) ArticleUpdate {
-	return q.where(load.like('title', pattern))
+	return q.where(article_title_like(pattern))
 }
 
-// where_summary keeps the rows whose `summary` is `value`.
+// where_title_contains keeps the rows where `title` contains `value`.
+pub fn (q ArticleUpdate) where_title_contains(value string) ArticleUpdate {
+	return q.where(article_title_contains(value))
+}
+
+// where_title_has_prefix keeps the rows where `title` starts with `value`.
+pub fn (q ArticleUpdate) where_title_has_prefix(value string) ArticleUpdate {
+	return q.where(article_title_has_prefix(value))
+}
+
+// where_title_has_suffix keeps the rows where `title` ends with `value`.
+pub fn (q ArticleUpdate) where_title_has_suffix(value string) ArticleUpdate {
+	return q.where(article_title_has_suffix(value))
+}
+
+// where_title_equal_fold keeps the rows where `title` is `value`, ignoring case.
+pub fn (q ArticleUpdate) where_title_equal_fold(value string) ArticleUpdate {
+	return q.where(article_title_equal_fold(value))
+}
+
+// where_title_contains_fold keeps the rows where `title` contains `value`, ignoring case.
+pub fn (q ArticleUpdate) where_title_contains_fold(value string) ArticleUpdate {
+	return q.where(article_title_contains_fold(value))
+}
+
+// where_summary keeps the rows where `summary` is `value`.
 pub fn (q ArticleUpdate) where_summary(value string) ArticleUpdate {
-	return q.where(load.eq('summary', value))
+	return q.where(article_summary_eq(value))
 }
 
-// where_summary_in keeps the rows whose `summary` is one of `values`.
+// where_summary_ne keeps the rows where `summary` is not `value`.
+pub fn (q ArticleUpdate) where_summary_ne(value string) ArticleUpdate {
+	return q.where(article_summary_ne(value))
+}
+
+// where_summary_in keeps the rows where `summary` is one of `values`.
 pub fn (q ArticleUpdate) where_summary_in(values []string) ArticleUpdate {
-	return q.where(load.in_strings('summary', values))
+	return q.where(article_summary_in(values))
 }
 
-// where_summary_like keeps the rows whose `summary` matches the SQL LIKE `pattern`.
+// where_summary_not_in keeps the rows where `summary` is none of `values`.
+pub fn (q ArticleUpdate) where_summary_not_in(values []string) ArticleUpdate {
+	return q.where(article_summary_not_in(values))
+}
+
+// where_summary_like keeps the rows where `summary` matches the SQL LIKE `pattern`.
 pub fn (q ArticleUpdate) where_summary_like(pattern string) ArticleUpdate {
-	return q.where(load.like('summary', pattern))
+	return q.where(article_summary_like(pattern))
 }
 
-// where_body keeps the rows whose `body` is `value`.
+// where_summary_contains keeps the rows where `summary` contains `value`.
+pub fn (q ArticleUpdate) where_summary_contains(value string) ArticleUpdate {
+	return q.where(article_summary_contains(value))
+}
+
+// where_summary_has_prefix keeps the rows where `summary` starts with `value`.
+pub fn (q ArticleUpdate) where_summary_has_prefix(value string) ArticleUpdate {
+	return q.where(article_summary_has_prefix(value))
+}
+
+// where_summary_has_suffix keeps the rows where `summary` ends with `value`.
+pub fn (q ArticleUpdate) where_summary_has_suffix(value string) ArticleUpdate {
+	return q.where(article_summary_has_suffix(value))
+}
+
+// where_summary_equal_fold keeps the rows where `summary` is `value`, ignoring case.
+pub fn (q ArticleUpdate) where_summary_equal_fold(value string) ArticleUpdate {
+	return q.where(article_summary_equal_fold(value))
+}
+
+// where_summary_contains_fold keeps the rows where `summary` contains `value`, ignoring case.
+pub fn (q ArticleUpdate) where_summary_contains_fold(value string) ArticleUpdate {
+	return q.where(article_summary_contains_fold(value))
+}
+
+// where_body keeps the rows where `body` is `value`.
 pub fn (q ArticleUpdate) where_body(value string) ArticleUpdate {
-	return q.where(load.eq('body', value))
+	return q.where(article_body_eq(value))
 }
 
-// where_body_in keeps the rows whose `body` is one of `values`.
+// where_body_ne keeps the rows where `body` is not `value`.
+pub fn (q ArticleUpdate) where_body_ne(value string) ArticleUpdate {
+	return q.where(article_body_ne(value))
+}
+
+// where_body_in keeps the rows where `body` is one of `values`.
 pub fn (q ArticleUpdate) where_body_in(values []string) ArticleUpdate {
-	return q.where(load.in_strings('body', values))
+	return q.where(article_body_in(values))
 }
 
-// where_body_like keeps the rows whose `body` matches the SQL LIKE `pattern`.
+// where_body_not_in keeps the rows where `body` is none of `values`.
+pub fn (q ArticleUpdate) where_body_not_in(values []string) ArticleUpdate {
+	return q.where(article_body_not_in(values))
+}
+
+// where_body_like keeps the rows where `body` matches the SQL LIKE `pattern`.
 pub fn (q ArticleUpdate) where_body_like(pattern string) ArticleUpdate {
-	return q.where(load.like('body', pattern))
+	return q.where(article_body_like(pattern))
 }
 
-// where_published_at keeps the rows whose `published_at` is `value`.
+// where_body_contains keeps the rows where `body` contains `value`.
+pub fn (q ArticleUpdate) where_body_contains(value string) ArticleUpdate {
+	return q.where(article_body_contains(value))
+}
+
+// where_body_has_prefix keeps the rows where `body` starts with `value`.
+pub fn (q ArticleUpdate) where_body_has_prefix(value string) ArticleUpdate {
+	return q.where(article_body_has_prefix(value))
+}
+
+// where_body_has_suffix keeps the rows where `body` ends with `value`.
+pub fn (q ArticleUpdate) where_body_has_suffix(value string) ArticleUpdate {
+	return q.where(article_body_has_suffix(value))
+}
+
+// where_body_equal_fold keeps the rows where `body` is `value`, ignoring case.
+pub fn (q ArticleUpdate) where_body_equal_fold(value string) ArticleUpdate {
+	return q.where(article_body_equal_fold(value))
+}
+
+// where_body_contains_fold keeps the rows where `body` contains `value`, ignoring case.
+pub fn (q ArticleUpdate) where_body_contains_fold(value string) ArticleUpdate {
+	return q.where(article_body_contains_fold(value))
+}
+
+// where_published_at keeps the rows where `published_at` is `value`.
 pub fn (q ArticleUpdate) where_published_at(value time.Time) ArticleUpdate {
-	return q.where(load.eq('published_at', value))
+	return q.where(article_published_at_eq(value))
 }
 
-// where_published_at_lt keeps the rows whose `published_at` comes before `value`.
+// where_published_at_ne keeps the rows where `published_at` is not `value`.
+pub fn (q ArticleUpdate) where_published_at_ne(value time.Time) ArticleUpdate {
+	return q.where(article_published_at_ne(value))
+}
+
+// where_published_at_lt keeps the rows where `published_at` comes before `value`.
 pub fn (q ArticleUpdate) where_published_at_lt(value time.Time) ArticleUpdate {
-	return q.where(load.lt('published_at', value))
+	return q.where(article_published_at_lt(value))
 }
 
-// where_published_at_le keeps the rows whose `published_at` comes at or before `value`.
+// where_published_at_le keeps the rows where `published_at` comes at or before `value`.
 pub fn (q ArticleUpdate) where_published_at_le(value time.Time) ArticleUpdate {
-	return q.where(load.le('published_at', value))
+	return q.where(article_published_at_le(value))
 }
 
-// where_published_at_gt keeps the rows whose `published_at` comes after `value`.
+// where_published_at_gt keeps the rows where `published_at` comes after `value`.
 pub fn (q ArticleUpdate) where_published_at_gt(value time.Time) ArticleUpdate {
-	return q.where(load.gt('published_at', value))
+	return q.where(article_published_at_gt(value))
 }
 
-// where_published_at_ge keeps the rows whose `published_at` comes at or after `value`.
+// where_published_at_ge keeps the rows where `published_at` comes at or after `value`.
 pub fn (q ArticleUpdate) where_published_at_ge(value time.Time) ArticleUpdate {
-	return q.where(load.ge('published_at', value))
+	return q.where(article_published_at_ge(value))
 }
 
-// where_published_at_is_null keeps the rows whose `published_at` is null.
+// where_published_at_is_null keeps the rows where `published_at` is null.
 pub fn (q ArticleUpdate) where_published_at_is_null() ArticleUpdate {
-	return q.where(load.is_null('published_at'))
+	return q.where(article_published_at_is_null())
 }
 
-// where_published_at_is_not_null keeps the rows whose `published_at` is not null.
+// where_published_at_is_not_null keeps the rows where `published_at` is not null.
 pub fn (q ArticleUpdate) where_published_at_is_not_null() ArticleUpdate {
-	return q.where(load.is_not_null('published_at'))
+	return q.where(article_published_at_is_not_null())
 }
 
-// where_created_at keeps the rows whose `created_at` is `value`.
+// where_created_at keeps the rows where `created_at` is `value`.
 pub fn (q ArticleUpdate) where_created_at(value time.Time) ArticleUpdate {
-	return q.where(load.eq('created_at', value))
+	return q.where(article_created_at_eq(value))
 }
 
-// where_created_at_lt keeps the rows whose `created_at` comes before `value`.
+// where_created_at_ne keeps the rows where `created_at` is not `value`.
+pub fn (q ArticleUpdate) where_created_at_ne(value time.Time) ArticleUpdate {
+	return q.where(article_created_at_ne(value))
+}
+
+// where_created_at_lt keeps the rows where `created_at` comes before `value`.
 pub fn (q ArticleUpdate) where_created_at_lt(value time.Time) ArticleUpdate {
-	return q.where(load.lt('created_at', value))
+	return q.where(article_created_at_lt(value))
 }
 
-// where_created_at_le keeps the rows whose `created_at` comes at or before `value`.
+// where_created_at_le keeps the rows where `created_at` comes at or before `value`.
 pub fn (q ArticleUpdate) where_created_at_le(value time.Time) ArticleUpdate {
-	return q.where(load.le('created_at', value))
+	return q.where(article_created_at_le(value))
 }
 
-// where_created_at_gt keeps the rows whose `created_at` comes after `value`.
+// where_created_at_gt keeps the rows where `created_at` comes after `value`.
 pub fn (q ArticleUpdate) where_created_at_gt(value time.Time) ArticleUpdate {
-	return q.where(load.gt('created_at', value))
+	return q.where(article_created_at_gt(value))
 }
 
-// where_created_at_ge keeps the rows whose `created_at` comes at or after `value`.
+// where_created_at_ge keeps the rows where `created_at` comes at or after `value`.
 pub fn (q ArticleUpdate) where_created_at_ge(value time.Time) ArticleUpdate {
-	return q.where(load.ge('created_at', value))
+	return q.where(article_created_at_ge(value))
 }
 
-// where_updated_at keeps the rows whose `updated_at` is `value`.
+// where_updated_at keeps the rows where `updated_at` is `value`.
 pub fn (q ArticleUpdate) where_updated_at(value time.Time) ArticleUpdate {
-	return q.where(load.eq('updated_at', value))
+	return q.where(article_updated_at_eq(value))
 }
 
-// where_updated_at_lt keeps the rows whose `updated_at` comes before `value`.
+// where_updated_at_ne keeps the rows where `updated_at` is not `value`.
+pub fn (q ArticleUpdate) where_updated_at_ne(value time.Time) ArticleUpdate {
+	return q.where(article_updated_at_ne(value))
+}
+
+// where_updated_at_lt keeps the rows where `updated_at` comes before `value`.
 pub fn (q ArticleUpdate) where_updated_at_lt(value time.Time) ArticleUpdate {
-	return q.where(load.lt('updated_at', value))
+	return q.where(article_updated_at_lt(value))
 }
 
-// where_updated_at_le keeps the rows whose `updated_at` comes at or before `value`.
+// where_updated_at_le keeps the rows where `updated_at` comes at or before `value`.
 pub fn (q ArticleUpdate) where_updated_at_le(value time.Time) ArticleUpdate {
-	return q.where(load.le('updated_at', value))
+	return q.where(article_updated_at_le(value))
 }
 
-// where_updated_at_gt keeps the rows whose `updated_at` comes after `value`.
+// where_updated_at_gt keeps the rows where `updated_at` comes after `value`.
 pub fn (q ArticleUpdate) where_updated_at_gt(value time.Time) ArticleUpdate {
-	return q.where(load.gt('updated_at', value))
+	return q.where(article_updated_at_gt(value))
 }
 
-// where_updated_at_ge keeps the rows whose `updated_at` comes at or after `value`.
+// where_updated_at_ge keeps the rows where `updated_at` comes at or after `value`.
 pub fn (q ArticleUpdate) where_updated_at_ge(value time.Time) ArticleUpdate {
-	return q.where(load.ge('updated_at', value))
+	return q.where(article_updated_at_ge(value))
 }
 
-// where_deleted_at keeps the rows whose `deleted_at` is `value`.
+// where_deleted_at keeps the rows where `deleted_at` is `value`.
 pub fn (q ArticleUpdate) where_deleted_at(value time.Time) ArticleUpdate {
-	return q.where(load.eq('deleted_at', value))
+	return q.where(article_deleted_at_eq(value))
 }
 
-// where_deleted_at_lt keeps the rows whose `deleted_at` comes before `value`.
+// where_deleted_at_ne keeps the rows where `deleted_at` is not `value`.
+pub fn (q ArticleUpdate) where_deleted_at_ne(value time.Time) ArticleUpdate {
+	return q.where(article_deleted_at_ne(value))
+}
+
+// where_deleted_at_lt keeps the rows where `deleted_at` comes before `value`.
 pub fn (q ArticleUpdate) where_deleted_at_lt(value time.Time) ArticleUpdate {
-	return q.where(load.lt('deleted_at', value))
+	return q.where(article_deleted_at_lt(value))
 }
 
-// where_deleted_at_le keeps the rows whose `deleted_at` comes at or before `value`.
+// where_deleted_at_le keeps the rows where `deleted_at` comes at or before `value`.
 pub fn (q ArticleUpdate) where_deleted_at_le(value time.Time) ArticleUpdate {
-	return q.where(load.le('deleted_at', value))
+	return q.where(article_deleted_at_le(value))
 }
 
-// where_deleted_at_gt keeps the rows whose `deleted_at` comes after `value`.
+// where_deleted_at_gt keeps the rows where `deleted_at` comes after `value`.
 pub fn (q ArticleUpdate) where_deleted_at_gt(value time.Time) ArticleUpdate {
-	return q.where(load.gt('deleted_at', value))
+	return q.where(article_deleted_at_gt(value))
 }
 
-// where_deleted_at_ge keeps the rows whose `deleted_at` comes at or after `value`.
+// where_deleted_at_ge keeps the rows where `deleted_at` comes at or after `value`.
 pub fn (q ArticleUpdate) where_deleted_at_ge(value time.Time) ArticleUpdate {
-	return q.where(load.ge('deleted_at', value))
+	return q.where(article_deleted_at_ge(value))
 }
 
-// where_deleted_at_is_null keeps the rows whose `deleted_at` is null.
+// where_deleted_at_is_null keeps the rows where `deleted_at` is null.
 pub fn (q ArticleUpdate) where_deleted_at_is_null() ArticleUpdate {
-	return q.where(load.is_null('deleted_at'))
+	return q.where(article_deleted_at_is_null())
 }
 
-// where_deleted_at_is_not_null keeps the rows whose `deleted_at` is not null.
+// where_deleted_at_is_not_null keeps the rows where `deleted_at` is not null.
 pub fn (q ArticleUpdate) where_deleted_at_is_not_null() ArticleUpdate {
-	return q.where(load.is_not_null('deleted_at'))
+	return q.where(article_deleted_at_is_not_null())
+}
+
+// has_author keeps the rows where it has a `author`.
+pub fn (q ArticleUpdate) has_author() ArticleUpdate {
+	return q.where(article_has_author())
+}
+
+// has_author_with keeps the rows that have a `author` that `configure` keeps.
+pub fn (q ArticleUpdate) has_author_with(configure fn (UserQuery) UserQuery) ArticleUpdate {
+	return q.where(article_has_author_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_comments keeps the rows where it has a `comments`.
+pub fn (q ArticleUpdate) has_comments() ArticleUpdate {
+	return q.where(article_has_comments())
+}
+
+// has_comments_with keeps the rows that have a `comments` that `configure` keeps.
+pub fn (q ArticleUpdate) has_comments_with(configure fn (CommentQuery) CommentQuery) ArticleUpdate {
+	return q.where(article_has_comments_with(...configure(q.graph.comments()).query.conds))
 }
 
 // set_slug sets `slug`.
@@ -1350,244 +1550,444 @@ pub fn (b ArticleDelete) where(conds ...load.Cond) ArticleDelete {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q ArticleDelete) where_id(value int) ArticleDelete {
-	return q.where(load.eq('id', value))
+	return q.where(article_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q ArticleDelete) where_id_ne(value int) ArticleDelete {
+	return q.where(article_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q ArticleDelete) where_id_lt(value int) ArticleDelete {
-	return q.where(load.lt('id', value))
+	return q.where(article_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q ArticleDelete) where_id_le(value int) ArticleDelete {
-	return q.where(load.le('id', value))
+	return q.where(article_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q ArticleDelete) where_id_gt(value int) ArticleDelete {
-	return q.where(load.gt('id', value))
+	return q.where(article_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q ArticleDelete) where_id_ge(value int) ArticleDelete {
-	return q.where(load.ge('id', value))
+	return q.where(article_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q ArticleDelete) where_id_in(values []int) ArticleDelete {
-	return q.where(load.in_ints('id', values))
+	return q.where(article_id_in(values))
 }
 
-// where_slug keeps the rows whose `slug` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q ArticleDelete) where_id_not_in(values []int) ArticleDelete {
+	return q.where(article_id_not_in(values))
+}
+
+// where_slug keeps the rows where `slug` is `value`.
 pub fn (q ArticleDelete) where_slug(value string) ArticleDelete {
-	return q.where(load.eq('slug', value))
+	return q.where(article_slug_eq(value))
 }
 
-// where_slug_in keeps the rows whose `slug` is one of `values`.
+// where_slug_ne keeps the rows where `slug` is not `value`.
+pub fn (q ArticleDelete) where_slug_ne(value string) ArticleDelete {
+	return q.where(article_slug_ne(value))
+}
+
+// where_slug_in keeps the rows where `slug` is one of `values`.
 pub fn (q ArticleDelete) where_slug_in(values []string) ArticleDelete {
-	return q.where(load.in_strings('slug', values))
+	return q.where(article_slug_in(values))
 }
 
-// where_slug_like keeps the rows whose `slug` matches the SQL LIKE `pattern`.
+// where_slug_not_in keeps the rows where `slug` is none of `values`.
+pub fn (q ArticleDelete) where_slug_not_in(values []string) ArticleDelete {
+	return q.where(article_slug_not_in(values))
+}
+
+// where_slug_like keeps the rows where `slug` matches the SQL LIKE `pattern`.
 pub fn (q ArticleDelete) where_slug_like(pattern string) ArticleDelete {
-	return q.where(load.like('slug', pattern))
+	return q.where(article_slug_like(pattern))
 }
 
-// where_user_id keeps the rows whose `user_id` is `value`.
+// where_slug_contains keeps the rows where `slug` contains `value`.
+pub fn (q ArticleDelete) where_slug_contains(value string) ArticleDelete {
+	return q.where(article_slug_contains(value))
+}
+
+// where_slug_has_prefix keeps the rows where `slug` starts with `value`.
+pub fn (q ArticleDelete) where_slug_has_prefix(value string) ArticleDelete {
+	return q.where(article_slug_has_prefix(value))
+}
+
+// where_slug_has_suffix keeps the rows where `slug` ends with `value`.
+pub fn (q ArticleDelete) where_slug_has_suffix(value string) ArticleDelete {
+	return q.where(article_slug_has_suffix(value))
+}
+
+// where_slug_equal_fold keeps the rows where `slug` is `value`, ignoring case.
+pub fn (q ArticleDelete) where_slug_equal_fold(value string) ArticleDelete {
+	return q.where(article_slug_equal_fold(value))
+}
+
+// where_slug_contains_fold keeps the rows where `slug` contains `value`, ignoring case.
+pub fn (q ArticleDelete) where_slug_contains_fold(value string) ArticleDelete {
+	return q.where(article_slug_contains_fold(value))
+}
+
+// where_user_id keeps the rows where `user_id` is `value`.
 pub fn (q ArticleDelete) where_user_id(value int) ArticleDelete {
-	return q.where(load.eq('user_id', value))
+	return q.where(article_user_id_eq(value))
 }
 
-// where_user_id_lt keeps the rows whose `user_id` comes before `value`.
+// where_user_id_ne keeps the rows where `user_id` is not `value`.
+pub fn (q ArticleDelete) where_user_id_ne(value int) ArticleDelete {
+	return q.where(article_user_id_ne(value))
+}
+
+// where_user_id_lt keeps the rows where `user_id` comes before `value`.
 pub fn (q ArticleDelete) where_user_id_lt(value int) ArticleDelete {
-	return q.where(load.lt('user_id', value))
+	return q.where(article_user_id_lt(value))
 }
 
-// where_user_id_le keeps the rows whose `user_id` comes at or before `value`.
+// where_user_id_le keeps the rows where `user_id` comes at or before `value`.
 pub fn (q ArticleDelete) where_user_id_le(value int) ArticleDelete {
-	return q.where(load.le('user_id', value))
+	return q.where(article_user_id_le(value))
 }
 
-// where_user_id_gt keeps the rows whose `user_id` comes after `value`.
+// where_user_id_gt keeps the rows where `user_id` comes after `value`.
 pub fn (q ArticleDelete) where_user_id_gt(value int) ArticleDelete {
-	return q.where(load.gt('user_id', value))
+	return q.where(article_user_id_gt(value))
 }
 
-// where_user_id_ge keeps the rows whose `user_id` comes at or after `value`.
+// where_user_id_ge keeps the rows where `user_id` comes at or after `value`.
 pub fn (q ArticleDelete) where_user_id_ge(value int) ArticleDelete {
-	return q.where(load.ge('user_id', value))
+	return q.where(article_user_id_ge(value))
 }
 
-// where_user_id_in keeps the rows whose `user_id` is one of `values`.
+// where_user_id_in keeps the rows where `user_id` is one of `values`.
 pub fn (q ArticleDelete) where_user_id_in(values []int) ArticleDelete {
-	return q.where(load.in_ints('user_id', values))
+	return q.where(article_user_id_in(values))
 }
 
-// where_title keeps the rows whose `title` is `value`.
+// where_user_id_not_in keeps the rows where `user_id` is none of `values`.
+pub fn (q ArticleDelete) where_user_id_not_in(values []int) ArticleDelete {
+	return q.where(article_user_id_not_in(values))
+}
+
+// where_title keeps the rows where `title` is `value`.
 pub fn (q ArticleDelete) where_title(value string) ArticleDelete {
-	return q.where(load.eq('title', value))
+	return q.where(article_title_eq(value))
 }
 
-// where_title_in keeps the rows whose `title` is one of `values`.
+// where_title_ne keeps the rows where `title` is not `value`.
+pub fn (q ArticleDelete) where_title_ne(value string) ArticleDelete {
+	return q.where(article_title_ne(value))
+}
+
+// where_title_in keeps the rows where `title` is one of `values`.
 pub fn (q ArticleDelete) where_title_in(values []string) ArticleDelete {
-	return q.where(load.in_strings('title', values))
+	return q.where(article_title_in(values))
 }
 
-// where_title_like keeps the rows whose `title` matches the SQL LIKE `pattern`.
+// where_title_not_in keeps the rows where `title` is none of `values`.
+pub fn (q ArticleDelete) where_title_not_in(values []string) ArticleDelete {
+	return q.where(article_title_not_in(values))
+}
+
+// where_title_like keeps the rows where `title` matches the SQL LIKE `pattern`.
 pub fn (q ArticleDelete) where_title_like(pattern string) ArticleDelete {
-	return q.where(load.like('title', pattern))
+	return q.where(article_title_like(pattern))
 }
 
-// where_summary keeps the rows whose `summary` is `value`.
+// where_title_contains keeps the rows where `title` contains `value`.
+pub fn (q ArticleDelete) where_title_contains(value string) ArticleDelete {
+	return q.where(article_title_contains(value))
+}
+
+// where_title_has_prefix keeps the rows where `title` starts with `value`.
+pub fn (q ArticleDelete) where_title_has_prefix(value string) ArticleDelete {
+	return q.where(article_title_has_prefix(value))
+}
+
+// where_title_has_suffix keeps the rows where `title` ends with `value`.
+pub fn (q ArticleDelete) where_title_has_suffix(value string) ArticleDelete {
+	return q.where(article_title_has_suffix(value))
+}
+
+// where_title_equal_fold keeps the rows where `title` is `value`, ignoring case.
+pub fn (q ArticleDelete) where_title_equal_fold(value string) ArticleDelete {
+	return q.where(article_title_equal_fold(value))
+}
+
+// where_title_contains_fold keeps the rows where `title` contains `value`, ignoring case.
+pub fn (q ArticleDelete) where_title_contains_fold(value string) ArticleDelete {
+	return q.where(article_title_contains_fold(value))
+}
+
+// where_summary keeps the rows where `summary` is `value`.
 pub fn (q ArticleDelete) where_summary(value string) ArticleDelete {
-	return q.where(load.eq('summary', value))
+	return q.where(article_summary_eq(value))
 }
 
-// where_summary_in keeps the rows whose `summary` is one of `values`.
+// where_summary_ne keeps the rows where `summary` is not `value`.
+pub fn (q ArticleDelete) where_summary_ne(value string) ArticleDelete {
+	return q.where(article_summary_ne(value))
+}
+
+// where_summary_in keeps the rows where `summary` is one of `values`.
 pub fn (q ArticleDelete) where_summary_in(values []string) ArticleDelete {
-	return q.where(load.in_strings('summary', values))
+	return q.where(article_summary_in(values))
 }
 
-// where_summary_like keeps the rows whose `summary` matches the SQL LIKE `pattern`.
+// where_summary_not_in keeps the rows where `summary` is none of `values`.
+pub fn (q ArticleDelete) where_summary_not_in(values []string) ArticleDelete {
+	return q.where(article_summary_not_in(values))
+}
+
+// where_summary_like keeps the rows where `summary` matches the SQL LIKE `pattern`.
 pub fn (q ArticleDelete) where_summary_like(pattern string) ArticleDelete {
-	return q.where(load.like('summary', pattern))
+	return q.where(article_summary_like(pattern))
 }
 
-// where_body keeps the rows whose `body` is `value`.
+// where_summary_contains keeps the rows where `summary` contains `value`.
+pub fn (q ArticleDelete) where_summary_contains(value string) ArticleDelete {
+	return q.where(article_summary_contains(value))
+}
+
+// where_summary_has_prefix keeps the rows where `summary` starts with `value`.
+pub fn (q ArticleDelete) where_summary_has_prefix(value string) ArticleDelete {
+	return q.where(article_summary_has_prefix(value))
+}
+
+// where_summary_has_suffix keeps the rows where `summary` ends with `value`.
+pub fn (q ArticleDelete) where_summary_has_suffix(value string) ArticleDelete {
+	return q.where(article_summary_has_suffix(value))
+}
+
+// where_summary_equal_fold keeps the rows where `summary` is `value`, ignoring case.
+pub fn (q ArticleDelete) where_summary_equal_fold(value string) ArticleDelete {
+	return q.where(article_summary_equal_fold(value))
+}
+
+// where_summary_contains_fold keeps the rows where `summary` contains `value`, ignoring case.
+pub fn (q ArticleDelete) where_summary_contains_fold(value string) ArticleDelete {
+	return q.where(article_summary_contains_fold(value))
+}
+
+// where_body keeps the rows where `body` is `value`.
 pub fn (q ArticleDelete) where_body(value string) ArticleDelete {
-	return q.where(load.eq('body', value))
+	return q.where(article_body_eq(value))
 }
 
-// where_body_in keeps the rows whose `body` is one of `values`.
+// where_body_ne keeps the rows where `body` is not `value`.
+pub fn (q ArticleDelete) where_body_ne(value string) ArticleDelete {
+	return q.where(article_body_ne(value))
+}
+
+// where_body_in keeps the rows where `body` is one of `values`.
 pub fn (q ArticleDelete) where_body_in(values []string) ArticleDelete {
-	return q.where(load.in_strings('body', values))
+	return q.where(article_body_in(values))
 }
 
-// where_body_like keeps the rows whose `body` matches the SQL LIKE `pattern`.
+// where_body_not_in keeps the rows where `body` is none of `values`.
+pub fn (q ArticleDelete) where_body_not_in(values []string) ArticleDelete {
+	return q.where(article_body_not_in(values))
+}
+
+// where_body_like keeps the rows where `body` matches the SQL LIKE `pattern`.
 pub fn (q ArticleDelete) where_body_like(pattern string) ArticleDelete {
-	return q.where(load.like('body', pattern))
+	return q.where(article_body_like(pattern))
 }
 
-// where_published_at keeps the rows whose `published_at` is `value`.
+// where_body_contains keeps the rows where `body` contains `value`.
+pub fn (q ArticleDelete) where_body_contains(value string) ArticleDelete {
+	return q.where(article_body_contains(value))
+}
+
+// where_body_has_prefix keeps the rows where `body` starts with `value`.
+pub fn (q ArticleDelete) where_body_has_prefix(value string) ArticleDelete {
+	return q.where(article_body_has_prefix(value))
+}
+
+// where_body_has_suffix keeps the rows where `body` ends with `value`.
+pub fn (q ArticleDelete) where_body_has_suffix(value string) ArticleDelete {
+	return q.where(article_body_has_suffix(value))
+}
+
+// where_body_equal_fold keeps the rows where `body` is `value`, ignoring case.
+pub fn (q ArticleDelete) where_body_equal_fold(value string) ArticleDelete {
+	return q.where(article_body_equal_fold(value))
+}
+
+// where_body_contains_fold keeps the rows where `body` contains `value`, ignoring case.
+pub fn (q ArticleDelete) where_body_contains_fold(value string) ArticleDelete {
+	return q.where(article_body_contains_fold(value))
+}
+
+// where_published_at keeps the rows where `published_at` is `value`.
 pub fn (q ArticleDelete) where_published_at(value time.Time) ArticleDelete {
-	return q.where(load.eq('published_at', value))
+	return q.where(article_published_at_eq(value))
 }
 
-// where_published_at_lt keeps the rows whose `published_at` comes before `value`.
+// where_published_at_ne keeps the rows where `published_at` is not `value`.
+pub fn (q ArticleDelete) where_published_at_ne(value time.Time) ArticleDelete {
+	return q.where(article_published_at_ne(value))
+}
+
+// where_published_at_lt keeps the rows where `published_at` comes before `value`.
 pub fn (q ArticleDelete) where_published_at_lt(value time.Time) ArticleDelete {
-	return q.where(load.lt('published_at', value))
+	return q.where(article_published_at_lt(value))
 }
 
-// where_published_at_le keeps the rows whose `published_at` comes at or before `value`.
+// where_published_at_le keeps the rows where `published_at` comes at or before `value`.
 pub fn (q ArticleDelete) where_published_at_le(value time.Time) ArticleDelete {
-	return q.where(load.le('published_at', value))
+	return q.where(article_published_at_le(value))
 }
 
-// where_published_at_gt keeps the rows whose `published_at` comes after `value`.
+// where_published_at_gt keeps the rows where `published_at` comes after `value`.
 pub fn (q ArticleDelete) where_published_at_gt(value time.Time) ArticleDelete {
-	return q.where(load.gt('published_at', value))
+	return q.where(article_published_at_gt(value))
 }
 
-// where_published_at_ge keeps the rows whose `published_at` comes at or after `value`.
+// where_published_at_ge keeps the rows where `published_at` comes at or after `value`.
 pub fn (q ArticleDelete) where_published_at_ge(value time.Time) ArticleDelete {
-	return q.where(load.ge('published_at', value))
+	return q.where(article_published_at_ge(value))
 }
 
-// where_published_at_is_null keeps the rows whose `published_at` is null.
+// where_published_at_is_null keeps the rows where `published_at` is null.
 pub fn (q ArticleDelete) where_published_at_is_null() ArticleDelete {
-	return q.where(load.is_null('published_at'))
+	return q.where(article_published_at_is_null())
 }
 
-// where_published_at_is_not_null keeps the rows whose `published_at` is not null.
+// where_published_at_is_not_null keeps the rows where `published_at` is not null.
 pub fn (q ArticleDelete) where_published_at_is_not_null() ArticleDelete {
-	return q.where(load.is_not_null('published_at'))
+	return q.where(article_published_at_is_not_null())
 }
 
-// where_created_at keeps the rows whose `created_at` is `value`.
+// where_created_at keeps the rows where `created_at` is `value`.
 pub fn (q ArticleDelete) where_created_at(value time.Time) ArticleDelete {
-	return q.where(load.eq('created_at', value))
+	return q.where(article_created_at_eq(value))
 }
 
-// where_created_at_lt keeps the rows whose `created_at` comes before `value`.
+// where_created_at_ne keeps the rows where `created_at` is not `value`.
+pub fn (q ArticleDelete) where_created_at_ne(value time.Time) ArticleDelete {
+	return q.where(article_created_at_ne(value))
+}
+
+// where_created_at_lt keeps the rows where `created_at` comes before `value`.
 pub fn (q ArticleDelete) where_created_at_lt(value time.Time) ArticleDelete {
-	return q.where(load.lt('created_at', value))
+	return q.where(article_created_at_lt(value))
 }
 
-// where_created_at_le keeps the rows whose `created_at` comes at or before `value`.
+// where_created_at_le keeps the rows where `created_at` comes at or before `value`.
 pub fn (q ArticleDelete) where_created_at_le(value time.Time) ArticleDelete {
-	return q.where(load.le('created_at', value))
+	return q.where(article_created_at_le(value))
 }
 
-// where_created_at_gt keeps the rows whose `created_at` comes after `value`.
+// where_created_at_gt keeps the rows where `created_at` comes after `value`.
 pub fn (q ArticleDelete) where_created_at_gt(value time.Time) ArticleDelete {
-	return q.where(load.gt('created_at', value))
+	return q.where(article_created_at_gt(value))
 }
 
-// where_created_at_ge keeps the rows whose `created_at` comes at or after `value`.
+// where_created_at_ge keeps the rows where `created_at` comes at or after `value`.
 pub fn (q ArticleDelete) where_created_at_ge(value time.Time) ArticleDelete {
-	return q.where(load.ge('created_at', value))
+	return q.where(article_created_at_ge(value))
 }
 
-// where_updated_at keeps the rows whose `updated_at` is `value`.
+// where_updated_at keeps the rows where `updated_at` is `value`.
 pub fn (q ArticleDelete) where_updated_at(value time.Time) ArticleDelete {
-	return q.where(load.eq('updated_at', value))
+	return q.where(article_updated_at_eq(value))
 }
 
-// where_updated_at_lt keeps the rows whose `updated_at` comes before `value`.
+// where_updated_at_ne keeps the rows where `updated_at` is not `value`.
+pub fn (q ArticleDelete) where_updated_at_ne(value time.Time) ArticleDelete {
+	return q.where(article_updated_at_ne(value))
+}
+
+// where_updated_at_lt keeps the rows where `updated_at` comes before `value`.
 pub fn (q ArticleDelete) where_updated_at_lt(value time.Time) ArticleDelete {
-	return q.where(load.lt('updated_at', value))
+	return q.where(article_updated_at_lt(value))
 }
 
-// where_updated_at_le keeps the rows whose `updated_at` comes at or before `value`.
+// where_updated_at_le keeps the rows where `updated_at` comes at or before `value`.
 pub fn (q ArticleDelete) where_updated_at_le(value time.Time) ArticleDelete {
-	return q.where(load.le('updated_at', value))
+	return q.where(article_updated_at_le(value))
 }
 
-// where_updated_at_gt keeps the rows whose `updated_at` comes after `value`.
+// where_updated_at_gt keeps the rows where `updated_at` comes after `value`.
 pub fn (q ArticleDelete) where_updated_at_gt(value time.Time) ArticleDelete {
-	return q.where(load.gt('updated_at', value))
+	return q.where(article_updated_at_gt(value))
 }
 
-// where_updated_at_ge keeps the rows whose `updated_at` comes at or after `value`.
+// where_updated_at_ge keeps the rows where `updated_at` comes at or after `value`.
 pub fn (q ArticleDelete) where_updated_at_ge(value time.Time) ArticleDelete {
-	return q.where(load.ge('updated_at', value))
+	return q.where(article_updated_at_ge(value))
 }
 
-// where_deleted_at keeps the rows whose `deleted_at` is `value`.
+// where_deleted_at keeps the rows where `deleted_at` is `value`.
 pub fn (q ArticleDelete) where_deleted_at(value time.Time) ArticleDelete {
-	return q.where(load.eq('deleted_at', value))
+	return q.where(article_deleted_at_eq(value))
 }
 
-// where_deleted_at_lt keeps the rows whose `deleted_at` comes before `value`.
+// where_deleted_at_ne keeps the rows where `deleted_at` is not `value`.
+pub fn (q ArticleDelete) where_deleted_at_ne(value time.Time) ArticleDelete {
+	return q.where(article_deleted_at_ne(value))
+}
+
+// where_deleted_at_lt keeps the rows where `deleted_at` comes before `value`.
 pub fn (q ArticleDelete) where_deleted_at_lt(value time.Time) ArticleDelete {
-	return q.where(load.lt('deleted_at', value))
+	return q.where(article_deleted_at_lt(value))
 }
 
-// where_deleted_at_le keeps the rows whose `deleted_at` comes at or before `value`.
+// where_deleted_at_le keeps the rows where `deleted_at` comes at or before `value`.
 pub fn (q ArticleDelete) where_deleted_at_le(value time.Time) ArticleDelete {
-	return q.where(load.le('deleted_at', value))
+	return q.where(article_deleted_at_le(value))
 }
 
-// where_deleted_at_gt keeps the rows whose `deleted_at` comes after `value`.
+// where_deleted_at_gt keeps the rows where `deleted_at` comes after `value`.
 pub fn (q ArticleDelete) where_deleted_at_gt(value time.Time) ArticleDelete {
-	return q.where(load.gt('deleted_at', value))
+	return q.where(article_deleted_at_gt(value))
 }
 
-// where_deleted_at_ge keeps the rows whose `deleted_at` comes at or after `value`.
+// where_deleted_at_ge keeps the rows where `deleted_at` comes at or after `value`.
 pub fn (q ArticleDelete) where_deleted_at_ge(value time.Time) ArticleDelete {
-	return q.where(load.ge('deleted_at', value))
+	return q.where(article_deleted_at_ge(value))
 }
 
-// where_deleted_at_is_null keeps the rows whose `deleted_at` is null.
+// where_deleted_at_is_null keeps the rows where `deleted_at` is null.
 pub fn (q ArticleDelete) where_deleted_at_is_null() ArticleDelete {
-	return q.where(load.is_null('deleted_at'))
+	return q.where(article_deleted_at_is_null())
 }
 
-// where_deleted_at_is_not_null keeps the rows whose `deleted_at` is not null.
+// where_deleted_at_is_not_null keeps the rows where `deleted_at` is not null.
 pub fn (q ArticleDelete) where_deleted_at_is_not_null() ArticleDelete {
-	return q.where(load.is_not_null('deleted_at'))
+	return q.where(article_deleted_at_is_not_null())
+}
+
+// has_author keeps the rows where it has a `author`.
+pub fn (q ArticleDelete) has_author() ArticleDelete {
+	return q.where(article_has_author())
+}
+
+// has_author_with keeps the rows that have a `author` that `configure` keeps.
+pub fn (q ArticleDelete) has_author_with(configure fn (UserQuery) UserQuery) ArticleDelete {
+	return q.where(article_has_author_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_comments keeps the rows where it has a `comments`.
+pub fn (q ArticleDelete) has_comments() ArticleDelete {
+	return q.where(article_has_comments())
+}
+
+// has_comments_with keeps the rows that have a `comments` that `configure` keeps.
+pub fn (q ArticleDelete) has_comments_with(configure fn (CommentQuery) CommentQuery) ArticleDelete {
+	return q.where(article_has_comments_with(...configure(q.graph.comments()).query.conds))
 }
 
 // exec deletes the rows, with their join table rows, in one transaction, and

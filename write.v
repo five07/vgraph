@@ -378,10 +378,10 @@ fn same_columns(rows []Row) bool {
 // statement, and returns the keys it reports.
 fn insert_returning(mut d Driver, t Table, rows []Row, m MutationData) ![]string {
 	columns := rows[0].keys()
-	mut p := Params{
+	mut p := load.Params{
 		dialect: d.dialect()
 	}
-	mut sql := 'INSERT INTO ${quote(t.name)}'
+	mut sql := 'INSERT INTO ${load.quote(t.name)}'
 	if columns.len == 0 {
 		sql += ' DEFAULT VALUES'
 	} else {
@@ -393,10 +393,10 @@ fn insert_returning(mut d Driver, t Table, rows []Row, m MutationData) ![]string
 			}
 			tuples << '(${cells.join(', ')})'
 		}
-		sql += ' (${columns.map(quote(it)).join(', ')}) VALUES ${tuples.join(', ')}'
+		sql += ' (${columns.map(load.quote(it)).join(', ')}) VALUES ${tuples.join(', ')}'
 	}
 	sql += conflict_clause(t, columns, m)!
-	sql += ' RETURNING ${quote(t.key)}'
+	sql += ' RETURNING ${load.quote(t.key)}'
 	result := d.exec_params(sql, p.values)!
 	return result.map(if it.len > 0 { it[0] or { '' } } else { '' })
 }
@@ -412,9 +412,9 @@ fn conflict_clause(t Table, columns []string, m MutationData) !string {
 	for name in m.conflict_columns {
 		t.column(name) or { return error('`${t.name}` has no column `${name}`') }
 	}
-	target := ' ON CONFLICT (${m.conflict_columns.map(quote(it)).join(', ')})'
+	target := ' ON CONFLICT (${m.conflict_columns.map(load.quote(it)).join(', ')})'
 	keep := m.conflict_columns[0]
-	ignore := '${target} DO UPDATE SET ${quote(keep)} = ${quote(t.name)}.${quote(keep)}'
+	ignore := '${target} DO UPDATE SET ${load.quote(keep)} = ${load.quote(t.name)}.${load.quote(keep)}'
 	return match m.on_conflict {
 		.fail {
 			target
@@ -430,7 +430,7 @@ fn conflict_clause(t Table, columns []string, m MutationData) !string {
 			for name in columns {
 				column := t.column(name) or { continue }
 				if name != t.key && name !in m.conflict_columns && !column.immutable {
-					changed << '${quote(name)} = excluded.${quote(name)}'
+					changed << '${load.quote(name)} = excluded.${load.quote(name)}'
 				}
 			}
 			if changed.len == 0 { ignore } else { '${target} DO UPDATE SET ${changed.join(', ')}' }
@@ -560,25 +560,9 @@ fn type_conds(e Edge) []load.Cond {
 // select_keys returns the keys of the rows of `t` that match `conds`, as
 // strings, in one query.
 fn (c Client) select_keys(t Table, conds []load.Cond) ![]string {
-	where := load.where_data(conds) or { return []string{} }
-	typ := match key_type(t)! {
-		.int { orm.type_idx['int'] }
-		.i64 { orm.type_idx['i64'] }
-		.string { orm.type_string }
-	}
-	config := orm.SelectConfig{
-		table:        orm.Table{
-			name: t.name
-		}
-		has_where:    where.fields.len > 0
-		primary:      t.key
-		fields:       [t.key]
-		select_exprs: [t.key]
-		types:        [typ]
-	}
-	mut conn := c.conn
-	rows := conn.select(config, orm.QueryData{}, where)!
-	return rows.map(key_text(it[0]))
+	return load.select_keys_where(c.conn, t.name, t.key, key_type(t)!, load.Query{
+		conds: conds
+	}, false)
 }
 
 // query_data returns `row` as the ORM's data for an insert or update.

@@ -275,7 +275,50 @@ pub fn (c Client) prepare_query(table string, q load.Query) !load.Query {
 		}
 		i.run(c.ctx, table, mut query)!
 	}
+	if query.lock.mode != .off && !c.in_tx {
+		return error('`for_update` and `for_share` lock rows until a transaction ends: run them in `tx`')
+	}
+	// the subqueries of edge predicates and traversals: their tables' rules
+	query.conds = c.prepare_conds(query.conds)!
 	return query
+}
+
+// prepare_conds returns `conds` with each subquery of a registered table
+// prepared as a query of it (`prepare_query`): its privacy rules and
+// interceptors apply, as they do to an edge load.
+fn (c Client) prepare_conds(conds []load.Cond) ![]load.Cond {
+	mut out := []load.Cond{cap: conds.len}
+	for cond in conds {
+		match cond.junction {
+			.and, .or, .not {
+				out << load.Cond{
+					...cond
+					children: c.prepare_conds(cond.children)!
+				}
+			}
+			.sub {
+				s := cond.sub[0]
+				prepared := if s.table in c.schema.tables {
+					c.prepare_query(s.table, load.Query{
+						conds: s.conds
+					})!.conds
+				} else {
+					c.prepare_conds(s.conds)!
+				}
+				out << load.Cond{
+					...cond
+					sub: [load.Sub{
+						...s
+						conds: prepared
+					}]
+				}
+			}
+			else {
+				out << cond
+			}
+		}
+	}
+	return out
 }
 
 // hooks_of returns the hooks of `table`, outermost first: privacy, the graph's,

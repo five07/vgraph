@@ -481,7 +481,7 @@ fn test_trace_reports_statements_without_values() {
 		if driver {
 			assert kinds == ['begin', 'raw', 'commit', 'begin', 'rollback']
 			assert log.events[1].statement.starts_with('INSERT INTO "posts" (')
-			assert log.events[1].statement.ends_with('VALUES (?, ?, ?, ?) RETURNING "id"')
+			assert log.events[1].statement.ends_with('VALUES (?, ?, CAST(? AS INTEGER), ?) RETURNING "id"')
 		} else {
 			assert kinds == ['begin', 'insert posts', 'commit', 'begin', 'rollback']
 		}

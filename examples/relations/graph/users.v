@@ -9,38 +9,52 @@ import models
 pub struct UserQuery {
 	graph Graph
 mut:
-	query          load.Query
-	with_card      bool
-	card_fns       []fn (CardQuery) CardQuery
-	with_spouse    bool
-	spouse_fns     []fn (UserQuery) UserQuery
-	with_pets      bool
-	pets_fns       []fn (PetQuery) PetQuery
-	with_groups    bool
-	groups_fns     []fn (GroupQuery) GroupQuery
-	with_following bool
-	following_fns  []fn (UserQuery) UserQuery
-	with_followers bool
-	followers_fns  []fn (UserQuery) UserQuery
-	with_friends   bool
-	friends_fns    []fn (UserQuery) UserQuery
-	with_devices   bool
-	devices_fns    []fn (DeviceQuery) DeviceQuery
+	query           load.Query
+	with_card       bool
+	card_fns        []fn (CardQuery) CardQuery
+	with_spouse     bool
+	spouse_fns      []fn (UserQuery) UserQuery
+	with_pets       bool
+	pets_fns        []fn (PetQuery) PetQuery
+	named_pets      map[string][]fn (PetQuery) PetQuery
+	with_groups     bool
+	groups_fns      []fn (GroupQuery) GroupQuery
+	named_groups    map[string][]fn (GroupQuery) GroupQuery
+	with_following  bool
+	following_fns   []fn (UserQuery) UserQuery
+	named_following map[string][]fn (UserQuery) UserQuery
+	with_followers  bool
+	followers_fns   []fn (UserQuery) UserQuery
+	named_followers map[string][]fn (UserQuery) UserQuery
+	with_friends    bool
+	friends_fns     []fn (UserQuery) UserQuery
+	named_friends   map[string][]fn (UserQuery) UserQuery
+	with_devices    bool
+	devices_fns     []fn (DeviceQuery) DeviceQuery
+	named_devices   map[string][]fn (DeviceQuery) DeviceQuery
 }
 
 // UserNode is a `users` row, with the edges its query loaded.
 pub struct UserNode {
 	graph Graph
 pub mut:
-	user      models.User
-	card      ?&CardNode   // set by `with_card()`
-	spouse    ?&UserNode   // set by `with_spouse()`
-	pets      []PetNode    // set by `with_pets()`
-	groups    []GroupNode  // set by `with_groups()`
-	following []UserNode   // set by `with_following()`
-	followers []UserNode   // set by `with_followers()`
-	friends   []UserNode   // set by `with_friends()`
-	devices   []DeviceNode // set by `with_devices()`
+	user            models.User
+	card            ?&CardNode              // set by `with_card()`
+	spouse          ?&UserNode              // set by `with_spouse()`
+	pets            []PetNode               // set by `with_pets()`
+	named_pets      map[string][]PetNode    // set by `with_named_pets()`
+	groups          []GroupNode             // set by `with_groups()`
+	named_groups    map[string][]GroupNode  // set by `with_named_groups()`
+	following       []UserNode              // set by `with_following()`
+	named_following map[string][]UserNode   // set by `with_named_following()`
+	followers       []UserNode              // set by `with_followers()`
+	named_followers map[string][]UserNode   // set by `with_named_followers()`
+	friends         []UserNode              // set by `with_friends()`
+	named_friends   map[string][]UserNode   // set by `with_named_friends()`
+	devices         []DeviceNode            // set by `with_devices()`
+	named_devices   map[string][]DeviceNode // set by `with_named_devices()`
+	// loaded: the edges the query loaded
+	loaded []string
 }
 
 // users starts a query of `users`.
@@ -91,154 +105,1017 @@ pub fn (q UserQuery) count() !int {
 	return load.count_where[models.User](q.graph.client.conn, q.graph.client.prepare_query('users', q.query)!)
 }
 
-// where_id keeps the rows whose `id` is `value`.
-pub fn (q UserQuery) where_id(value int) UserQuery {
-	return q.where(load.eq('id', value))
+// user_id_eq returns the condition that `id` is `value`.
+pub fn user_id_eq(value int) load.Cond {
+	return load.eq('id', value)
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
-pub fn (q UserQuery) where_id_lt(value int) UserQuery {
-	return q.where(load.lt('id', value))
+// user_id_ne returns the condition that `id` is not `value`.
+pub fn user_id_ne(value int) load.Cond {
+	return load.ne('id', value)
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
-pub fn (q UserQuery) where_id_le(value int) UserQuery {
-	return q.where(load.le('id', value))
+// user_id_lt returns the condition that `id` comes before `value`.
+pub fn user_id_lt(value int) load.Cond {
+	return load.lt('id', value)
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
-pub fn (q UserQuery) where_id_gt(value int) UserQuery {
-	return q.where(load.gt('id', value))
+// user_id_le returns the condition that `id` comes at or before `value`.
+pub fn user_id_le(value int) load.Cond {
+	return load.le('id', value)
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
-pub fn (q UserQuery) where_id_ge(value int) UserQuery {
-	return q.where(load.ge('id', value))
+// user_id_gt returns the condition that `id` comes after `value`.
+pub fn user_id_gt(value int) load.Cond {
+	return load.gt('id', value)
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
-pub fn (q UserQuery) where_id_in(values []int) UserQuery {
-	return q.where(load.in_ints('id', values))
+// user_id_ge returns the condition that `id` comes at or after `value`.
+pub fn user_id_ge(value int) load.Cond {
+	return load.ge('id', value)
 }
 
-// order_by_id orders the rows by `id`, ascending.
+// user_id_in returns the condition that `id` is one of `values`.
+pub fn user_id_in(values []int) load.Cond {
+	return load.in_ints('id', values)
+}
+
+// user_id_not_in returns the condition that `id` is none of `values`.
+pub fn user_id_not_in(values []int) load.Cond {
+	return load.not_in_ints('id', values)
+}
+
+// user_name_eq returns the condition that `name` is `value`.
+pub fn user_name_eq(value string) load.Cond {
+	return load.eq('name', value)
+}
+
+// user_name_ne returns the condition that `name` is not `value`.
+pub fn user_name_ne(value string) load.Cond {
+	return load.ne('name', value)
+}
+
+// user_name_in returns the condition that `name` is one of `values`.
+pub fn user_name_in(values []string) load.Cond {
+	return load.in_strings('name', values)
+}
+
+// user_name_not_in returns the condition that `name` is none of `values`.
+pub fn user_name_not_in(values []string) load.Cond {
+	return load.not_in_strings('name', values)
+}
+
+// user_name_like returns the condition that `name` matches the SQL LIKE `pattern`.
+pub fn user_name_like(pattern string) load.Cond {
+	return load.like('name', pattern)
+}
+
+// user_name_contains returns the condition that `name` contains `value`.
+pub fn user_name_contains(value string) load.Cond {
+	return load.contains('name', value)
+}
+
+// user_name_has_prefix returns the condition that `name` starts with `value`.
+pub fn user_name_has_prefix(value string) load.Cond {
+	return load.has_prefix('name', value)
+}
+
+// user_name_has_suffix returns the condition that `name` ends with `value`.
+pub fn user_name_has_suffix(value string) load.Cond {
+	return load.has_suffix('name', value)
+}
+
+// user_name_equal_fold returns the condition that `name` is `value`, ignoring case.
+pub fn user_name_equal_fold(value string) load.Cond {
+	return load.equal_fold('name', value)
+}
+
+// user_name_contains_fold returns the condition that `name` contains `value`, ignoring case.
+pub fn user_name_contains_fold(value string) load.Cond {
+	return load.contains_fold('name', value)
+}
+
+// user_spouse_id_eq returns the condition that `spouse_id` is `value`.
+pub fn user_spouse_id_eq(value int) load.Cond {
+	return load.eq('spouse_id', value)
+}
+
+// user_spouse_id_ne returns the condition that `spouse_id` is not `value`.
+pub fn user_spouse_id_ne(value int) load.Cond {
+	return load.ne('spouse_id', value)
+}
+
+// user_spouse_id_lt returns the condition that `spouse_id` comes before `value`.
+pub fn user_spouse_id_lt(value int) load.Cond {
+	return load.lt('spouse_id', value)
+}
+
+// user_spouse_id_le returns the condition that `spouse_id` comes at or before `value`.
+pub fn user_spouse_id_le(value int) load.Cond {
+	return load.le('spouse_id', value)
+}
+
+// user_spouse_id_gt returns the condition that `spouse_id` comes after `value`.
+pub fn user_spouse_id_gt(value int) load.Cond {
+	return load.gt('spouse_id', value)
+}
+
+// user_spouse_id_ge returns the condition that `spouse_id` comes at or after `value`.
+pub fn user_spouse_id_ge(value int) load.Cond {
+	return load.ge('spouse_id', value)
+}
+
+// user_spouse_id_in returns the condition that `spouse_id` is one of `values`.
+pub fn user_spouse_id_in(values []int) load.Cond {
+	return load.in_ints('spouse_id', values)
+}
+
+// user_spouse_id_not_in returns the condition that `spouse_id` is none of `values`.
+pub fn user_spouse_id_not_in(values []int) load.Cond {
+	return load.not_in_ints('spouse_id', values)
+}
+
+// user_spouse_id_is_null returns the condition that `spouse_id` is null.
+pub fn user_spouse_id_is_null() load.Cond {
+	return load.is_null('spouse_id')
+}
+
+// user_spouse_id_is_not_null returns the condition that `spouse_id` is not null.
+pub fn user_spouse_id_is_not_null() load.Cond {
+	return load.is_not_null('spouse_id')
+}
+
+// user_has_card returns the condition that it has a `card`.
+pub fn user_has_card() load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'cards', column: 'owner_id', kind: .int, conds: []load.Cond{} })
+}
+
+// user_has_card_with returns the condition that it has a `card` that matches `conds`.
+pub fn user_has_card_with(conds ...load.Cond) load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'cards', column: 'owner_id', kind: .int, conds: conds })
+}
+
+// user_has_spouse returns the condition that it has a `spouse`.
+pub fn user_has_spouse() load.Cond {
+	return load.in_sub('spouse_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} })
+}
+
+// user_has_spouse_with returns the condition that it has a `spouse` that matches `conds`.
+pub fn user_has_spouse_with(conds ...load.Cond) load.Cond {
+	return load.in_sub('spouse_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds })
+}
+
+// user_has_pets returns the condition that it has a `pets`.
+pub fn user_has_pets() load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'pets', column: 'owner_id', kind: .int, conds: []load.Cond{} })
+}
+
+// user_has_pets_with returns the condition that it has a `pets` that matches `conds`.
+pub fn user_has_pets_with(conds ...load.Cond) load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'pets', column: 'owner_id', kind: .int, conds: conds })
+}
+
+// user_has_groups returns the condition that it has a `groups`.
+pub fn user_has_groups() load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'group_users', column: 'user_id', kind: .int, conds: [load.in_sub('group_id', load.Sub{ table: 'groups', column: 'id', kind: .int, conds: []load.Cond{} })] })
+}
+
+// user_has_groups_with returns the condition that it has a `groups` that matches `conds`.
+pub fn user_has_groups_with(conds ...load.Cond) load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'group_users', column: 'user_id', kind: .int, conds: [load.in_sub('group_id', load.Sub{ table: 'groups', column: 'id', kind: .int, conds: conds })] })
+}
+
+// user_has_following returns the condition that it has a `following`.
+pub fn user_has_following() load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'follows', column: 'follower_id', kind: .int, conds: [load.in_sub('followee_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} })] })
+}
+
+// user_has_following_with returns the condition that it has a `following` that matches `conds`.
+pub fn user_has_following_with(conds ...load.Cond) load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'follows', column: 'follower_id', kind: .int, conds: [load.in_sub('followee_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds })] })
+}
+
+// user_has_followers returns the condition that it has a `followers`.
+pub fn user_has_followers() load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'follows', column: 'followee_id', kind: .int, conds: [load.in_sub('follower_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} })] })
+}
+
+// user_has_followers_with returns the condition that it has a `followers` that matches `conds`.
+pub fn user_has_followers_with(conds ...load.Cond) load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'follows', column: 'followee_id', kind: .int, conds: [load.in_sub('follower_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds })] })
+}
+
+// user_has_friends returns the condition that it has a `friends`.
+pub fn user_has_friends() load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'friendships', column: 'user_id', kind: .int, conds: [load.in_sub('friend_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} })] })
+}
+
+// user_has_friends_with returns the condition that it has a `friends` that matches `conds`.
+pub fn user_has_friends_with(conds ...load.Cond) load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'friendships', column: 'user_id', kind: .int, conds: [load.in_sub('friend_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds })] })
+}
+
+// user_has_devices returns the condition that it has a `devices`.
+pub fn user_has_devices() load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'devices', column: 'owner_id', kind: .int, conds: []load.Cond{} })
+}
+
+// user_has_devices_with returns the condition that it has a `devices` that matches `conds`.
+pub fn user_has_devices_with(conds ...load.Cond) load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'devices', column: 'owner_id', kind: .int, conds: conds })
+}
+
+// order_by_id orders the rows by `id`, ascending, after the orders
+// given before.
 pub fn (q UserQuery) order_by_id() UserQuery {
-	mut next := q
-	next.query = load.Query{
-		...q.query
-		order: 'id'
-		desc:  false
-	}
-	return next
+	return q.order_by(load.asc('id'))
 }
 
-// order_by_id_desc orders the rows by `id`, descending.
+// order_by_id_desc orders the rows by `id`, descending, after the
+// orders given before.
 pub fn (q UserQuery) order_by_id_desc() UserQuery {
-	mut next := q
-	next.query = load.Query{
-		...q.query
-		order: 'id'
-		desc:  true
-	}
-	return next
+	return q.order_by(load.desc('id'))
 }
 
-// where_name keeps the rows whose `name` is `value`.
-pub fn (q UserQuery) where_name(value string) UserQuery {
-	return q.where(load.eq('name', value))
-}
-
-// where_name_in keeps the rows whose `name` is one of `values`.
-pub fn (q UserQuery) where_name_in(values []string) UserQuery {
-	return q.where(load.in_strings('name', values))
-}
-
-// where_name_like keeps the rows whose `name` matches the SQL LIKE `pattern`.
-pub fn (q UserQuery) where_name_like(pattern string) UserQuery {
-	return q.where(load.like('name', pattern))
-}
-
-// order_by_name orders the rows by `name`, ascending.
+// order_by_name orders the rows by `name`, ascending, after the orders
+// given before.
 pub fn (q UserQuery) order_by_name() UserQuery {
-	mut next := q
-	next.query = load.Query{
-		...q.query
-		order: 'name'
-		desc:  false
-	}
-	return next
+	return q.order_by(load.asc('name'))
 }
 
-// order_by_name_desc orders the rows by `name`, descending.
+// order_by_name_desc orders the rows by `name`, descending, after the
+// orders given before.
 pub fn (q UserQuery) order_by_name_desc() UserQuery {
-	mut next := q
-	next.query = load.Query{
-		...q.query
-		order: 'name'
-		desc:  true
-	}
-	return next
+	return q.order_by(load.desc('name'))
 }
 
-// where_spouse_id keeps the rows whose `spouse_id` is `value`.
-pub fn (q UserQuery) where_spouse_id(value int) UserQuery {
-	return q.where(load.eq('spouse_id', value))
-}
-
-// where_spouse_id_lt keeps the rows whose `spouse_id` comes before `value`.
-pub fn (q UserQuery) where_spouse_id_lt(value int) UserQuery {
-	return q.where(load.lt('spouse_id', value))
-}
-
-// where_spouse_id_le keeps the rows whose `spouse_id` comes at or before `value`.
-pub fn (q UserQuery) where_spouse_id_le(value int) UserQuery {
-	return q.where(load.le('spouse_id', value))
-}
-
-// where_spouse_id_gt keeps the rows whose `spouse_id` comes after `value`.
-pub fn (q UserQuery) where_spouse_id_gt(value int) UserQuery {
-	return q.where(load.gt('spouse_id', value))
-}
-
-// where_spouse_id_ge keeps the rows whose `spouse_id` comes at or after `value`.
-pub fn (q UserQuery) where_spouse_id_ge(value int) UserQuery {
-	return q.where(load.ge('spouse_id', value))
-}
-
-// where_spouse_id_in keeps the rows whose `spouse_id` is one of `values`.
-pub fn (q UserQuery) where_spouse_id_in(values []int) UserQuery {
-	return q.where(load.in_ints('spouse_id', values))
-}
-
-// where_spouse_id_is_null keeps the rows whose `spouse_id` is null.
-pub fn (q UserQuery) where_spouse_id_is_null() UserQuery {
-	return q.where(load.is_null('spouse_id'))
-}
-
-// where_spouse_id_is_not_null keeps the rows whose `spouse_id` is not null.
-pub fn (q UserQuery) where_spouse_id_is_not_null() UserQuery {
-	return q.where(load.is_not_null('spouse_id'))
-}
-
-// order_by_spouse_id orders the rows by `spouse_id`, ascending.
+// order_by_spouse_id orders the rows by `spouse_id`, ascending, after the orders
+// given before.
 pub fn (q UserQuery) order_by_spouse_id() UserQuery {
+	return q.order_by(load.asc('spouse_id'))
+}
+
+// order_by_spouse_id_desc orders the rows by `spouse_id`, descending, after the
+// orders given before.
+pub fn (q UserQuery) order_by_spouse_id_desc() UserQuery {
+	return q.order_by(load.desc('spouse_id'))
+}
+
+// where_id keeps the rows where `id` is `value`.
+pub fn (q UserQuery) where_id(value int) UserQuery {
+	return q.where(user_id_eq(value))
+}
+
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q UserQuery) where_id_ne(value int) UserQuery {
+	return q.where(user_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
+pub fn (q UserQuery) where_id_lt(value int) UserQuery {
+	return q.where(user_id_lt(value))
+}
+
+// where_id_le keeps the rows where `id` comes at or before `value`.
+pub fn (q UserQuery) where_id_le(value int) UserQuery {
+	return q.where(user_id_le(value))
+}
+
+// where_id_gt keeps the rows where `id` comes after `value`.
+pub fn (q UserQuery) where_id_gt(value int) UserQuery {
+	return q.where(user_id_gt(value))
+}
+
+// where_id_ge keeps the rows where `id` comes at or after `value`.
+pub fn (q UserQuery) where_id_ge(value int) UserQuery {
+	return q.where(user_id_ge(value))
+}
+
+// where_id_in keeps the rows where `id` is one of `values`.
+pub fn (q UserQuery) where_id_in(values []int) UserQuery {
+	return q.where(user_id_in(values))
+}
+
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q UserQuery) where_id_not_in(values []int) UserQuery {
+	return q.where(user_id_not_in(values))
+}
+
+// where_name keeps the rows where `name` is `value`.
+pub fn (q UserQuery) where_name(value string) UserQuery {
+	return q.where(user_name_eq(value))
+}
+
+// where_name_ne keeps the rows where `name` is not `value`.
+pub fn (q UserQuery) where_name_ne(value string) UserQuery {
+	return q.where(user_name_ne(value))
+}
+
+// where_name_in keeps the rows where `name` is one of `values`.
+pub fn (q UserQuery) where_name_in(values []string) UserQuery {
+	return q.where(user_name_in(values))
+}
+
+// where_name_not_in keeps the rows where `name` is none of `values`.
+pub fn (q UserQuery) where_name_not_in(values []string) UserQuery {
+	return q.where(user_name_not_in(values))
+}
+
+// where_name_like keeps the rows where `name` matches the SQL LIKE `pattern`.
+pub fn (q UserQuery) where_name_like(pattern string) UserQuery {
+	return q.where(user_name_like(pattern))
+}
+
+// where_name_contains keeps the rows where `name` contains `value`.
+pub fn (q UserQuery) where_name_contains(value string) UserQuery {
+	return q.where(user_name_contains(value))
+}
+
+// where_name_has_prefix keeps the rows where `name` starts with `value`.
+pub fn (q UserQuery) where_name_has_prefix(value string) UserQuery {
+	return q.where(user_name_has_prefix(value))
+}
+
+// where_name_has_suffix keeps the rows where `name` ends with `value`.
+pub fn (q UserQuery) where_name_has_suffix(value string) UserQuery {
+	return q.where(user_name_has_suffix(value))
+}
+
+// where_name_equal_fold keeps the rows where `name` is `value`, ignoring case.
+pub fn (q UserQuery) where_name_equal_fold(value string) UserQuery {
+	return q.where(user_name_equal_fold(value))
+}
+
+// where_name_contains_fold keeps the rows where `name` contains `value`, ignoring case.
+pub fn (q UserQuery) where_name_contains_fold(value string) UserQuery {
+	return q.where(user_name_contains_fold(value))
+}
+
+// where_spouse_id keeps the rows where `spouse_id` is `value`.
+pub fn (q UserQuery) where_spouse_id(value int) UserQuery {
+	return q.where(user_spouse_id_eq(value))
+}
+
+// where_spouse_id_ne keeps the rows where `spouse_id` is not `value`.
+pub fn (q UserQuery) where_spouse_id_ne(value int) UserQuery {
+	return q.where(user_spouse_id_ne(value))
+}
+
+// where_spouse_id_lt keeps the rows where `spouse_id` comes before `value`.
+pub fn (q UserQuery) where_spouse_id_lt(value int) UserQuery {
+	return q.where(user_spouse_id_lt(value))
+}
+
+// where_spouse_id_le keeps the rows where `spouse_id` comes at or before `value`.
+pub fn (q UserQuery) where_spouse_id_le(value int) UserQuery {
+	return q.where(user_spouse_id_le(value))
+}
+
+// where_spouse_id_gt keeps the rows where `spouse_id` comes after `value`.
+pub fn (q UserQuery) where_spouse_id_gt(value int) UserQuery {
+	return q.where(user_spouse_id_gt(value))
+}
+
+// where_spouse_id_ge keeps the rows where `spouse_id` comes at or after `value`.
+pub fn (q UserQuery) where_spouse_id_ge(value int) UserQuery {
+	return q.where(user_spouse_id_ge(value))
+}
+
+// where_spouse_id_in keeps the rows where `spouse_id` is one of `values`.
+pub fn (q UserQuery) where_spouse_id_in(values []int) UserQuery {
+	return q.where(user_spouse_id_in(values))
+}
+
+// where_spouse_id_not_in keeps the rows where `spouse_id` is none of `values`.
+pub fn (q UserQuery) where_spouse_id_not_in(values []int) UserQuery {
+	return q.where(user_spouse_id_not_in(values))
+}
+
+// where_spouse_id_is_null keeps the rows where `spouse_id` is null.
+pub fn (q UserQuery) where_spouse_id_is_null() UserQuery {
+	return q.where(user_spouse_id_is_null())
+}
+
+// where_spouse_id_is_not_null keeps the rows where `spouse_id` is not null.
+pub fn (q UserQuery) where_spouse_id_is_not_null() UserQuery {
+	return q.where(user_spouse_id_is_not_null())
+}
+
+// has_card keeps the rows where it has a `card`.
+pub fn (q UserQuery) has_card() UserQuery {
+	return q.where(user_has_card())
+}
+
+// has_card_with keeps the rows that have a `card` that `configure` keeps.
+pub fn (q UserQuery) has_card_with(configure fn (CardQuery) CardQuery) UserQuery {
+	return q.where(user_has_card_with(...configure(q.graph.cards()).query.conds))
+}
+
+// has_spouse keeps the rows where it has a `spouse`.
+pub fn (q UserQuery) has_spouse() UserQuery {
+	return q.where(user_has_spouse())
+}
+
+// has_spouse_with keeps the rows that have a `spouse` that `configure` keeps.
+pub fn (q UserQuery) has_spouse_with(configure fn (UserQuery) UserQuery) UserQuery {
+	return q.where(user_has_spouse_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_pets keeps the rows where it has a `pets`.
+pub fn (q UserQuery) has_pets() UserQuery {
+	return q.where(user_has_pets())
+}
+
+// has_pets_with keeps the rows that have a `pets` that `configure` keeps.
+pub fn (q UserQuery) has_pets_with(configure fn (PetQuery) PetQuery) UserQuery {
+	return q.where(user_has_pets_with(...configure(q.graph.pets()).query.conds))
+}
+
+// has_groups keeps the rows where it has a `groups`.
+pub fn (q UserQuery) has_groups() UserQuery {
+	return q.where(user_has_groups())
+}
+
+// has_groups_with keeps the rows that have a `groups` that `configure` keeps.
+pub fn (q UserQuery) has_groups_with(configure fn (GroupQuery) GroupQuery) UserQuery {
+	return q.where(user_has_groups_with(...configure(q.graph.groups()).query.conds))
+}
+
+// has_following keeps the rows where it has a `following`.
+pub fn (q UserQuery) has_following() UserQuery {
+	return q.where(user_has_following())
+}
+
+// has_following_with keeps the rows that have a `following` that `configure` keeps.
+pub fn (q UserQuery) has_following_with(configure fn (UserQuery) UserQuery) UserQuery {
+	return q.where(user_has_following_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_followers keeps the rows where it has a `followers`.
+pub fn (q UserQuery) has_followers() UserQuery {
+	return q.where(user_has_followers())
+}
+
+// has_followers_with keeps the rows that have a `followers` that `configure` keeps.
+pub fn (q UserQuery) has_followers_with(configure fn (UserQuery) UserQuery) UserQuery {
+	return q.where(user_has_followers_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_friends keeps the rows where it has a `friends`.
+pub fn (q UserQuery) has_friends() UserQuery {
+	return q.where(user_has_friends())
+}
+
+// has_friends_with keeps the rows that have a `friends` that `configure` keeps.
+pub fn (q UserQuery) has_friends_with(configure fn (UserQuery) UserQuery) UserQuery {
+	return q.where(user_has_friends_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_devices keeps the rows where it has a `devices`.
+pub fn (q UserQuery) has_devices() UserQuery {
+	return q.where(user_has_devices())
+}
+
+// has_devices_with keeps the rows that have a `devices` that `configure` keeps.
+pub fn (q UserQuery) has_devices_with(configure fn (DeviceQuery) DeviceQuery) UserQuery {
+	return q.where(user_has_devices_with(...configure(q.graph.devices()).query.conds))
+}
+
+// query_card starts a query of the `card` of the rows that match this
+// query's conditions; its order, limit and offset don't apply.
+pub fn (q UserQuery) query_card() CardQuery {
+	return q.graph.cards().where(load.in_sub('owner_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: q.query.conds }))
+}
+
+// query_spouse starts a query of the `spouse` of the rows that match this
+// query's conditions; its order, limit and offset don't apply.
+pub fn (q UserQuery) query_spouse() UserQuery {
+	return q.graph.users().where(load.in_sub('id', load.Sub{ table: 'users', column: 'spouse_id', kind: .int, conds: q.query.conds }))
+}
+
+// query_pets starts a query of the `pets` of the rows that match this
+// query's conditions; its order, limit and offset don't apply.
+pub fn (q UserQuery) query_pets() PetQuery {
+	return q.graph.pets().where(load.in_sub('owner_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: q.query.conds }))
+}
+
+// query_groups starts a query of the `groups` of the rows that match this
+// query's conditions; its order, limit and offset don't apply.
+pub fn (q UserQuery) query_groups() GroupQuery {
+	return q.graph.groups().where(load.in_sub('id', load.Sub{ table: 'group_users', column: 'group_id', kind: .int, conds: [load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: q.query.conds })] }))
+}
+
+// query_following starts a query of the `following` of the rows that match this
+// query's conditions; its order, limit and offset don't apply.
+pub fn (q UserQuery) query_following() UserQuery {
+	return q.graph.users().where(load.in_sub('id', load.Sub{ table: 'follows', column: 'followee_id', kind: .int, conds: [load.in_sub('follower_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: q.query.conds })] }))
+}
+
+// query_followers starts a query of the `followers` of the rows that match this
+// query's conditions; its order, limit and offset don't apply.
+pub fn (q UserQuery) query_followers() UserQuery {
+	return q.graph.users().where(load.in_sub('id', load.Sub{ table: 'follows', column: 'follower_id', kind: .int, conds: [load.in_sub('followee_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: q.query.conds })] }))
+}
+
+// query_friends starts a query of the `friends` of the rows that match this
+// query's conditions; its order, limit and offset don't apply.
+pub fn (q UserQuery) query_friends() UserQuery {
+	return q.graph.users().where(load.in_sub('id', load.Sub{ table: 'friendships', column: 'friend_id', kind: .int, conds: [load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: q.query.conds })] }))
+}
+
+// query_devices starts a query of the `devices` of the rows that match this
+// query's conditions; its order, limit and offset don't apply.
+pub fn (q UserQuery) query_devices() DeviceQuery {
+	return q.graph.devices().where(load.in_sub('owner_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: q.query.conds }))
+}
+
+// only returns the one matching row, with the requested edges: a
+// `NotFoundError` when there is none, a `NotSingularError` when there are more.
+pub fn (q UserQuery) only() !UserNode {
+	nodes := q.limit(2).all()!
+	if nodes.len == 0 {
+		return NotFoundError{
+			table: 'users'
+		}
+	}
+	if nodes.len > 1 {
+		return NotSingularError{
+			table: 'users'
+		}
+	}
+	return nodes[0]
+}
+
+// ids returns the keys of the matching rows, in order, and no edges.
+pub fn (q UserQuery) ids() ![]int {
+	keys := load.select_keys_where(q.graph.client.conn, 'users', 'id', .int, q.graph.client.prepare_query('users', q.query)!, true)!
+	return keys.map(it.int())
+}
+
+// first_id returns the key of the first matching row, or a `NotFoundError`.
+pub fn (q UserQuery) first_id() !int {
+	ids := q.limit(1).ids()!
+	if ids.len == 0 {
+		return NotFoundError{
+			table: 'users'
+		}
+	}
+	return ids[0]
+}
+
+// only_id returns the key of the one matching row: a `NotFoundError` when
+// there is none, a `NotSingularError` when there are more.
+pub fn (q UserQuery) only_id() !int {
+	ids := q.limit(2).ids()!
+	if ids.len == 0 {
+		return NotFoundError{
+			table: 'users'
+		}
+	}
+	if ids.len > 1 {
+		return NotSingularError{
+			table: 'users'
+		}
+	}
+	return ids[0]
+}
+
+// exist reports whether any row matches.
+pub fn (q UserQuery) exist() !bool {
+	return q.limit(1).ids()!.len > 0
+}
+
+// select reads only `columns`, and the key, of the rows; the others keep their
+// zero values. An edge load needs the columns it follows.
+pub fn (q UserQuery) select(columns ...string) UserQuery {
+	mut all := columns.clone()
+	if 'id' !in all {
+		all << 'id'
+	}
 	mut next := q
 	next.query = load.Query{
 		...q.query
-		order: 'spouse_id'
-		desc:  false
+		columns: all
 	}
 	return next
 }
 
-// order_by_spouse_id_desc orders the rows by `spouse_id`, descending.
-pub fn (q UserQuery) order_by_spouse_id_desc() UserQuery {
+// unique makes `scan` read each distinct row once.
+pub fn (q UserQuery) unique() UserQuery {
 	mut next := q
 	next.query = load.Query{
 		...q.query
-		order: 'spouse_id'
-		desc:  true
+		distinct: true
 	}
+	return next
+}
+
+// scan reads the matching rows into `T`, the app's struct for some of the
+// columns, by column name.
+pub fn (q UserQuery) scan[T]() ![]T {
+	return load.select_into[T](q.graph.client.conn, 'users', 'id', .int, q.graph.client.prepare_query('users', q.query)!)
+}
+
+// order_by orders the rows by `orders` too, after the orders given before,
+// such as `vgraph.desc('id').nulls_last()`.
+pub fn (q UserQuery) order_by(orders ...load.Order) UserQuery {
+	mut all := q.query.orders.clone()
+	all << orders
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		orders: all
+	}
+	return next
+}
+
+// for_update locks the matching rows (FOR UPDATE) until the transaction ends.
+// It runs in `tx`, on PostgreSQL.
+pub fn (q UserQuery) for_update() UserQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		lock: load.Lock{
+			...q.query.lock
+			mode: .update
+		}
+	}
+	return next
+}
+
+// for_share locks the matching rows (FOR SHARE) until the transaction ends.
+// It runs in `tx`, on PostgreSQL.
+pub fn (q UserQuery) for_share() UserQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		lock: load.Lock{
+			...q.query.lock
+			mode: .share
+		}
+	}
+	return next
+}
+
+// no_wait: a lock fails at once on a row another transaction locked.
+pub fn (q UserQuery) no_wait() UserQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		lock: load.Lock{
+			...q.query.lock
+			no_wait: true
+		}
+	}
+	return next
+}
+
+// skip_locked: a lock leaves out the rows other transactions locked.
+pub fn (q UserQuery) skip_locked() UserQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		lock: load.Lock{
+			...q.query.lock
+			skip_locked: true
+		}
+	}
+	return next
+}
+
+// sum_id returns the sum of `id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q UserQuery) sum_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'users', 'id', q.graph.client.prepare_query('users', q.query)!, .sum, 'id')
+}
+
+// min_id returns the min of `id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q UserQuery) min_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'users', 'id', q.graph.client.prepare_query('users', q.query)!, .min, 'id')
+}
+
+// max_id returns the max of `id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q UserQuery) max_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'users', 'id', q.graph.client.prepare_query('users', q.query)!, .max, 'id')
+}
+
+// mean_id returns the mean of `id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q UserQuery) mean_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'users', 'id', q.graph.client.prepare_query('users', q.query)!, .avg, 'id')
+}
+
+// sum_spouse_id returns the sum of `spouse_id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q UserQuery) sum_spouse_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'users', 'id', q.graph.client.prepare_query('users', q.query)!, .sum, 'spouse_id')
+}
+
+// min_spouse_id returns the min of `spouse_id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q UserQuery) min_spouse_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'users', 'id', q.graph.client.prepare_query('users', q.query)!, .min, 'spouse_id')
+}
+
+// max_spouse_id returns the max of `spouse_id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q UserQuery) max_spouse_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'users', 'id', q.graph.client.prepare_query('users', q.query)!, .max, 'spouse_id')
+}
+
+// mean_spouse_id returns the mean of `spouse_id` over the matching rows, in one
+// query; 0 when none has a value.
+pub fn (q UserQuery) mean_spouse_id() !f64 {
+	return load.aggregate_where(q.graph.client.conn, 'users', 'id', q.graph.client.prepare_query('users', q.query)!, .avg, 'spouse_id')
+}
+
+// UserGroupBy groups the rows of a `UserQuery`. Start one with `group_by`.
+pub struct UserGroupBy {
+	query UserQuery
+pub:
+	columns    []string
+	aggregates []load.Aggregate
+}
+
+// group_by groups the matching rows by `columns`. It needs a vgraph driver.
+pub fn (q UserQuery) group_by(columns ...string) UserGroupBy {
+	return UserGroupBy{
+		query:   q
+		columns: columns
+	}
+}
+
+// aggregate adds what each group gets, such as `vgraph.count()` or
+// `vgraph.sum('views')`.
+pub fn (g UserGroupBy) aggregate(aggregates ...load.Aggregate) UserGroupBy {
+	mut all := g.aggregates.clone()
+	all << aggregates
+	return UserGroupBy{
+		...g
+		aggregates: all
+	}
+}
+
+// all returns the groups, ordered by their columns.
+pub fn (g UserGroupBy) all() ![]load.Group {
+	q := g.query
+	return load.group_where(q.graph.client.conn, 'users', q.graph.client.prepare_query('users', q.query)!, g.columns.map(load.GroupColumn{
+		name: it
+		typ:  user_column_type(it)
+	}), g.aggregates)
+}
+
+// scan reads the groups into `T`, by name: its fields named after the grouped
+// columns and the aggregates (`count`, `sum_views`).
+pub fn (g UserGroupBy) scan[T]() ![]T {
+	return load.scan_groups[T](g.all()!)
+}
+
+// user_column_type returns the V type of a column of `users`.
+fn user_column_type(column string) string {
+	return match column {
+		'id' { 'int' }
+		'name' { 'string' }
+		'spouse_id' { '?int' }
+		else { '' }
+	}
+}
+
+// order_by_card_id orders the rows by the `id` of their `card`.
+pub fn (q UserQuery) order_by_card_id() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."id" FROM "cards" AS "t1" WHERE "t1"."owner_id" = "t0"."id" LIMIT 1)'
+	})
+}
+
+// order_by_card_id_desc orders the rows by the `id` of their
+// `card`, descending.
+pub fn (q UserQuery) order_by_card_id_desc() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."id" FROM "cards" AS "t1" WHERE "t1"."owner_id" = "t0"."id" LIMIT 1)'
+		desc: true
+	})
+}
+
+// order_by_card_number orders the rows by the `number` of their `card`.
+pub fn (q UserQuery) order_by_card_number() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."number" FROM "cards" AS "t1" WHERE "t1"."owner_id" = "t0"."id" LIMIT 1)'
+	})
+}
+
+// order_by_card_number_desc orders the rows by the `number` of their
+// `card`, descending.
+pub fn (q UserQuery) order_by_card_number_desc() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."number" FROM "cards" AS "t1" WHERE "t1"."owner_id" = "t0"."id" LIMIT 1)'
+		desc: true
+	})
+}
+
+// order_by_card_owner_id orders the rows by the `owner_id` of their `card`.
+pub fn (q UserQuery) order_by_card_owner_id() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."owner_id" FROM "cards" AS "t1" WHERE "t1"."owner_id" = "t0"."id" LIMIT 1)'
+	})
+}
+
+// order_by_card_owner_id_desc orders the rows by the `owner_id` of their
+// `card`, descending.
+pub fn (q UserQuery) order_by_card_owner_id_desc() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."owner_id" FROM "cards" AS "t1" WHERE "t1"."owner_id" = "t0"."id" LIMIT 1)'
+		desc: true
+	})
+}
+
+// order_by_spouse_name orders the rows by the `name` of their `spouse`.
+pub fn (q UserQuery) order_by_spouse_name() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."name" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."spouse_id")'
+	})
+}
+
+// order_by_spouse_name_desc orders the rows by the `name` of their
+// `spouse`, descending.
+pub fn (q UserQuery) order_by_spouse_name_desc() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."name" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."spouse_id")'
+		desc: true
+	})
+}
+
+// order_by_spouse_spouse_id orders the rows by the `spouse_id` of their `spouse`.
+pub fn (q UserQuery) order_by_spouse_spouse_id() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."spouse_id" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."spouse_id")'
+	})
+}
+
+// order_by_spouse_spouse_id_desc orders the rows by the `spouse_id` of their
+// `spouse`, descending.
+pub fn (q UserQuery) order_by_spouse_spouse_id_desc() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."spouse_id" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."spouse_id")'
+		desc: true
+	})
+}
+
+// order_by_pets_count orders the rows by their number of `pets`.
+pub fn (q UserQuery) order_by_pets_count() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "pets" AS "t1" WHERE "t1"."owner_id" = "t0"."id")'
+	})
+}
+
+// order_by_pets_count_desc orders the rows by their number of `pets`, most
+// first.
+pub fn (q UserQuery) order_by_pets_count_desc() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "pets" AS "t1" WHERE "t1"."owner_id" = "t0"."id")'
+		desc: true
+	})
+}
+
+// with_named_pets loads `pets` as `configure` says into
+// `named_pets[name]`, besides any other load of it.
+pub fn (q UserQuery) with_named_pets(name string, configure ...fn (PetQuery) PetQuery) UserQuery {
+	mut next := q
+	mut named := q.named_pets.clone()
+	named[name] = configure
+	next.named_pets = named
+	return next
+}
+
+// order_by_groups_count orders the rows by their number of `groups`.
+pub fn (q UserQuery) order_by_groups_count() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "group_users" AS "t1" WHERE "t1"."user_id" = "t0"."id")'
+	})
+}
+
+// order_by_groups_count_desc orders the rows by their number of `groups`, most
+// first.
+pub fn (q UserQuery) order_by_groups_count_desc() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "group_users" AS "t1" WHERE "t1"."user_id" = "t0"."id")'
+		desc: true
+	})
+}
+
+// with_named_groups loads `groups` as `configure` says into
+// `named_groups[name]`, besides any other load of it.
+pub fn (q UserQuery) with_named_groups(name string, configure ...fn (GroupQuery) GroupQuery) UserQuery {
+	mut next := q
+	mut named := q.named_groups.clone()
+	named[name] = configure
+	next.named_groups = named
+	return next
+}
+
+// order_by_following_count orders the rows by their number of `following`.
+pub fn (q UserQuery) order_by_following_count() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "follows" AS "t1" WHERE "t1"."follower_id" = "t0"."id")'
+	})
+}
+
+// order_by_following_count_desc orders the rows by their number of `following`, most
+// first.
+pub fn (q UserQuery) order_by_following_count_desc() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "follows" AS "t1" WHERE "t1"."follower_id" = "t0"."id")'
+		desc: true
+	})
+}
+
+// with_named_following loads `following` as `configure` says into
+// `named_following[name]`, besides any other load of it.
+pub fn (q UserQuery) with_named_following(name string, configure ...fn (UserQuery) UserQuery) UserQuery {
+	mut next := q
+	mut named := q.named_following.clone()
+	named[name] = configure
+	next.named_following = named
+	return next
+}
+
+// order_by_followers_count orders the rows by their number of `followers`.
+pub fn (q UserQuery) order_by_followers_count() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "follows" AS "t1" WHERE "t1"."followee_id" = "t0"."id")'
+	})
+}
+
+// order_by_followers_count_desc orders the rows by their number of `followers`, most
+// first.
+pub fn (q UserQuery) order_by_followers_count_desc() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "follows" AS "t1" WHERE "t1"."followee_id" = "t0"."id")'
+		desc: true
+	})
+}
+
+// with_named_followers loads `followers` as `configure` says into
+// `named_followers[name]`, besides any other load of it.
+pub fn (q UserQuery) with_named_followers(name string, configure ...fn (UserQuery) UserQuery) UserQuery {
+	mut next := q
+	mut named := q.named_followers.clone()
+	named[name] = configure
+	next.named_followers = named
+	return next
+}
+
+// order_by_friends_count orders the rows by their number of `friends`.
+pub fn (q UserQuery) order_by_friends_count() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "friendships" AS "t1" WHERE "t1"."user_id" = "t0"."id")'
+	})
+}
+
+// order_by_friends_count_desc orders the rows by their number of `friends`, most
+// first.
+pub fn (q UserQuery) order_by_friends_count_desc() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "friendships" AS "t1" WHERE "t1"."user_id" = "t0"."id")'
+		desc: true
+	})
+}
+
+// with_named_friends loads `friends` as `configure` says into
+// `named_friends[name]`, besides any other load of it.
+pub fn (q UserQuery) with_named_friends(name string, configure ...fn (UserQuery) UserQuery) UserQuery {
+	mut next := q
+	mut named := q.named_friends.clone()
+	named[name] = configure
+	next.named_friends = named
+	return next
+}
+
+// order_by_devices_count orders the rows by their number of `devices`.
+pub fn (q UserQuery) order_by_devices_count() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "devices" AS "t1" WHERE "t1"."owner_id" = "t0"."id")'
+	})
+}
+
+// order_by_devices_count_desc orders the rows by their number of `devices`, most
+// first.
+pub fn (q UserQuery) order_by_devices_count_desc() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "devices" AS "t1" WHERE "t1"."owner_id" = "t0"."id")'
+		desc: true
+	})
+}
+
+// with_named_devices loads `devices` as `configure` says into
+// `named_devices[name]`, besides any other load of it.
+pub fn (q UserQuery) with_named_devices(name string, configure ...fn (DeviceQuery) DeviceQuery) UserQuery {
+	mut next := q
+	mut named := q.named_devices.clone()
+	named[name] = configure
+	next.named_devices = named
 	return next
 }
 
@@ -340,197 +1217,394 @@ pub fn (q UserQuery) nodes(rows []models.User) ![]UserNode {
 		user:  it
 	})
 	if q.with_card {
-		mut sub := q.graph.cards()
-		for configure in q.card_fns {
-			sub = configure(sub)
-		}
-		children := sub.nodes(load.select_in[models.Card](q.graph.client.conn, 'owner_id',
-			rows.map(it.id.str()),
-			query: q.graph.client.prepare_query('cards', sub.query)!
-		)!)!
-		mut by_parent := map[string][]CardNode{}
-		for child in children {
-			by_parent[child.card.owner_id.str()] << child
-		}
-		// at most one each: the first, in the order of the query
+		found := q.load_card(rows, q.card_fns)!
 		for mut node in nodes {
-			if found := by_parent[node.user.id.str()] {
+			// at most one each: the first, in the order of the query
+			list := found[node.user.id.str()] or { [] }
+			if list.len > 0 {
 				node.card = &CardNode{
-					...found[0]
+					...list[0]
 				}
 			}
+			node.loaded << 'card'
 		}
 	}
 	if q.with_spouse {
-		mut sub := q.graph.users()
-		for configure in q.spouse_fns {
-			sub = configure(sub)
-		}
-		mut keys := []string{}
-		for row in rows {
-			if key := row.spouse_id {
-				keys << key.str()
-			}
-		}
-		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
-			load.unique(keys),
-			query: q.graph.client.prepare_query('users', sub.query)!
-		)!)!
-		mut by_key := map[string]&UserNode{}
-		for target in targets {
-			by_key[target.user.id.str()] = &UserNode{
-				...target
-			}
-		}
+		found := q.load_spouse(rows, q.spouse_fns)!
 		for mut node in nodes {
-			if key := node.user.spouse_id {
-				if target := by_key[key.str()] {
-					node.spouse = target
+			// at most one each: the first, in the order of the query
+			list := found[node.user.id.str()] or { [] }
+			if list.len > 0 {
+				node.spouse = &UserNode{
+					...list[0]
 				}
 			}
+			node.loaded << 'spouse'
 		}
 	}
 	if q.with_pets {
-		mut sub := q.graph.pets()
-		for configure in q.pets_fns {
-			sub = configure(sub)
-		}
-		children := sub.nodes(load.select_in[models.Pet](q.graph.client.conn, 'owner_id',
-			rows.map(it.id.str()),
-			query: q.graph.client.prepare_query('pets', sub.query)!
-		)!)!
-		mut by_parent := map[string][]PetNode{}
-		for child in children {
-			if parent := child.pet.owner_id {
-				by_parent[parent.str()] << child
-			}
-		}
+		found := q.load_pets(rows, q.pets_fns)!
 		for mut node in nodes {
-			node.pets = by_parent[node.user.id.str()] or { [] }
+			node.pets = found[node.user.id.str()] or { [] }
+			node.loaded << 'pets'
+		}
+	}
+	for name, fns in q.named_pets {
+		found := q.load_pets(rows, fns)!
+		for mut node in nodes {
+			node.named_pets[name] = found[node.user.id.str()] or { [] }
 		}
 	}
 	if q.with_groups {
-		mut sub := q.graph.groups()
-		for configure in q.groups_fns {
-			sub = configure(sub)
-		}
-		pairs := load.link_pairs(q.graph.client.conn, 'group_users', 'user_id',
-			'group_id', rows.map(it.id.str()), .int, .int)!
-		targets := sub.nodes(load.select_in[models.Group](q.graph.client.conn, 'id',
-			load.unique(pairs.map(it[1])),
-			query: q.graph.client.prepare_query('groups', sub.query)!
-		)!)!
-		// each parent's targets in the order of the query
-		mut parents_of := map[string][]string{}
-		for pair in pairs {
-			parents_of[pair[1]] << pair[0]
-		}
-		mut linked := map[string][]GroupNode{}
-		for target in targets {
-			for parent in parents_of[target.group.id.str()] or { [] } {
-				linked[parent] << target
-			}
-		}
+		found := q.load_groups(rows, q.groups_fns)!
 		for mut node in nodes {
-			node.groups = linked[node.user.id.str()] or { [] }
+			node.groups = found[node.user.id.str()] or { [] }
+			node.loaded << 'groups'
+		}
+	}
+	for name, fns in q.named_groups {
+		found := q.load_groups(rows, fns)!
+		for mut node in nodes {
+			node.named_groups[name] = found[node.user.id.str()] or { [] }
 		}
 	}
 	if q.with_following {
-		mut sub := q.graph.users()
-		for configure in q.following_fns {
-			sub = configure(sub)
-		}
-		pairs := load.link_pairs(q.graph.client.conn, 'follows', 'follower_id',
-			'followee_id', rows.map(it.id.str()), .int, .int)!
-		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
-			load.unique(pairs.map(it[1])),
-			query: q.graph.client.prepare_query('users', sub.query)!
-		)!)!
-		// each parent's targets in the order of the query
-		mut parents_of := map[string][]string{}
-		for pair in pairs {
-			parents_of[pair[1]] << pair[0]
-		}
-		mut linked := map[string][]UserNode{}
-		for target in targets {
-			for parent in parents_of[target.user.id.str()] or { [] } {
-				linked[parent] << target
-			}
-		}
+		found := q.load_following(rows, q.following_fns)!
 		for mut node in nodes {
-			node.following = linked[node.user.id.str()] or { [] }
+			node.following = found[node.user.id.str()] or { [] }
+			node.loaded << 'following'
+		}
+	}
+	for name, fns in q.named_following {
+		found := q.load_following(rows, fns)!
+		for mut node in nodes {
+			node.named_following[name] = found[node.user.id.str()] or { [] }
 		}
 	}
 	if q.with_followers {
-		mut sub := q.graph.users()
-		for configure in q.followers_fns {
-			sub = configure(sub)
-		}
-		pairs := load.link_pairs(q.graph.client.conn, 'follows', 'followee_id',
-			'follower_id', rows.map(it.id.str()), .int, .int)!
-		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
-			load.unique(pairs.map(it[1])),
-			query: q.graph.client.prepare_query('users', sub.query)!
-		)!)!
-		// each parent's targets in the order of the query
-		mut parents_of := map[string][]string{}
-		for pair in pairs {
-			parents_of[pair[1]] << pair[0]
-		}
-		mut linked := map[string][]UserNode{}
-		for target in targets {
-			for parent in parents_of[target.user.id.str()] or { [] } {
-				linked[parent] << target
-			}
-		}
+		found := q.load_followers(rows, q.followers_fns)!
 		for mut node in nodes {
-			node.followers = linked[node.user.id.str()] or { [] }
+			node.followers = found[node.user.id.str()] or { [] }
+			node.loaded << 'followers'
+		}
+	}
+	for name, fns in q.named_followers {
+		found := q.load_followers(rows, fns)!
+		for mut node in nodes {
+			node.named_followers[name] = found[node.user.id.str()] or { [] }
 		}
 	}
 	if q.with_friends {
-		mut sub := q.graph.users()
-		for configure in q.friends_fns {
-			sub = configure(sub)
-		}
-		pairs := load.link_pairs(q.graph.client.conn, 'friendships', 'user_id',
-			'friend_id', rows.map(it.id.str()), .int, .int)!
-		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
-			load.unique(pairs.map(it[1])),
-			query: q.graph.client.prepare_query('users', sub.query)!
-		)!)!
-		// each parent's targets in the order of the query
-		mut parents_of := map[string][]string{}
-		for pair in pairs {
-			parents_of[pair[1]] << pair[0]
-		}
-		mut linked := map[string][]UserNode{}
-		for target in targets {
-			for parent in parents_of[target.user.id.str()] or { [] } {
-				linked[parent] << target
-			}
-		}
+		found := q.load_friends(rows, q.friends_fns)!
 		for mut node in nodes {
-			node.friends = linked[node.user.id.str()] or { [] }
+			node.friends = found[node.user.id.str()] or { [] }
+			node.loaded << 'friends'
+		}
+	}
+	for name, fns in q.named_friends {
+		found := q.load_friends(rows, fns)!
+		for mut node in nodes {
+			node.named_friends[name] = found[node.user.id.str()] or { [] }
 		}
 	}
 	if q.with_devices {
-		mut sub := q.graph.devices()
-		for configure in q.devices_fns {
-			sub = configure(sub)
-		}
-		children := sub.nodes(load.select_in[models.Device](q.graph.client.conn, 'owner_id',
-			rows.map(it.id.str()),
-			query: q.graph.client.prepare_query('devices', sub.query)!
-		)!)!
-		mut by_parent := map[string][]DeviceNode{}
-		for child in children {
-			by_parent[child.device.owner_id.str()] << child
-		}
+		found := q.load_devices(rows, q.devices_fns)!
 		for mut node in nodes {
-			node.devices = by_parent[node.user.id.str()] or { [] }
+			node.devices = found[node.user.id.str()] or { [] }
+			node.loaded << 'devices'
+		}
+	}
+	for name, fns in q.named_devices {
+		found := q.load_devices(rows, fns)!
+		for mut node in nodes {
+			node.named_devices[name] = found[node.user.id.str()] or { [] }
 		}
 	}
 	return nodes
+}
+
+// load_card loads the `card` of `rows`, keyed by each row's key.
+fn (q UserQuery) load_card(rows []models.User, fns []fn (CardQuery) CardQuery) !map[string][]CardNode {
+	mut sub := q.graph.cards()
+	for configure in fns {
+		sub = configure(sub)
+	}
+	children := sub.nodes(load.select_in[models.Card](q.graph.client.conn, 'owner_id',
+		rows.map(it.id.str()),
+		query: q.graph.client.prepare_query('cards', sub.query)!
+	)!)!
+	mut by_parent := map[string][]CardNode{}
+	for child in children {
+		by_parent[child.card.owner_id.str()] << child
+	}
+	return by_parent
+}
+
+// card_or_err returns the `card`: a `NotLoadedError` when the query didn't
+// load it, a `NotFoundError` when the row has none.
+pub fn (n UserNode) card_or_err() !&CardNode {
+	if 'card' !in n.loaded {
+		return NotLoadedError{
+			edge: 'users.card'
+		}
+	}
+	if target := n.card {
+		return target
+	}
+	return NotFoundError{
+		table: 'cards'
+	}
+}
+
+// load_spouse loads the `spouse` of `rows`, keyed by each row's key.
+fn (q UserQuery) load_spouse(rows []models.User, fns []fn (UserQuery) UserQuery) !map[string][]UserNode {
+	mut sub := q.graph.users()
+	for configure in fns {
+		sub = configure(sub)
+	}
+	mut keys := []string{}
+	for row in rows {
+		if fk := row.spouse_id {
+			keys << fk.str()
+		}
+	}
+	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id', load.unique(keys),
+		query: q.graph.client.prepare_query('users', sub.query)!
+	)!)!
+	mut by_key := map[string]UserNode{}
+	for target in targets {
+		by_key[target.user.id.str()] = target
+	}
+	mut found := map[string][]UserNode{}
+	for row in rows {
+		fk := row.spouse_id or { continue }
+		if target := by_key[fk.str()] {
+			found[row.id.str()] = [target]
+		}
+	}
+	return found
+}
+
+// spouse_or_err returns the `spouse`: a `NotLoadedError` when the query didn't
+// load it, a `NotFoundError` when the row has none.
+pub fn (n UserNode) spouse_or_err() !&UserNode {
+	if 'spouse' !in n.loaded {
+		return NotLoadedError{
+			edge: 'users.spouse'
+		}
+	}
+	if target := n.spouse {
+		return target
+	}
+	return NotFoundError{
+		table: 'users'
+	}
+}
+
+// load_pets loads the `pets` of `rows`, keyed by each row's key.
+fn (q UserQuery) load_pets(rows []models.User, fns []fn (PetQuery) PetQuery) !map[string][]PetNode {
+	mut sub := q.graph.pets()
+	for configure in fns {
+		sub = configure(sub)
+	}
+	children := sub.nodes(load.select_in[models.Pet](q.graph.client.conn, 'owner_id',
+		rows.map(it.id.str()),
+		query: q.graph.client.prepare_query('pets', sub.query)!
+	)!)!
+	mut by_parent := map[string][]PetNode{}
+	for child in children {
+		if parent := child.pet.owner_id {
+			by_parent[parent.str()] << child
+		}
+	}
+	return by_parent
+}
+
+// pets_or_err returns the `pets`, or a `NotLoadedError` when the query
+// didn't load them.
+pub fn (n UserNode) pets_or_err() ![]PetNode {
+	if 'pets' !in n.loaded {
+		return NotLoadedError{
+			edge: 'users.pets'
+		}
+	}
+	return n.pets
+}
+
+// load_groups loads the `groups` of `rows`, keyed by each row's key.
+fn (q UserQuery) load_groups(rows []models.User, fns []fn (GroupQuery) GroupQuery) !map[string][]GroupNode {
+	mut sub := q.graph.groups()
+	for configure in fns {
+		sub = configure(sub)
+	}
+	pairs := load.link_pairs(q.graph.client.conn, 'group_users', 'user_id',
+		'group_id', rows.map(it.id.str()), .int, .int)!
+	targets := sub.nodes(load.select_in[models.Group](q.graph.client.conn, 'id',
+		load.unique(pairs.map(it[1])),
+		query: q.graph.client.prepare_query('groups', sub.query)!
+	)!)!
+	// each parent's targets in the order of the query
+	mut parents_of := map[string][]string{}
+	for pair in pairs {
+		parents_of[pair[1]] << pair[0]
+	}
+	mut linked := map[string][]GroupNode{}
+	for target in targets {
+		for parent in parents_of[target.group.id.str()] or { [] } {
+			linked[parent] << target
+		}
+	}
+	return linked
+}
+
+// groups_or_err returns the `groups`, or a `NotLoadedError` when the query
+// didn't load them.
+pub fn (n UserNode) groups_or_err() ![]GroupNode {
+	if 'groups' !in n.loaded {
+		return NotLoadedError{
+			edge: 'users.groups'
+		}
+	}
+	return n.groups
+}
+
+// load_following loads the `following` of `rows`, keyed by each row's key.
+fn (q UserQuery) load_following(rows []models.User, fns []fn (UserQuery) UserQuery) !map[string][]UserNode {
+	mut sub := q.graph.users()
+	for configure in fns {
+		sub = configure(sub)
+	}
+	pairs := load.link_pairs(q.graph.client.conn, 'follows', 'follower_id',
+		'followee_id', rows.map(it.id.str()), .int, .int)!
+	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
+		load.unique(pairs.map(it[1])),
+		query: q.graph.client.prepare_query('users', sub.query)!
+	)!)!
+	// each parent's targets in the order of the query
+	mut parents_of := map[string][]string{}
+	for pair in pairs {
+		parents_of[pair[1]] << pair[0]
+	}
+	mut linked := map[string][]UserNode{}
+	for target in targets {
+		for parent in parents_of[target.user.id.str()] or { [] } {
+			linked[parent] << target
+		}
+	}
+	return linked
+}
+
+// following_or_err returns the `following`, or a `NotLoadedError` when the query
+// didn't load them.
+pub fn (n UserNode) following_or_err() ![]UserNode {
+	if 'following' !in n.loaded {
+		return NotLoadedError{
+			edge: 'users.following'
+		}
+	}
+	return n.following
+}
+
+// load_followers loads the `followers` of `rows`, keyed by each row's key.
+fn (q UserQuery) load_followers(rows []models.User, fns []fn (UserQuery) UserQuery) !map[string][]UserNode {
+	mut sub := q.graph.users()
+	for configure in fns {
+		sub = configure(sub)
+	}
+	pairs := load.link_pairs(q.graph.client.conn, 'follows', 'followee_id',
+		'follower_id', rows.map(it.id.str()), .int, .int)!
+	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
+		load.unique(pairs.map(it[1])),
+		query: q.graph.client.prepare_query('users', sub.query)!
+	)!)!
+	// each parent's targets in the order of the query
+	mut parents_of := map[string][]string{}
+	for pair in pairs {
+		parents_of[pair[1]] << pair[0]
+	}
+	mut linked := map[string][]UserNode{}
+	for target in targets {
+		for parent in parents_of[target.user.id.str()] or { [] } {
+			linked[parent] << target
+		}
+	}
+	return linked
+}
+
+// followers_or_err returns the `followers`, or a `NotLoadedError` when the query
+// didn't load them.
+pub fn (n UserNode) followers_or_err() ![]UserNode {
+	if 'followers' !in n.loaded {
+		return NotLoadedError{
+			edge: 'users.followers'
+		}
+	}
+	return n.followers
+}
+
+// load_friends loads the `friends` of `rows`, keyed by each row's key.
+fn (q UserQuery) load_friends(rows []models.User, fns []fn (UserQuery) UserQuery) !map[string][]UserNode {
+	mut sub := q.graph.users()
+	for configure in fns {
+		sub = configure(sub)
+	}
+	pairs := load.link_pairs(q.graph.client.conn, 'friendships', 'user_id',
+		'friend_id', rows.map(it.id.str()), .int, .int)!
+	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
+		load.unique(pairs.map(it[1])),
+		query: q.graph.client.prepare_query('users', sub.query)!
+	)!)!
+	// each parent's targets in the order of the query
+	mut parents_of := map[string][]string{}
+	for pair in pairs {
+		parents_of[pair[1]] << pair[0]
+	}
+	mut linked := map[string][]UserNode{}
+	for target in targets {
+		for parent in parents_of[target.user.id.str()] or { [] } {
+			linked[parent] << target
+		}
+	}
+	return linked
+}
+
+// friends_or_err returns the `friends`, or a `NotLoadedError` when the query
+// didn't load them.
+pub fn (n UserNode) friends_or_err() ![]UserNode {
+	if 'friends' !in n.loaded {
+		return NotLoadedError{
+			edge: 'users.friends'
+		}
+	}
+	return n.friends
+}
+
+// load_devices loads the `devices` of `rows`, keyed by each row's key.
+fn (q UserQuery) load_devices(rows []models.User, fns []fn (DeviceQuery) DeviceQuery) !map[string][]DeviceNode {
+	mut sub := q.graph.devices()
+	for configure in fns {
+		sub = configure(sub)
+	}
+	children := sub.nodes(load.select_in[models.Device](q.graph.client.conn, 'owner_id',
+		rows.map(it.id.str()),
+		query: q.graph.client.prepare_query('devices', sub.query)!
+	)!)!
+	mut by_parent := map[string][]DeviceNode{}
+	for child in children {
+		by_parent[child.device.owner_id.str()] << child
+	}
+	return by_parent
+}
+
+// devices_or_err returns the `devices`, or a `NotLoadedError` when the query
+// didn't load them.
+pub fn (n UserNode) devices_or_err() ![]DeviceNode {
+	if 'devices' !in n.loaded {
+		return NotLoadedError{
+			edge: 'users.devices'
+		}
+	}
+	return n.devices
 }
 
 // query_card starts a query of this row's `card`.

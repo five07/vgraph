@@ -97,7 +97,7 @@ pub fn link_pairs(conn orm.Connection, table string, from_col string, to_col str
 		types:        [orm_type(from), orm_type(to)]
 	}
 	mut c := conn
-	rows := c.select(config, orm.QueryData{}, where_of([in_keys(from_col, ids, from)]))!
+	rows := c.select(config, orm.QueryData{}, orm_where(in_keys(from_col, ids, from)))!
 	mut pairs := [][]string{cap: rows.len}
 	for row in rows {
 		pairs << [cell_key(row[0], from_col)!, cell_key(row[1], to_col)!]

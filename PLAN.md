@@ -662,24 +662,24 @@ that Ent doesn't.
 | | mixins (shared fields, edges, hooks) | none; V's embedded structs may serve | 6d |
 | | annotations (`entsql`, `entgql`) | `@[table]`; `@[graphql]` in Phase 4 (Q29) | 4 / 6d |
 | | views, multiple database schemas | none | 6d |
-| **Queries** | predicates `EQ`, `NEQ`, `In`, `NotIn`, `GT`/`GTE`/`LT`/`LTE`, `IsNil`, `NotNil` | all but `NEQ` and `NotIn` generated (`load` has `ne`) | 6b |
-| | `Contains`, `HasPrefix`, `HasSuffix`, `EqualFold`, `ContainsFold` | `_like` in the client; GraphQL's `Contains` / `HasPrefix` / `HasSuffix` are LIKE patterns without escaping `%` and `_` | 6b: escaping, and the `Fold` forms |
-| | `And`, `Or`, `Not` | AND only | 6b |
-| | `Has<Edge>`, `Has<Edge>With` | none | 6b |
-| | custom SQL predicates | `where(load.Cond...)`, column conditions only | 6b |
-| | order by several fields, by an edge's count or field, nulls first/last | one field | 6b |
+| **Queries** | predicates `EQ`, `NEQ`, `In`, `NotIn`, `GT`/`GTE`/`LT`/`LTE`, `IsNil`, `NotNil` | all, as methods and functions | 6b (done) |
+| | `Contains`, `HasPrefix`, `HasSuffix`, `EqualFold`, `ContainsFold` | all, escaped; GraphQL's escaped too | 6b (done) |
+| | `And`, `Or`, `Not` | `load.and`, `or`, `not` | 6b (done) |
+| | `Has<Edge>`, `Has<Edge>With` | `has_<edge>`, `has_<edge>_with` | 6b (done) |
+| | custom SQL predicates | `load.raw`, with parameters | 6b (done) |
+| | order by several fields, by an edge's count or field, nulls first/last | `order_by_*` add columns; `order_by_<edge>_count`, `order_by_<edge>_<field>`; `nulls_first` / `nulls_last` | 6b (done) |
 | | `Limit`, `Offset` | `limit` | `offset` in 4 |
-| | `All`, `First`, `Only`, `IDs`, `FirstID`, `OnlyID`, `Count`, `Exist` | `all`, `first` | `count` in 4; rest 6b |
-| | `Select`, `Scan`, `Unique` | none | 6b |
-| | `GroupBy`, `Aggregate` (count, sum, min, max, mean) | none | 6b |
-| | `Modify`, raw SQL (`sql/modifier`, `sql/execquery`) | none | 6b |
-| | `ForUpdate`, `ForShare` (`sql/lock`) | none | 6b |
-| | traversal from a query (`users().where_…().query_pets()`) | from a node only | 6b |
+| | `All`, `First`, `Only`, `IDs`, `FirstID`, `OnlyID`, `Count`, `Exist` | all | 4, 6b (done) |
+| | `Select`, `Scan`, `Unique` | `select`, `scan[T]`, `unique` | 6b (done) |
+| | `GroupBy`, `Aggregate` (count, sum, min, max, mean) | `sum_` / `min_` / `max_` / `mean_<field>`; `group_by(...).aggregate(...)` | 6b (done) |
+| | `Modify`, raw SQL (`sql/modifier`, `sql/execquery`) | raw predicates; `Modify` left out (Q79) | 6b (done) |
+| | `ForUpdate`, `ForShare` (`sql/lock`) | `for_update`, `for_share`, `no_wait`, `skip_locked`; PostgreSQL | 6b (done) |
+| | traversal from a query (`users().where_…().query_pets()`) | `query_<edge>` on a query | 6b (done) |
 | | traversal from a node | `query_<edge>` | done |
 | | eager loading, nested and configured (`With<Edge>`) | `with_<edge>` | done |
-| | named edges (`WithNamed<Edge>`) | none | 6b |
-| | `Edges.<X>OrErr`: "not loaded" told apart from "empty" | option fields and lists | 6b |
-| | `entql`, generic filtering at runtime | none | 6b |
+| | named edges (`WithNamed<Edge>`) | `with_named_<edge>` | 6b (done) |
+| | `Edges.<X>OrErr`: "not loaded" told apart from "empty" | `<edge>_or_err` | 6b (done) |
+| | `entql`, generic filtering at runtime | the `load.Cond` tree, `prepare_query`, `select_keys_where` | 6b (done) |
 | **Writes** | `Create`, `CreateBulk`, `MapCreateBulk` | `create`, `create_bulk`, `map_create_bulk` | 6a (done) |
 | | upsert (`OnConflict`, `UpdateNewValues`, `Ignore`, `DoNothing`) | `on_conflict_columns`, `update_new_values`, `ignore`, `do_nothing`, with a driver | 6a (done) |
 | | `Update`, `UpdateOne`, `UpdateOneID`: `Set`, `Add` (increment), `Clear`, `Append` | `update`, `update_one`, `update_one_id`; `set_`, `add_`, `clear_` | 6a (done); `Append` 6d, with JSON fields |
@@ -803,6 +803,65 @@ Work per sub-phase (Q51–Q60 answered):
 
 Decisions before 6c (Q61–Q69, 2026-10-13): the defaults. Trace events carry no
 values: no parameters, and no error messages (Q67).
+
+Decisions before 6b (Q70–Q81, 2026-10-13): the defaults; reads that need SQL the
+ORM can't express run keys first (Q70 (a)).
+
+*6b result (2026-10-13, done):*
+- **Conditions** (`load/cond.v`, Q71): `load.Cond` is a tree (`Junction`: leaf, and,
+  or, not, true, false, sub, raw), with `and`, `or`, `not`, `contains`,
+  `has_prefix`, `has_suffix`, `equal_fold`, `contains_fold`, `raw`, `in_sub`.
+  `normalize` pushes NOT down to the operators (LIKE, folds, subqueries and raw SQL
+  keep a NOT) and folds constants, so an empty `IN` inside an OR no longer empties
+  the whole query, as 6a's flat list did. The ORM gets AND, OR and parentheses
+  (`orm_where`); a driver gets SQL (`render`).
+- **The plan** (`load/plan.v`, Q70 (a)): a query the ORM can run is one query, as
+  before; otherwise, with a driver, the keys first (`SELECT "t0"."key" … ORDER BY …
+  LIMIT … FOR UPDATE`), then the rows by key through the ORM, in the keys' order;
+  without one, subqueries run first (`resolve`), an escape the value doesn't need
+  is dropped, a fold becomes ILIKE on `db.pg` (found by type name, so not through
+  `vgraph.trace`), and the rest is refused naming the drivers. `select_where`,
+  `select_in` (edge loads), `count_where`, `aggregate_where`, `select_keys_where`,
+  `select_into` (scan) and `group_where` all use it. `Query` gained `orders`,
+  `lock`, `distinct` and `columns`; `load.Order` / `asc` / `desc` / `nulls_first` /
+  `nulls_last`, `Lock`, `Aggregate` (`count`, `sum`, `mean`, `min_of`, `max_of`; in
+  `vgraph` too), `Group`, `scan_groups`. Parameters stay text; on SQLite a number is
+  written `CAST(? AS INTEGER)` (or `REAL`), as SQLite converts text to a number only
+  next to a column of that type, which raw SQL broke.
+- **Subqueries and privacy** (Q73): `prepare_query` prepares each subquery of a
+  registered table as a query of it, so its privacy rules and interceptors apply,
+  and a soft-deleted pet doesn't count for `has_pets`. Edge predicates are
+  `column IN (SELECT …)` subqueries rather than `EXISTS`: the same rows, and the
+  same SQL for the no-driver fallback; each adds `IS NOT NULL` so a `NOT IN` is
+  right with nullable columns. Locks need a transaction (`prepare_query`) and
+  PostgreSQL (Q78: refused on SQLite).
+- **Generator** (`gen/query.v`): per field and operator a method and a function
+  (`graph.user_name_eq`); `has_<edge>` and `has_<edge>_with` (a function taking
+  conditions, as Ent's, and a method taking a configured query) on queries, updates
+  and deletes; `query_<edge>` on queries; `only`, `ids`, `first_id`, `only_id`,
+  `exist`, `select`, `unique`, `scan[T]`; `sum_` / `min_` / `max_` / `mean_<field>`;
+  `<T>GroupBy` with `aggregate`, `all`, `scan[T]`; `order_by`,
+  `order_by_<edge>_count[_desc]` on list edges, `order_by_<edge>_<field>[_desc]` on
+  unique ones (but a many_to_one edge's key, which is its own column, and names a
+  field order takes); `order_by_<field>` now adds a column (Q77); `for_update`,
+  `for_share`, `no_wait`, `skip_locked`; `with_named_<edge>` and
+  `node.named_<edge>` on list edges; `node.loaded` and `<edge>_or_err`. Edge loads
+  are one private `load_<edge>` method each, which `with_` and named loads share.
+  `graph.v` gained `NotSingularError`, `NotLoadedError` and `with_conds`.
+- **GraphQL** (Q80): `Contains` / `HasPrefix` / `HasSuffix` are escaped.
+- **Tests:** `load/cond_test.v` (negation, constants, the ORM's parentheses, SQL for
+  each dialect, the no-driver fallback). `examples/relations` `check_queries`, on
+  both its clients (without a driver, with the selects each runs, and with one) and
+  both databases: `has_<edge>`, `has_<edge>_with` and traversal from a query for
+  every relationship kind and UUID keys; or / not; every string predicate; the
+  refusals without a driver; every result method; aggregates; `group_by` with
+  `scan`; orders by several columns, by edge count and edge field, nulls last;
+  locks (on PostgreSQL; refused on SQLite and outside a transaction); named edges
+  and `<edge>_or_err`. All 21 test files pass, and both PostgreSQL tests against
+  PostgreSQL 18; `examples/service`'s query counts are unchanged.
+- **Found on the way:** inside module `load`, `or(...)` can't be called by name (it
+  parses as the keyword); `load.or(...)` from other modules works. The test uses a
+  local `either`.
 
 *6c result (2026-10-13, done):*
 - **Hooks** (`hooks.v`, Q61–Q63): `vgraph.Hook` (`name`, `on`, `cond`, `run`),
@@ -1676,7 +1735,7 @@ returns a null cell as `''`, so rows can't be read back reliably as text.
   null makes optional strings ambiguous, and time and bool parsing differ by dialect.
 - (c) **Wait for the upstream `orm.RawConnection`** (`TODO.md`), which returns typed
   cells. Blocks 6b.
->  A:
+>  A: (a)
 
 **Q71. Composing predicates: `and`, `or`, `not`.** `load.Cond` becomes a tree:
 `load.and(...)`, `load.or(...)`, `load.not(...)`. **Default:**
@@ -1688,7 +1747,7 @@ returns a null cell as `''`, so rows can't be read back reliably as text.
   negating each operator (`=` to `<>`, `IN` to `NOT IN`, `<` to `>=`, AND to OR), and
   needs a driver only around `LIKE`;
 - the generated client gains the missing `where_<field>_ne` and `where_<field>_not_in`.
->  A:
+>  A: perfect
 
 **Q72. String predicates.** **Default:**
 - `where_<field>_contains`, `_has_prefix`, `_has_suffix`: `LIKE` with `%` and `_`
@@ -1700,7 +1759,7 @@ returns a null cell as `''`, so rows can't be read back reliably as text.
 - GraphQL's `Contains` / `HasPrefix` / `HasSuffix` switch to the escaped forms here,
   which fixes the Phase 4 note; `EqualFold` / `ContainsFold` join the `WhereInput` in
   6e with the rest of it (Q80).
->  A:
+>  A: agreed
 
 **Q73. Edge predicates.** `has_<edge>()` and `has_<edge>_with(fn (q PetQuery) PetQuery)`,
 on every edge kind, polymorphic and through join tables. **Default:**
@@ -1709,7 +1768,7 @@ on every edge kind, polymorphic and through join tables. **Default:**
 - the target's privacy rules and interceptors apply to the subquery, as to an edge
   load, so a soft-deleted pet doesn't count; Ent leaves them out, but here edge
   loads already apply them, and the two should agree.
->  A:
+>  A: looks good
 
 **Q74. Traversal from a query.** `g.users().where_name('ada').query_pets()` returns a
 `PetQuery` of the pets of every user that matches. **Default:** the `PetQuery` holds
@@ -1717,7 +1776,7 @@ the users query and resolves it when it runs: a subquery (`owner_id IN (SELECT i
 FROM users WHERE …)`) with a driver, two queries without one. Every edge kind, as
 `query_<edge>` on a node has today; a many_to_many edge reads its join table in the
 same way.
->  A:
+>  A: perfect
 
 **Q75. Results.** **Default:**
 - `only()`: the one matching row, a `NotFoundError` for none, a `NotSingularError`
@@ -1730,7 +1789,7 @@ same way.
 - `scan[T]() ![]T`: rows read into an app struct by column name, with
   `load.select_where[T]`'s mapping. It is the one generic method here, and gets a
   regression test of its own.
->  A:
+>  A: looks good
 
 **Q76. Aggregates.** V has no `any`, so results are typed by what they are.
 **Default:**
@@ -1741,7 +1800,7 @@ same way.
   needing a driver, returns `[]vgraph.Group`: `key map[string]orm.Primitive` (the
   grouped columns) and `values map[string]f64` (`count`, `sum_views`, …), with
   `scan[T]()` to read groups into an app struct instead.
->  A:
+>  A: good
 
 **Q77. Ordering.** **Default:**
 - `order_by_<field>()` and `_desc()` add an order column instead of replacing the
@@ -1752,14 +1811,14 @@ same way.
   `order_by_<edge>_<field>()` on unique ones (many_to_one, one_to_one), through a
   driver subquery;
 - GraphQL's `orderBy` stays one field until 6e.
->  A:
+>  A: agreed
 
 **Q78. Locking.** **Default:** `for_update()` and `for_share()`, with `no_wait()` and
 `skip_locked()`, through a driver, inside a transaction only (an error outside one).
 On PostgreSQL they lock the rows. SQLite has no row locks: there they are refused
 with an error saying so, rather than accepted and ignored. The other choice is to
 accept them as no-ops on SQLite, since its transactions already serialize writers.
->  A:
+>  A: default
 
 **Q79. The rest of the query inventory.** **Default:**
 - named edges: `with_named_<edge>(name, configure)` loads an edge more than once
@@ -1771,12 +1830,12 @@ accept them as no-ops on SQLite, since its transactions already serialize writer
   interpolated text, through a driver; Ent's `Modify` for selects is left out;
 - `entql` (filtering at runtime, untyped): the `load.Cond` tree and
   `Client.prepare_query` already are that, and `Client.select_keys` is exposed for it.
->  A:
+>  A: good
 
 **Q80. GraphQL in 6b.** **Default:** only the escaping fix (Q72). `and` / `or` / `not`,
 `has<Edge>` / `has<Edge>With`, the `Fold` predicates, multi-field `orderBy` and
 connections stay in 6e, which builds them on 6b.
->  A:
+>  A: yes
 
 **Q81. Exit criteria for 6b.** **Default:** Q59's, and:
 - every predicate, result method, aggregate, order and lock tested on SQLite and
@@ -1786,7 +1845,7 @@ connections stay in 6e, which builds them on 6b.
   query for each relationship kind, with the queries each runs;
 - the existing query-count tests unchanged: what the ORM can run still runs in one
   query.
->  A:
+>  A: good
 
 ## 8. Future state
 

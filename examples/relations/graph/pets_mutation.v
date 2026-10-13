@@ -590,124 +590,194 @@ pub fn (b PetUpdate) where(conds ...load.Cond) PetUpdate {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q PetUpdate) where_id(value int) PetUpdate {
-	return q.where(load.eq('id', value))
+	return q.where(pet_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q PetUpdate) where_id_ne(value int) PetUpdate {
+	return q.where(pet_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q PetUpdate) where_id_lt(value int) PetUpdate {
-	return q.where(load.lt('id', value))
+	return q.where(pet_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q PetUpdate) where_id_le(value int) PetUpdate {
-	return q.where(load.le('id', value))
+	return q.where(pet_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q PetUpdate) where_id_gt(value int) PetUpdate {
-	return q.where(load.gt('id', value))
+	return q.where(pet_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q PetUpdate) where_id_ge(value int) PetUpdate {
-	return q.where(load.ge('id', value))
+	return q.where(pet_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q PetUpdate) where_id_in(values []int) PetUpdate {
-	return q.where(load.in_ints('id', values))
+	return q.where(pet_id_in(values))
 }
 
-// where_name keeps the rows whose `name` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q PetUpdate) where_id_not_in(values []int) PetUpdate {
+	return q.where(pet_id_not_in(values))
+}
+
+// where_name keeps the rows where `name` is `value`.
 pub fn (q PetUpdate) where_name(value string) PetUpdate {
-	return q.where(load.eq('name', value))
+	return q.where(pet_name_eq(value))
 }
 
-// where_name_in keeps the rows whose `name` is one of `values`.
+// where_name_ne keeps the rows where `name` is not `value`.
+pub fn (q PetUpdate) where_name_ne(value string) PetUpdate {
+	return q.where(pet_name_ne(value))
+}
+
+// where_name_in keeps the rows where `name` is one of `values`.
 pub fn (q PetUpdate) where_name_in(values []string) PetUpdate {
-	return q.where(load.in_strings('name', values))
+	return q.where(pet_name_in(values))
 }
 
-// where_name_like keeps the rows whose `name` matches the SQL LIKE `pattern`.
+// where_name_not_in keeps the rows where `name` is none of `values`.
+pub fn (q PetUpdate) where_name_not_in(values []string) PetUpdate {
+	return q.where(pet_name_not_in(values))
+}
+
+// where_name_like keeps the rows where `name` matches the SQL LIKE `pattern`.
 pub fn (q PetUpdate) where_name_like(pattern string) PetUpdate {
-	return q.where(load.like('name', pattern))
+	return q.where(pet_name_like(pattern))
 }
 
-// where_owner_id keeps the rows whose `owner_id` is `value`.
+// where_name_contains keeps the rows where `name` contains `value`.
+pub fn (q PetUpdate) where_name_contains(value string) PetUpdate {
+	return q.where(pet_name_contains(value))
+}
+
+// where_name_has_prefix keeps the rows where `name` starts with `value`.
+pub fn (q PetUpdate) where_name_has_prefix(value string) PetUpdate {
+	return q.where(pet_name_has_prefix(value))
+}
+
+// where_name_has_suffix keeps the rows where `name` ends with `value`.
+pub fn (q PetUpdate) where_name_has_suffix(value string) PetUpdate {
+	return q.where(pet_name_has_suffix(value))
+}
+
+// where_name_equal_fold keeps the rows where `name` is `value`, ignoring case.
+pub fn (q PetUpdate) where_name_equal_fold(value string) PetUpdate {
+	return q.where(pet_name_equal_fold(value))
+}
+
+// where_name_contains_fold keeps the rows where `name` contains `value`, ignoring case.
+pub fn (q PetUpdate) where_name_contains_fold(value string) PetUpdate {
+	return q.where(pet_name_contains_fold(value))
+}
+
+// where_owner_id keeps the rows where `owner_id` is `value`.
 pub fn (q PetUpdate) where_owner_id(value int) PetUpdate {
-	return q.where(load.eq('owner_id', value))
+	return q.where(pet_owner_id_eq(value))
 }
 
-// where_owner_id_lt keeps the rows whose `owner_id` comes before `value`.
+// where_owner_id_ne keeps the rows where `owner_id` is not `value`.
+pub fn (q PetUpdate) where_owner_id_ne(value int) PetUpdate {
+	return q.where(pet_owner_id_ne(value))
+}
+
+// where_owner_id_lt keeps the rows where `owner_id` comes before `value`.
 pub fn (q PetUpdate) where_owner_id_lt(value int) PetUpdate {
-	return q.where(load.lt('owner_id', value))
+	return q.where(pet_owner_id_lt(value))
 }
 
-// where_owner_id_le keeps the rows whose `owner_id` comes at or before `value`.
+// where_owner_id_le keeps the rows where `owner_id` comes at or before `value`.
 pub fn (q PetUpdate) where_owner_id_le(value int) PetUpdate {
-	return q.where(load.le('owner_id', value))
+	return q.where(pet_owner_id_le(value))
 }
 
-// where_owner_id_gt keeps the rows whose `owner_id` comes after `value`.
+// where_owner_id_gt keeps the rows where `owner_id` comes after `value`.
 pub fn (q PetUpdate) where_owner_id_gt(value int) PetUpdate {
-	return q.where(load.gt('owner_id', value))
+	return q.where(pet_owner_id_gt(value))
 }
 
-// where_owner_id_ge keeps the rows whose `owner_id` comes at or after `value`.
+// where_owner_id_ge keeps the rows where `owner_id` comes at or after `value`.
 pub fn (q PetUpdate) where_owner_id_ge(value int) PetUpdate {
-	return q.where(load.ge('owner_id', value))
+	return q.where(pet_owner_id_ge(value))
 }
 
-// where_owner_id_in keeps the rows whose `owner_id` is one of `values`.
+// where_owner_id_in keeps the rows where `owner_id` is one of `values`.
 pub fn (q PetUpdate) where_owner_id_in(values []int) PetUpdate {
-	return q.where(load.in_ints('owner_id', values))
+	return q.where(pet_owner_id_in(values))
 }
 
-// where_owner_id_is_null keeps the rows whose `owner_id` is null.
+// where_owner_id_not_in keeps the rows where `owner_id` is none of `values`.
+pub fn (q PetUpdate) where_owner_id_not_in(values []int) PetUpdate {
+	return q.where(pet_owner_id_not_in(values))
+}
+
+// where_owner_id_is_null keeps the rows where `owner_id` is null.
 pub fn (q PetUpdate) where_owner_id_is_null() PetUpdate {
-	return q.where(load.is_null('owner_id'))
+	return q.where(pet_owner_id_is_null())
 }
 
-// where_owner_id_is_not_null keeps the rows whose `owner_id` is not null.
+// where_owner_id_is_not_null keeps the rows where `owner_id` is not null.
 pub fn (q PetUpdate) where_owner_id_is_not_null() PetUpdate {
-	return q.where(load.is_not_null('owner_id'))
+	return q.where(pet_owner_id_is_not_null())
 }
 
-// where_deleted_at keeps the rows whose `deleted_at` is `value`.
+// where_deleted_at keeps the rows where `deleted_at` is `value`.
 pub fn (q PetUpdate) where_deleted_at(value time.Time) PetUpdate {
-	return q.where(load.eq('deleted_at', value))
+	return q.where(pet_deleted_at_eq(value))
 }
 
-// where_deleted_at_lt keeps the rows whose `deleted_at` comes before `value`.
+// where_deleted_at_ne keeps the rows where `deleted_at` is not `value`.
+pub fn (q PetUpdate) where_deleted_at_ne(value time.Time) PetUpdate {
+	return q.where(pet_deleted_at_ne(value))
+}
+
+// where_deleted_at_lt keeps the rows where `deleted_at` comes before `value`.
 pub fn (q PetUpdate) where_deleted_at_lt(value time.Time) PetUpdate {
-	return q.where(load.lt('deleted_at', value))
+	return q.where(pet_deleted_at_lt(value))
 }
 
-// where_deleted_at_le keeps the rows whose `deleted_at` comes at or before `value`.
+// where_deleted_at_le keeps the rows where `deleted_at` comes at or before `value`.
 pub fn (q PetUpdate) where_deleted_at_le(value time.Time) PetUpdate {
-	return q.where(load.le('deleted_at', value))
+	return q.where(pet_deleted_at_le(value))
 }
 
-// where_deleted_at_gt keeps the rows whose `deleted_at` comes after `value`.
+// where_deleted_at_gt keeps the rows where `deleted_at` comes after `value`.
 pub fn (q PetUpdate) where_deleted_at_gt(value time.Time) PetUpdate {
-	return q.where(load.gt('deleted_at', value))
+	return q.where(pet_deleted_at_gt(value))
 }
 
-// where_deleted_at_ge keeps the rows whose `deleted_at` comes at or after `value`.
+// where_deleted_at_ge keeps the rows where `deleted_at` comes at or after `value`.
 pub fn (q PetUpdate) where_deleted_at_ge(value time.Time) PetUpdate {
-	return q.where(load.ge('deleted_at', value))
+	return q.where(pet_deleted_at_ge(value))
 }
 
-// where_deleted_at_is_null keeps the rows whose `deleted_at` is null.
+// where_deleted_at_is_null keeps the rows where `deleted_at` is null.
 pub fn (q PetUpdate) where_deleted_at_is_null() PetUpdate {
-	return q.where(load.is_null('deleted_at'))
+	return q.where(pet_deleted_at_is_null())
 }
 
-// where_deleted_at_is_not_null keeps the rows whose `deleted_at` is not null.
+// where_deleted_at_is_not_null keeps the rows where `deleted_at` is not null.
 pub fn (q PetUpdate) where_deleted_at_is_not_null() PetUpdate {
-	return q.where(load.is_not_null('deleted_at'))
+	return q.where(pet_deleted_at_is_not_null())
+}
+
+// has_owner keeps the rows where it has a `owner`.
+pub fn (q PetUpdate) has_owner() PetUpdate {
+	return q.where(pet_has_owner())
+}
+
+// has_owner_with keeps the rows that have a `owner` that `configure` keeps.
+pub fn (q PetUpdate) has_owner_with(configure fn (UserQuery) UserQuery) PetUpdate {
+	return q.where(pet_has_owner_with(...configure(q.graph.users()).query.conds))
 }
 
 // set_name sets `name`.
@@ -860,124 +930,194 @@ pub fn (b PetDelete) where(conds ...load.Cond) PetDelete {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q PetDelete) where_id(value int) PetDelete {
-	return q.where(load.eq('id', value))
+	return q.where(pet_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q PetDelete) where_id_ne(value int) PetDelete {
+	return q.where(pet_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q PetDelete) where_id_lt(value int) PetDelete {
-	return q.where(load.lt('id', value))
+	return q.where(pet_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q PetDelete) where_id_le(value int) PetDelete {
-	return q.where(load.le('id', value))
+	return q.where(pet_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q PetDelete) where_id_gt(value int) PetDelete {
-	return q.where(load.gt('id', value))
+	return q.where(pet_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q PetDelete) where_id_ge(value int) PetDelete {
-	return q.where(load.ge('id', value))
+	return q.where(pet_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q PetDelete) where_id_in(values []int) PetDelete {
-	return q.where(load.in_ints('id', values))
+	return q.where(pet_id_in(values))
 }
 
-// where_name keeps the rows whose `name` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q PetDelete) where_id_not_in(values []int) PetDelete {
+	return q.where(pet_id_not_in(values))
+}
+
+// where_name keeps the rows where `name` is `value`.
 pub fn (q PetDelete) where_name(value string) PetDelete {
-	return q.where(load.eq('name', value))
+	return q.where(pet_name_eq(value))
 }
 
-// where_name_in keeps the rows whose `name` is one of `values`.
+// where_name_ne keeps the rows where `name` is not `value`.
+pub fn (q PetDelete) where_name_ne(value string) PetDelete {
+	return q.where(pet_name_ne(value))
+}
+
+// where_name_in keeps the rows where `name` is one of `values`.
 pub fn (q PetDelete) where_name_in(values []string) PetDelete {
-	return q.where(load.in_strings('name', values))
+	return q.where(pet_name_in(values))
 }
 
-// where_name_like keeps the rows whose `name` matches the SQL LIKE `pattern`.
+// where_name_not_in keeps the rows where `name` is none of `values`.
+pub fn (q PetDelete) where_name_not_in(values []string) PetDelete {
+	return q.where(pet_name_not_in(values))
+}
+
+// where_name_like keeps the rows where `name` matches the SQL LIKE `pattern`.
 pub fn (q PetDelete) where_name_like(pattern string) PetDelete {
-	return q.where(load.like('name', pattern))
+	return q.where(pet_name_like(pattern))
 }
 
-// where_owner_id keeps the rows whose `owner_id` is `value`.
+// where_name_contains keeps the rows where `name` contains `value`.
+pub fn (q PetDelete) where_name_contains(value string) PetDelete {
+	return q.where(pet_name_contains(value))
+}
+
+// where_name_has_prefix keeps the rows where `name` starts with `value`.
+pub fn (q PetDelete) where_name_has_prefix(value string) PetDelete {
+	return q.where(pet_name_has_prefix(value))
+}
+
+// where_name_has_suffix keeps the rows where `name` ends with `value`.
+pub fn (q PetDelete) where_name_has_suffix(value string) PetDelete {
+	return q.where(pet_name_has_suffix(value))
+}
+
+// where_name_equal_fold keeps the rows where `name` is `value`, ignoring case.
+pub fn (q PetDelete) where_name_equal_fold(value string) PetDelete {
+	return q.where(pet_name_equal_fold(value))
+}
+
+// where_name_contains_fold keeps the rows where `name` contains `value`, ignoring case.
+pub fn (q PetDelete) where_name_contains_fold(value string) PetDelete {
+	return q.where(pet_name_contains_fold(value))
+}
+
+// where_owner_id keeps the rows where `owner_id` is `value`.
 pub fn (q PetDelete) where_owner_id(value int) PetDelete {
-	return q.where(load.eq('owner_id', value))
+	return q.where(pet_owner_id_eq(value))
 }
 
-// where_owner_id_lt keeps the rows whose `owner_id` comes before `value`.
+// where_owner_id_ne keeps the rows where `owner_id` is not `value`.
+pub fn (q PetDelete) where_owner_id_ne(value int) PetDelete {
+	return q.where(pet_owner_id_ne(value))
+}
+
+// where_owner_id_lt keeps the rows where `owner_id` comes before `value`.
 pub fn (q PetDelete) where_owner_id_lt(value int) PetDelete {
-	return q.where(load.lt('owner_id', value))
+	return q.where(pet_owner_id_lt(value))
 }
 
-// where_owner_id_le keeps the rows whose `owner_id` comes at or before `value`.
+// where_owner_id_le keeps the rows where `owner_id` comes at or before `value`.
 pub fn (q PetDelete) where_owner_id_le(value int) PetDelete {
-	return q.where(load.le('owner_id', value))
+	return q.where(pet_owner_id_le(value))
 }
 
-// where_owner_id_gt keeps the rows whose `owner_id` comes after `value`.
+// where_owner_id_gt keeps the rows where `owner_id` comes after `value`.
 pub fn (q PetDelete) where_owner_id_gt(value int) PetDelete {
-	return q.where(load.gt('owner_id', value))
+	return q.where(pet_owner_id_gt(value))
 }
 
-// where_owner_id_ge keeps the rows whose `owner_id` comes at or after `value`.
+// where_owner_id_ge keeps the rows where `owner_id` comes at or after `value`.
 pub fn (q PetDelete) where_owner_id_ge(value int) PetDelete {
-	return q.where(load.ge('owner_id', value))
+	return q.where(pet_owner_id_ge(value))
 }
 
-// where_owner_id_in keeps the rows whose `owner_id` is one of `values`.
+// where_owner_id_in keeps the rows where `owner_id` is one of `values`.
 pub fn (q PetDelete) where_owner_id_in(values []int) PetDelete {
-	return q.where(load.in_ints('owner_id', values))
+	return q.where(pet_owner_id_in(values))
 }
 
-// where_owner_id_is_null keeps the rows whose `owner_id` is null.
+// where_owner_id_not_in keeps the rows where `owner_id` is none of `values`.
+pub fn (q PetDelete) where_owner_id_not_in(values []int) PetDelete {
+	return q.where(pet_owner_id_not_in(values))
+}
+
+// where_owner_id_is_null keeps the rows where `owner_id` is null.
 pub fn (q PetDelete) where_owner_id_is_null() PetDelete {
-	return q.where(load.is_null('owner_id'))
+	return q.where(pet_owner_id_is_null())
 }
 
-// where_owner_id_is_not_null keeps the rows whose `owner_id` is not null.
+// where_owner_id_is_not_null keeps the rows where `owner_id` is not null.
 pub fn (q PetDelete) where_owner_id_is_not_null() PetDelete {
-	return q.where(load.is_not_null('owner_id'))
+	return q.where(pet_owner_id_is_not_null())
 }
 
-// where_deleted_at keeps the rows whose `deleted_at` is `value`.
+// where_deleted_at keeps the rows where `deleted_at` is `value`.
 pub fn (q PetDelete) where_deleted_at(value time.Time) PetDelete {
-	return q.where(load.eq('deleted_at', value))
+	return q.where(pet_deleted_at_eq(value))
 }
 
-// where_deleted_at_lt keeps the rows whose `deleted_at` comes before `value`.
+// where_deleted_at_ne keeps the rows where `deleted_at` is not `value`.
+pub fn (q PetDelete) where_deleted_at_ne(value time.Time) PetDelete {
+	return q.where(pet_deleted_at_ne(value))
+}
+
+// where_deleted_at_lt keeps the rows where `deleted_at` comes before `value`.
 pub fn (q PetDelete) where_deleted_at_lt(value time.Time) PetDelete {
-	return q.where(load.lt('deleted_at', value))
+	return q.where(pet_deleted_at_lt(value))
 }
 
-// where_deleted_at_le keeps the rows whose `deleted_at` comes at or before `value`.
+// where_deleted_at_le keeps the rows where `deleted_at` comes at or before `value`.
 pub fn (q PetDelete) where_deleted_at_le(value time.Time) PetDelete {
-	return q.where(load.le('deleted_at', value))
+	return q.where(pet_deleted_at_le(value))
 }
 
-// where_deleted_at_gt keeps the rows whose `deleted_at` comes after `value`.
+// where_deleted_at_gt keeps the rows where `deleted_at` comes after `value`.
 pub fn (q PetDelete) where_deleted_at_gt(value time.Time) PetDelete {
-	return q.where(load.gt('deleted_at', value))
+	return q.where(pet_deleted_at_gt(value))
 }
 
-// where_deleted_at_ge keeps the rows whose `deleted_at` comes at or after `value`.
+// where_deleted_at_ge keeps the rows where `deleted_at` comes at or after `value`.
 pub fn (q PetDelete) where_deleted_at_ge(value time.Time) PetDelete {
-	return q.where(load.ge('deleted_at', value))
+	return q.where(pet_deleted_at_ge(value))
 }
 
-// where_deleted_at_is_null keeps the rows whose `deleted_at` is null.
+// where_deleted_at_is_null keeps the rows where `deleted_at` is null.
 pub fn (q PetDelete) where_deleted_at_is_null() PetDelete {
-	return q.where(load.is_null('deleted_at'))
+	return q.where(pet_deleted_at_is_null())
 }
 
-// where_deleted_at_is_not_null keeps the rows whose `deleted_at` is not null.
+// where_deleted_at_is_not_null keeps the rows where `deleted_at` is not null.
 pub fn (q PetDelete) where_deleted_at_is_not_null() PetDelete {
-	return q.where(load.is_not_null('deleted_at'))
+	return q.where(pet_deleted_at_is_not_null())
+}
+
+// has_owner keeps the rows where it has a `owner`.
+pub fn (q PetDelete) has_owner() PetDelete {
+	return q.where(pet_has_owner())
+}
+
+// has_owner_with keeps the rows that have a `owner` that `configure` keeps.
+pub fn (q PetDelete) has_owner_with(configure fn (UserQuery) UserQuery) PetDelete {
+	return q.where(pet_has_owner_with(...configure(q.graph.users()).query.conds))
 }
 
 // exec deletes the rows, with their join table rows, in one transaction, and

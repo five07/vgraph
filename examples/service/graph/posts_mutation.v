@@ -729,179 +729,304 @@ pub fn (b PostUpdate) where(conds ...load.Cond) PostUpdate {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q PostUpdate) where_id(value int) PostUpdate {
-	return q.where(load.eq('id', value))
+	return q.where(post_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q PostUpdate) where_id_ne(value int) PostUpdate {
+	return q.where(post_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q PostUpdate) where_id_lt(value int) PostUpdate {
-	return q.where(load.lt('id', value))
+	return q.where(post_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q PostUpdate) where_id_le(value int) PostUpdate {
-	return q.where(load.le('id', value))
+	return q.where(post_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q PostUpdate) where_id_gt(value int) PostUpdate {
-	return q.where(load.gt('id', value))
+	return q.where(post_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q PostUpdate) where_id_ge(value int) PostUpdate {
-	return q.where(load.ge('id', value))
+	return q.where(post_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q PostUpdate) where_id_in(values []int) PostUpdate {
-	return q.where(load.in_ints('id', values))
+	return q.where(post_id_in(values))
 }
 
-// where_slug keeps the rows whose `slug` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q PostUpdate) where_id_not_in(values []int) PostUpdate {
+	return q.where(post_id_not_in(values))
+}
+
+// where_slug keeps the rows where `slug` is `value`.
 pub fn (q PostUpdate) where_slug(value string) PostUpdate {
-	return q.where(load.eq('slug', value))
+	return q.where(post_slug_eq(value))
 }
 
-// where_slug_in keeps the rows whose `slug` is one of `values`.
+// where_slug_ne keeps the rows where `slug` is not `value`.
+pub fn (q PostUpdate) where_slug_ne(value string) PostUpdate {
+	return q.where(post_slug_ne(value))
+}
+
+// where_slug_in keeps the rows where `slug` is one of `values`.
 pub fn (q PostUpdate) where_slug_in(values []string) PostUpdate {
-	return q.where(load.in_strings('slug', values))
+	return q.where(post_slug_in(values))
 }
 
-// where_slug_like keeps the rows whose `slug` matches the SQL LIKE `pattern`.
+// where_slug_not_in keeps the rows where `slug` is none of `values`.
+pub fn (q PostUpdate) where_slug_not_in(values []string) PostUpdate {
+	return q.where(post_slug_not_in(values))
+}
+
+// where_slug_like keeps the rows where `slug` matches the SQL LIKE `pattern`.
 pub fn (q PostUpdate) where_slug_like(pattern string) PostUpdate {
-	return q.where(load.like('slug', pattern))
+	return q.where(post_slug_like(pattern))
 }
 
-// where_user_id keeps the rows whose `user_id` is `value`.
+// where_slug_contains keeps the rows where `slug` contains `value`.
+pub fn (q PostUpdate) where_slug_contains(value string) PostUpdate {
+	return q.where(post_slug_contains(value))
+}
+
+// where_slug_has_prefix keeps the rows where `slug` starts with `value`.
+pub fn (q PostUpdate) where_slug_has_prefix(value string) PostUpdate {
+	return q.where(post_slug_has_prefix(value))
+}
+
+// where_slug_has_suffix keeps the rows where `slug` ends with `value`.
+pub fn (q PostUpdate) where_slug_has_suffix(value string) PostUpdate {
+	return q.where(post_slug_has_suffix(value))
+}
+
+// where_slug_equal_fold keeps the rows where `slug` is `value`, ignoring case.
+pub fn (q PostUpdate) where_slug_equal_fold(value string) PostUpdate {
+	return q.where(post_slug_equal_fold(value))
+}
+
+// where_slug_contains_fold keeps the rows where `slug` contains `value`, ignoring case.
+pub fn (q PostUpdate) where_slug_contains_fold(value string) PostUpdate {
+	return q.where(post_slug_contains_fold(value))
+}
+
+// where_user_id keeps the rows where `user_id` is `value`.
 pub fn (q PostUpdate) where_user_id(value int) PostUpdate {
-	return q.where(load.eq('user_id', value))
+	return q.where(post_user_id_eq(value))
 }
 
-// where_user_id_lt keeps the rows whose `user_id` comes before `value`.
+// where_user_id_ne keeps the rows where `user_id` is not `value`.
+pub fn (q PostUpdate) where_user_id_ne(value int) PostUpdate {
+	return q.where(post_user_id_ne(value))
+}
+
+// where_user_id_lt keeps the rows where `user_id` comes before `value`.
 pub fn (q PostUpdate) where_user_id_lt(value int) PostUpdate {
-	return q.where(load.lt('user_id', value))
+	return q.where(post_user_id_lt(value))
 }
 
-// where_user_id_le keeps the rows whose `user_id` comes at or before `value`.
+// where_user_id_le keeps the rows where `user_id` comes at or before `value`.
 pub fn (q PostUpdate) where_user_id_le(value int) PostUpdate {
-	return q.where(load.le('user_id', value))
+	return q.where(post_user_id_le(value))
 }
 
-// where_user_id_gt keeps the rows whose `user_id` comes after `value`.
+// where_user_id_gt keeps the rows where `user_id` comes after `value`.
 pub fn (q PostUpdate) where_user_id_gt(value int) PostUpdate {
-	return q.where(load.gt('user_id', value))
+	return q.where(post_user_id_gt(value))
 }
 
-// where_user_id_ge keeps the rows whose `user_id` comes at or after `value`.
+// where_user_id_ge keeps the rows where `user_id` comes at or after `value`.
 pub fn (q PostUpdate) where_user_id_ge(value int) PostUpdate {
-	return q.where(load.ge('user_id', value))
+	return q.where(post_user_id_ge(value))
 }
 
-// where_user_id_in keeps the rows whose `user_id` is one of `values`.
+// where_user_id_in keeps the rows where `user_id` is one of `values`.
 pub fn (q PostUpdate) where_user_id_in(values []int) PostUpdate {
-	return q.where(load.in_ints('user_id', values))
+	return q.where(post_user_id_in(values))
 }
 
-// where_body keeps the rows whose `body` is `value`.
+// where_user_id_not_in keeps the rows where `user_id` is none of `values`.
+pub fn (q PostUpdate) where_user_id_not_in(values []int) PostUpdate {
+	return q.where(post_user_id_not_in(values))
+}
+
+// where_body keeps the rows where `body` is `value`.
 pub fn (q PostUpdate) where_body(value string) PostUpdate {
-	return q.where(load.eq('body', value))
+	return q.where(post_body_eq(value))
 }
 
-// where_body_in keeps the rows whose `body` is one of `values`.
+// where_body_ne keeps the rows where `body` is not `value`.
+pub fn (q PostUpdate) where_body_ne(value string) PostUpdate {
+	return q.where(post_body_ne(value))
+}
+
+// where_body_in keeps the rows where `body` is one of `values`.
 pub fn (q PostUpdate) where_body_in(values []string) PostUpdate {
-	return q.where(load.in_strings('body', values))
+	return q.where(post_body_in(values))
 }
 
-// where_body_like keeps the rows whose `body` matches the SQL LIKE `pattern`.
+// where_body_not_in keeps the rows where `body` is none of `values`.
+pub fn (q PostUpdate) where_body_not_in(values []string) PostUpdate {
+	return q.where(post_body_not_in(values))
+}
+
+// where_body_like keeps the rows where `body` matches the SQL LIKE `pattern`.
 pub fn (q PostUpdate) where_body_like(pattern string) PostUpdate {
-	return q.where(load.like('body', pattern))
+	return q.where(post_body_like(pattern))
 }
 
-// where_created_at keeps the rows whose `created_at` is `value`.
+// where_body_contains keeps the rows where `body` contains `value`.
+pub fn (q PostUpdate) where_body_contains(value string) PostUpdate {
+	return q.where(post_body_contains(value))
+}
+
+// where_body_has_prefix keeps the rows where `body` starts with `value`.
+pub fn (q PostUpdate) where_body_has_prefix(value string) PostUpdate {
+	return q.where(post_body_has_prefix(value))
+}
+
+// where_body_has_suffix keeps the rows where `body` ends with `value`.
+pub fn (q PostUpdate) where_body_has_suffix(value string) PostUpdate {
+	return q.where(post_body_has_suffix(value))
+}
+
+// where_body_equal_fold keeps the rows where `body` is `value`, ignoring case.
+pub fn (q PostUpdate) where_body_equal_fold(value string) PostUpdate {
+	return q.where(post_body_equal_fold(value))
+}
+
+// where_body_contains_fold keeps the rows where `body` contains `value`, ignoring case.
+pub fn (q PostUpdate) where_body_contains_fold(value string) PostUpdate {
+	return q.where(post_body_contains_fold(value))
+}
+
+// where_created_at keeps the rows where `created_at` is `value`.
 pub fn (q PostUpdate) where_created_at(value time.Time) PostUpdate {
-	return q.where(load.eq('created_at', value))
+	return q.where(post_created_at_eq(value))
 }
 
-// where_created_at_lt keeps the rows whose `created_at` comes before `value`.
+// where_created_at_ne keeps the rows where `created_at` is not `value`.
+pub fn (q PostUpdate) where_created_at_ne(value time.Time) PostUpdate {
+	return q.where(post_created_at_ne(value))
+}
+
+// where_created_at_lt keeps the rows where `created_at` comes before `value`.
 pub fn (q PostUpdate) where_created_at_lt(value time.Time) PostUpdate {
-	return q.where(load.lt('created_at', value))
+	return q.where(post_created_at_lt(value))
 }
 
-// where_created_at_le keeps the rows whose `created_at` comes at or before `value`.
+// where_created_at_le keeps the rows where `created_at` comes at or before `value`.
 pub fn (q PostUpdate) where_created_at_le(value time.Time) PostUpdate {
-	return q.where(load.le('created_at', value))
+	return q.where(post_created_at_le(value))
 }
 
-// where_created_at_gt keeps the rows whose `created_at` comes after `value`.
+// where_created_at_gt keeps the rows where `created_at` comes after `value`.
 pub fn (q PostUpdate) where_created_at_gt(value time.Time) PostUpdate {
-	return q.where(load.gt('created_at', value))
+	return q.where(post_created_at_gt(value))
 }
 
-// where_created_at_ge keeps the rows whose `created_at` comes at or after `value`.
+// where_created_at_ge keeps the rows where `created_at` comes at or after `value`.
 pub fn (q PostUpdate) where_created_at_ge(value time.Time) PostUpdate {
-	return q.where(load.ge('created_at', value))
+	return q.where(post_created_at_ge(value))
 }
 
-// where_updated_at keeps the rows whose `updated_at` is `value`.
+// where_updated_at keeps the rows where `updated_at` is `value`.
 pub fn (q PostUpdate) where_updated_at(value time.Time) PostUpdate {
-	return q.where(load.eq('updated_at', value))
+	return q.where(post_updated_at_eq(value))
 }
 
-// where_updated_at_lt keeps the rows whose `updated_at` comes before `value`.
+// where_updated_at_ne keeps the rows where `updated_at` is not `value`.
+pub fn (q PostUpdate) where_updated_at_ne(value time.Time) PostUpdate {
+	return q.where(post_updated_at_ne(value))
+}
+
+// where_updated_at_lt keeps the rows where `updated_at` comes before `value`.
 pub fn (q PostUpdate) where_updated_at_lt(value time.Time) PostUpdate {
-	return q.where(load.lt('updated_at', value))
+	return q.where(post_updated_at_lt(value))
 }
 
-// where_updated_at_le keeps the rows whose `updated_at` comes at or before `value`.
+// where_updated_at_le keeps the rows where `updated_at` comes at or before `value`.
 pub fn (q PostUpdate) where_updated_at_le(value time.Time) PostUpdate {
-	return q.where(load.le('updated_at', value))
+	return q.where(post_updated_at_le(value))
 }
 
-// where_updated_at_gt keeps the rows whose `updated_at` comes after `value`.
+// where_updated_at_gt keeps the rows where `updated_at` comes after `value`.
 pub fn (q PostUpdate) where_updated_at_gt(value time.Time) PostUpdate {
-	return q.where(load.gt('updated_at', value))
+	return q.where(post_updated_at_gt(value))
 }
 
-// where_updated_at_ge keeps the rows whose `updated_at` comes at or after `value`.
+// where_updated_at_ge keeps the rows where `updated_at` comes at or after `value`.
 pub fn (q PostUpdate) where_updated_at_ge(value time.Time) PostUpdate {
-	return q.where(load.ge('updated_at', value))
+	return q.where(post_updated_at_ge(value))
 }
 
-// where_deleted_at keeps the rows whose `deleted_at` is `value`.
+// where_deleted_at keeps the rows where `deleted_at` is `value`.
 pub fn (q PostUpdate) where_deleted_at(value time.Time) PostUpdate {
-	return q.where(load.eq('deleted_at', value))
+	return q.where(post_deleted_at_eq(value))
 }
 
-// where_deleted_at_lt keeps the rows whose `deleted_at` comes before `value`.
+// where_deleted_at_ne keeps the rows where `deleted_at` is not `value`.
+pub fn (q PostUpdate) where_deleted_at_ne(value time.Time) PostUpdate {
+	return q.where(post_deleted_at_ne(value))
+}
+
+// where_deleted_at_lt keeps the rows where `deleted_at` comes before `value`.
 pub fn (q PostUpdate) where_deleted_at_lt(value time.Time) PostUpdate {
-	return q.where(load.lt('deleted_at', value))
+	return q.where(post_deleted_at_lt(value))
 }
 
-// where_deleted_at_le keeps the rows whose `deleted_at` comes at or before `value`.
+// where_deleted_at_le keeps the rows where `deleted_at` comes at or before `value`.
 pub fn (q PostUpdate) where_deleted_at_le(value time.Time) PostUpdate {
-	return q.where(load.le('deleted_at', value))
+	return q.where(post_deleted_at_le(value))
 }
 
-// where_deleted_at_gt keeps the rows whose `deleted_at` comes after `value`.
+// where_deleted_at_gt keeps the rows where `deleted_at` comes after `value`.
 pub fn (q PostUpdate) where_deleted_at_gt(value time.Time) PostUpdate {
-	return q.where(load.gt('deleted_at', value))
+	return q.where(post_deleted_at_gt(value))
 }
 
-// where_deleted_at_ge keeps the rows whose `deleted_at` comes at or after `value`.
+// where_deleted_at_ge keeps the rows where `deleted_at` comes at or after `value`.
 pub fn (q PostUpdate) where_deleted_at_ge(value time.Time) PostUpdate {
-	return q.where(load.ge('deleted_at', value))
+	return q.where(post_deleted_at_ge(value))
 }
 
-// where_deleted_at_is_null keeps the rows whose `deleted_at` is null.
+// where_deleted_at_is_null keeps the rows where `deleted_at` is null.
 pub fn (q PostUpdate) where_deleted_at_is_null() PostUpdate {
-	return q.where(load.is_null('deleted_at'))
+	return q.where(post_deleted_at_is_null())
 }
 
-// where_deleted_at_is_not_null keeps the rows whose `deleted_at` is not null.
+// where_deleted_at_is_not_null keeps the rows where `deleted_at` is not null.
 pub fn (q PostUpdate) where_deleted_at_is_not_null() PostUpdate {
-	return q.where(load.is_not_null('deleted_at'))
+	return q.where(post_deleted_at_is_not_null())
+}
+
+// has_author keeps the rows where it has a `author`.
+pub fn (q PostUpdate) has_author() PostUpdate {
+	return q.where(post_has_author())
+}
+
+// has_author_with keeps the rows that have a `author` that `configure` keeps.
+pub fn (q PostUpdate) has_author_with(configure fn (UserQuery) UserQuery) PostUpdate {
+	return q.where(post_has_author_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_comments keeps the rows where it has a `comments`.
+pub fn (q PostUpdate) has_comments() PostUpdate {
+	return q.where(post_has_comments())
+}
+
+// has_comments_with keeps the rows that have a `comments` that `configure` keeps.
+pub fn (q PostUpdate) has_comments_with(configure fn (CommentQuery) CommentQuery) PostUpdate {
+	return q.where(post_has_comments_with(...configure(q.graph.comments()).query.conds))
 }
 
 // set_slug sets `slug`.
@@ -1098,179 +1223,304 @@ pub fn (b PostDelete) where(conds ...load.Cond) PostDelete {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q PostDelete) where_id(value int) PostDelete {
-	return q.where(load.eq('id', value))
+	return q.where(post_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q PostDelete) where_id_ne(value int) PostDelete {
+	return q.where(post_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q PostDelete) where_id_lt(value int) PostDelete {
-	return q.where(load.lt('id', value))
+	return q.where(post_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q PostDelete) where_id_le(value int) PostDelete {
-	return q.where(load.le('id', value))
+	return q.where(post_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q PostDelete) where_id_gt(value int) PostDelete {
-	return q.where(load.gt('id', value))
+	return q.where(post_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q PostDelete) where_id_ge(value int) PostDelete {
-	return q.where(load.ge('id', value))
+	return q.where(post_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q PostDelete) where_id_in(values []int) PostDelete {
-	return q.where(load.in_ints('id', values))
+	return q.where(post_id_in(values))
 }
 
-// where_slug keeps the rows whose `slug` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q PostDelete) where_id_not_in(values []int) PostDelete {
+	return q.where(post_id_not_in(values))
+}
+
+// where_slug keeps the rows where `slug` is `value`.
 pub fn (q PostDelete) where_slug(value string) PostDelete {
-	return q.where(load.eq('slug', value))
+	return q.where(post_slug_eq(value))
 }
 
-// where_slug_in keeps the rows whose `slug` is one of `values`.
+// where_slug_ne keeps the rows where `slug` is not `value`.
+pub fn (q PostDelete) where_slug_ne(value string) PostDelete {
+	return q.where(post_slug_ne(value))
+}
+
+// where_slug_in keeps the rows where `slug` is one of `values`.
 pub fn (q PostDelete) where_slug_in(values []string) PostDelete {
-	return q.where(load.in_strings('slug', values))
+	return q.where(post_slug_in(values))
 }
 
-// where_slug_like keeps the rows whose `slug` matches the SQL LIKE `pattern`.
+// where_slug_not_in keeps the rows where `slug` is none of `values`.
+pub fn (q PostDelete) where_slug_not_in(values []string) PostDelete {
+	return q.where(post_slug_not_in(values))
+}
+
+// where_slug_like keeps the rows where `slug` matches the SQL LIKE `pattern`.
 pub fn (q PostDelete) where_slug_like(pattern string) PostDelete {
-	return q.where(load.like('slug', pattern))
+	return q.where(post_slug_like(pattern))
 }
 
-// where_user_id keeps the rows whose `user_id` is `value`.
+// where_slug_contains keeps the rows where `slug` contains `value`.
+pub fn (q PostDelete) where_slug_contains(value string) PostDelete {
+	return q.where(post_slug_contains(value))
+}
+
+// where_slug_has_prefix keeps the rows where `slug` starts with `value`.
+pub fn (q PostDelete) where_slug_has_prefix(value string) PostDelete {
+	return q.where(post_slug_has_prefix(value))
+}
+
+// where_slug_has_suffix keeps the rows where `slug` ends with `value`.
+pub fn (q PostDelete) where_slug_has_suffix(value string) PostDelete {
+	return q.where(post_slug_has_suffix(value))
+}
+
+// where_slug_equal_fold keeps the rows where `slug` is `value`, ignoring case.
+pub fn (q PostDelete) where_slug_equal_fold(value string) PostDelete {
+	return q.where(post_slug_equal_fold(value))
+}
+
+// where_slug_contains_fold keeps the rows where `slug` contains `value`, ignoring case.
+pub fn (q PostDelete) where_slug_contains_fold(value string) PostDelete {
+	return q.where(post_slug_contains_fold(value))
+}
+
+// where_user_id keeps the rows where `user_id` is `value`.
 pub fn (q PostDelete) where_user_id(value int) PostDelete {
-	return q.where(load.eq('user_id', value))
+	return q.where(post_user_id_eq(value))
 }
 
-// where_user_id_lt keeps the rows whose `user_id` comes before `value`.
+// where_user_id_ne keeps the rows where `user_id` is not `value`.
+pub fn (q PostDelete) where_user_id_ne(value int) PostDelete {
+	return q.where(post_user_id_ne(value))
+}
+
+// where_user_id_lt keeps the rows where `user_id` comes before `value`.
 pub fn (q PostDelete) where_user_id_lt(value int) PostDelete {
-	return q.where(load.lt('user_id', value))
+	return q.where(post_user_id_lt(value))
 }
 
-// where_user_id_le keeps the rows whose `user_id` comes at or before `value`.
+// where_user_id_le keeps the rows where `user_id` comes at or before `value`.
 pub fn (q PostDelete) where_user_id_le(value int) PostDelete {
-	return q.where(load.le('user_id', value))
+	return q.where(post_user_id_le(value))
 }
 
-// where_user_id_gt keeps the rows whose `user_id` comes after `value`.
+// where_user_id_gt keeps the rows where `user_id` comes after `value`.
 pub fn (q PostDelete) where_user_id_gt(value int) PostDelete {
-	return q.where(load.gt('user_id', value))
+	return q.where(post_user_id_gt(value))
 }
 
-// where_user_id_ge keeps the rows whose `user_id` comes at or after `value`.
+// where_user_id_ge keeps the rows where `user_id` comes at or after `value`.
 pub fn (q PostDelete) where_user_id_ge(value int) PostDelete {
-	return q.where(load.ge('user_id', value))
+	return q.where(post_user_id_ge(value))
 }
 
-// where_user_id_in keeps the rows whose `user_id` is one of `values`.
+// where_user_id_in keeps the rows where `user_id` is one of `values`.
 pub fn (q PostDelete) where_user_id_in(values []int) PostDelete {
-	return q.where(load.in_ints('user_id', values))
+	return q.where(post_user_id_in(values))
 }
 
-// where_body keeps the rows whose `body` is `value`.
+// where_user_id_not_in keeps the rows where `user_id` is none of `values`.
+pub fn (q PostDelete) where_user_id_not_in(values []int) PostDelete {
+	return q.where(post_user_id_not_in(values))
+}
+
+// where_body keeps the rows where `body` is `value`.
 pub fn (q PostDelete) where_body(value string) PostDelete {
-	return q.where(load.eq('body', value))
+	return q.where(post_body_eq(value))
 }
 
-// where_body_in keeps the rows whose `body` is one of `values`.
+// where_body_ne keeps the rows where `body` is not `value`.
+pub fn (q PostDelete) where_body_ne(value string) PostDelete {
+	return q.where(post_body_ne(value))
+}
+
+// where_body_in keeps the rows where `body` is one of `values`.
 pub fn (q PostDelete) where_body_in(values []string) PostDelete {
-	return q.where(load.in_strings('body', values))
+	return q.where(post_body_in(values))
 }
 
-// where_body_like keeps the rows whose `body` matches the SQL LIKE `pattern`.
+// where_body_not_in keeps the rows where `body` is none of `values`.
+pub fn (q PostDelete) where_body_not_in(values []string) PostDelete {
+	return q.where(post_body_not_in(values))
+}
+
+// where_body_like keeps the rows where `body` matches the SQL LIKE `pattern`.
 pub fn (q PostDelete) where_body_like(pattern string) PostDelete {
-	return q.where(load.like('body', pattern))
+	return q.where(post_body_like(pattern))
 }
 
-// where_created_at keeps the rows whose `created_at` is `value`.
+// where_body_contains keeps the rows where `body` contains `value`.
+pub fn (q PostDelete) where_body_contains(value string) PostDelete {
+	return q.where(post_body_contains(value))
+}
+
+// where_body_has_prefix keeps the rows where `body` starts with `value`.
+pub fn (q PostDelete) where_body_has_prefix(value string) PostDelete {
+	return q.where(post_body_has_prefix(value))
+}
+
+// where_body_has_suffix keeps the rows where `body` ends with `value`.
+pub fn (q PostDelete) where_body_has_suffix(value string) PostDelete {
+	return q.where(post_body_has_suffix(value))
+}
+
+// where_body_equal_fold keeps the rows where `body` is `value`, ignoring case.
+pub fn (q PostDelete) where_body_equal_fold(value string) PostDelete {
+	return q.where(post_body_equal_fold(value))
+}
+
+// where_body_contains_fold keeps the rows where `body` contains `value`, ignoring case.
+pub fn (q PostDelete) where_body_contains_fold(value string) PostDelete {
+	return q.where(post_body_contains_fold(value))
+}
+
+// where_created_at keeps the rows where `created_at` is `value`.
 pub fn (q PostDelete) where_created_at(value time.Time) PostDelete {
-	return q.where(load.eq('created_at', value))
+	return q.where(post_created_at_eq(value))
 }
 
-// where_created_at_lt keeps the rows whose `created_at` comes before `value`.
+// where_created_at_ne keeps the rows where `created_at` is not `value`.
+pub fn (q PostDelete) where_created_at_ne(value time.Time) PostDelete {
+	return q.where(post_created_at_ne(value))
+}
+
+// where_created_at_lt keeps the rows where `created_at` comes before `value`.
 pub fn (q PostDelete) where_created_at_lt(value time.Time) PostDelete {
-	return q.where(load.lt('created_at', value))
+	return q.where(post_created_at_lt(value))
 }
 
-// where_created_at_le keeps the rows whose `created_at` comes at or before `value`.
+// where_created_at_le keeps the rows where `created_at` comes at or before `value`.
 pub fn (q PostDelete) where_created_at_le(value time.Time) PostDelete {
-	return q.where(load.le('created_at', value))
+	return q.where(post_created_at_le(value))
 }
 
-// where_created_at_gt keeps the rows whose `created_at` comes after `value`.
+// where_created_at_gt keeps the rows where `created_at` comes after `value`.
 pub fn (q PostDelete) where_created_at_gt(value time.Time) PostDelete {
-	return q.where(load.gt('created_at', value))
+	return q.where(post_created_at_gt(value))
 }
 
-// where_created_at_ge keeps the rows whose `created_at` comes at or after `value`.
+// where_created_at_ge keeps the rows where `created_at` comes at or after `value`.
 pub fn (q PostDelete) where_created_at_ge(value time.Time) PostDelete {
-	return q.where(load.ge('created_at', value))
+	return q.where(post_created_at_ge(value))
 }
 
-// where_updated_at keeps the rows whose `updated_at` is `value`.
+// where_updated_at keeps the rows where `updated_at` is `value`.
 pub fn (q PostDelete) where_updated_at(value time.Time) PostDelete {
-	return q.where(load.eq('updated_at', value))
+	return q.where(post_updated_at_eq(value))
 }
 
-// where_updated_at_lt keeps the rows whose `updated_at` comes before `value`.
+// where_updated_at_ne keeps the rows where `updated_at` is not `value`.
+pub fn (q PostDelete) where_updated_at_ne(value time.Time) PostDelete {
+	return q.where(post_updated_at_ne(value))
+}
+
+// where_updated_at_lt keeps the rows where `updated_at` comes before `value`.
 pub fn (q PostDelete) where_updated_at_lt(value time.Time) PostDelete {
-	return q.where(load.lt('updated_at', value))
+	return q.where(post_updated_at_lt(value))
 }
 
-// where_updated_at_le keeps the rows whose `updated_at` comes at or before `value`.
+// where_updated_at_le keeps the rows where `updated_at` comes at or before `value`.
 pub fn (q PostDelete) where_updated_at_le(value time.Time) PostDelete {
-	return q.where(load.le('updated_at', value))
+	return q.where(post_updated_at_le(value))
 }
 
-// where_updated_at_gt keeps the rows whose `updated_at` comes after `value`.
+// where_updated_at_gt keeps the rows where `updated_at` comes after `value`.
 pub fn (q PostDelete) where_updated_at_gt(value time.Time) PostDelete {
-	return q.where(load.gt('updated_at', value))
+	return q.where(post_updated_at_gt(value))
 }
 
-// where_updated_at_ge keeps the rows whose `updated_at` comes at or after `value`.
+// where_updated_at_ge keeps the rows where `updated_at` comes at or after `value`.
 pub fn (q PostDelete) where_updated_at_ge(value time.Time) PostDelete {
-	return q.where(load.ge('updated_at', value))
+	return q.where(post_updated_at_ge(value))
 }
 
-// where_deleted_at keeps the rows whose `deleted_at` is `value`.
+// where_deleted_at keeps the rows where `deleted_at` is `value`.
 pub fn (q PostDelete) where_deleted_at(value time.Time) PostDelete {
-	return q.where(load.eq('deleted_at', value))
+	return q.where(post_deleted_at_eq(value))
 }
 
-// where_deleted_at_lt keeps the rows whose `deleted_at` comes before `value`.
+// where_deleted_at_ne keeps the rows where `deleted_at` is not `value`.
+pub fn (q PostDelete) where_deleted_at_ne(value time.Time) PostDelete {
+	return q.where(post_deleted_at_ne(value))
+}
+
+// where_deleted_at_lt keeps the rows where `deleted_at` comes before `value`.
 pub fn (q PostDelete) where_deleted_at_lt(value time.Time) PostDelete {
-	return q.where(load.lt('deleted_at', value))
+	return q.where(post_deleted_at_lt(value))
 }
 
-// where_deleted_at_le keeps the rows whose `deleted_at` comes at or before `value`.
+// where_deleted_at_le keeps the rows where `deleted_at` comes at or before `value`.
 pub fn (q PostDelete) where_deleted_at_le(value time.Time) PostDelete {
-	return q.where(load.le('deleted_at', value))
+	return q.where(post_deleted_at_le(value))
 }
 
-// where_deleted_at_gt keeps the rows whose `deleted_at` comes after `value`.
+// where_deleted_at_gt keeps the rows where `deleted_at` comes after `value`.
 pub fn (q PostDelete) where_deleted_at_gt(value time.Time) PostDelete {
-	return q.where(load.gt('deleted_at', value))
+	return q.where(post_deleted_at_gt(value))
 }
 
-// where_deleted_at_ge keeps the rows whose `deleted_at` comes at or after `value`.
+// where_deleted_at_ge keeps the rows where `deleted_at` comes at or after `value`.
 pub fn (q PostDelete) where_deleted_at_ge(value time.Time) PostDelete {
-	return q.where(load.ge('deleted_at', value))
+	return q.where(post_deleted_at_ge(value))
 }
 
-// where_deleted_at_is_null keeps the rows whose `deleted_at` is null.
+// where_deleted_at_is_null keeps the rows where `deleted_at` is null.
 pub fn (q PostDelete) where_deleted_at_is_null() PostDelete {
-	return q.where(load.is_null('deleted_at'))
+	return q.where(post_deleted_at_is_null())
 }
 
-// where_deleted_at_is_not_null keeps the rows whose `deleted_at` is not null.
+// where_deleted_at_is_not_null keeps the rows where `deleted_at` is not null.
 pub fn (q PostDelete) where_deleted_at_is_not_null() PostDelete {
-	return q.where(load.is_not_null('deleted_at'))
+	return q.where(post_deleted_at_is_not_null())
+}
+
+// has_author keeps the rows where it has a `author`.
+pub fn (q PostDelete) has_author() PostDelete {
+	return q.where(post_has_author())
+}
+
+// has_author_with keeps the rows that have a `author` that `configure` keeps.
+pub fn (q PostDelete) has_author_with(configure fn (UserQuery) UserQuery) PostDelete {
+	return q.where(post_has_author_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_comments keeps the rows where it has a `comments`.
+pub fn (q PostDelete) has_comments() PostDelete {
+	return q.where(post_has_comments())
+}
+
+// has_comments_with keeps the rows that have a `comments` that `configure` keeps.
+pub fn (q PostDelete) has_comments_with(configure fn (CommentQuery) CommentQuery) PostDelete {
+	return q.where(post_has_comments_with(...configure(q.graph.comments()).query.conds))
 }
 
 // exec deletes the rows, with their join table rows, in one transaction, and

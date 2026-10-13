@@ -547,49 +547,114 @@ pub fn (b GroupUpdate) where(conds ...load.Cond) GroupUpdate {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q GroupUpdate) where_id(value int) GroupUpdate {
-	return q.where(load.eq('id', value))
+	return q.where(group_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q GroupUpdate) where_id_ne(value int) GroupUpdate {
+	return q.where(group_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q GroupUpdate) where_id_lt(value int) GroupUpdate {
-	return q.where(load.lt('id', value))
+	return q.where(group_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q GroupUpdate) where_id_le(value int) GroupUpdate {
-	return q.where(load.le('id', value))
+	return q.where(group_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q GroupUpdate) where_id_gt(value int) GroupUpdate {
-	return q.where(load.gt('id', value))
+	return q.where(group_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q GroupUpdate) where_id_ge(value int) GroupUpdate {
-	return q.where(load.ge('id', value))
+	return q.where(group_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q GroupUpdate) where_id_in(values []int) GroupUpdate {
-	return q.where(load.in_ints('id', values))
+	return q.where(group_id_in(values))
 }
 
-// where_name keeps the rows whose `name` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q GroupUpdate) where_id_not_in(values []int) GroupUpdate {
+	return q.where(group_id_not_in(values))
+}
+
+// where_name keeps the rows where `name` is `value`.
 pub fn (q GroupUpdate) where_name(value string) GroupUpdate {
-	return q.where(load.eq('name', value))
+	return q.where(group_name_eq(value))
 }
 
-// where_name_in keeps the rows whose `name` is one of `values`.
+// where_name_ne keeps the rows where `name` is not `value`.
+pub fn (q GroupUpdate) where_name_ne(value string) GroupUpdate {
+	return q.where(group_name_ne(value))
+}
+
+// where_name_in keeps the rows where `name` is one of `values`.
 pub fn (q GroupUpdate) where_name_in(values []string) GroupUpdate {
-	return q.where(load.in_strings('name', values))
+	return q.where(group_name_in(values))
 }
 
-// where_name_like keeps the rows whose `name` matches the SQL LIKE `pattern`.
+// where_name_not_in keeps the rows where `name` is none of `values`.
+pub fn (q GroupUpdate) where_name_not_in(values []string) GroupUpdate {
+	return q.where(group_name_not_in(values))
+}
+
+// where_name_like keeps the rows where `name` matches the SQL LIKE `pattern`.
 pub fn (q GroupUpdate) where_name_like(pattern string) GroupUpdate {
-	return q.where(load.like('name', pattern))
+	return q.where(group_name_like(pattern))
+}
+
+// where_name_contains keeps the rows where `name` contains `value`.
+pub fn (q GroupUpdate) where_name_contains(value string) GroupUpdate {
+	return q.where(group_name_contains(value))
+}
+
+// where_name_has_prefix keeps the rows where `name` starts with `value`.
+pub fn (q GroupUpdate) where_name_has_prefix(value string) GroupUpdate {
+	return q.where(group_name_has_prefix(value))
+}
+
+// where_name_has_suffix keeps the rows where `name` ends with `value`.
+pub fn (q GroupUpdate) where_name_has_suffix(value string) GroupUpdate {
+	return q.where(group_name_has_suffix(value))
+}
+
+// where_name_equal_fold keeps the rows where `name` is `value`, ignoring case.
+pub fn (q GroupUpdate) where_name_equal_fold(value string) GroupUpdate {
+	return q.where(group_name_equal_fold(value))
+}
+
+// where_name_contains_fold keeps the rows where `name` contains `value`, ignoring case.
+pub fn (q GroupUpdate) where_name_contains_fold(value string) GroupUpdate {
+	return q.where(group_name_contains_fold(value))
+}
+
+// has_users keeps the rows where it has a `users`.
+pub fn (q GroupUpdate) has_users() GroupUpdate {
+	return q.where(group_has_users())
+}
+
+// has_users_with keeps the rows that have a `users` that `configure` keeps.
+pub fn (q GroupUpdate) has_users_with(configure fn (UserQuery) UserQuery) GroupUpdate {
+	return q.where(group_has_users_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_devices keeps the rows where it has a `devices`.
+pub fn (q GroupUpdate) has_devices() GroupUpdate {
+	return q.where(group_has_devices())
+}
+
+// has_devices_with keeps the rows that have a `devices` that `configure` keeps.
+pub fn (q GroupUpdate) has_devices_with(configure fn (DeviceQuery) DeviceQuery) GroupUpdate {
+	return q.where(group_has_devices_with(...configure(q.graph.devices()).query.conds))
 }
 
 // set_name sets `name`.
@@ -750,49 +815,114 @@ pub fn (b GroupDelete) where(conds ...load.Cond) GroupDelete {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q GroupDelete) where_id(value int) GroupDelete {
-	return q.where(load.eq('id', value))
+	return q.where(group_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q GroupDelete) where_id_ne(value int) GroupDelete {
+	return q.where(group_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q GroupDelete) where_id_lt(value int) GroupDelete {
-	return q.where(load.lt('id', value))
+	return q.where(group_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q GroupDelete) where_id_le(value int) GroupDelete {
-	return q.where(load.le('id', value))
+	return q.where(group_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q GroupDelete) where_id_gt(value int) GroupDelete {
-	return q.where(load.gt('id', value))
+	return q.where(group_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q GroupDelete) where_id_ge(value int) GroupDelete {
-	return q.where(load.ge('id', value))
+	return q.where(group_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q GroupDelete) where_id_in(values []int) GroupDelete {
-	return q.where(load.in_ints('id', values))
+	return q.where(group_id_in(values))
 }
 
-// where_name keeps the rows whose `name` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q GroupDelete) where_id_not_in(values []int) GroupDelete {
+	return q.where(group_id_not_in(values))
+}
+
+// where_name keeps the rows where `name` is `value`.
 pub fn (q GroupDelete) where_name(value string) GroupDelete {
-	return q.where(load.eq('name', value))
+	return q.where(group_name_eq(value))
 }
 
-// where_name_in keeps the rows whose `name` is one of `values`.
+// where_name_ne keeps the rows where `name` is not `value`.
+pub fn (q GroupDelete) where_name_ne(value string) GroupDelete {
+	return q.where(group_name_ne(value))
+}
+
+// where_name_in keeps the rows where `name` is one of `values`.
 pub fn (q GroupDelete) where_name_in(values []string) GroupDelete {
-	return q.where(load.in_strings('name', values))
+	return q.where(group_name_in(values))
 }
 
-// where_name_like keeps the rows whose `name` matches the SQL LIKE `pattern`.
+// where_name_not_in keeps the rows where `name` is none of `values`.
+pub fn (q GroupDelete) where_name_not_in(values []string) GroupDelete {
+	return q.where(group_name_not_in(values))
+}
+
+// where_name_like keeps the rows where `name` matches the SQL LIKE `pattern`.
 pub fn (q GroupDelete) where_name_like(pattern string) GroupDelete {
-	return q.where(load.like('name', pattern))
+	return q.where(group_name_like(pattern))
+}
+
+// where_name_contains keeps the rows where `name` contains `value`.
+pub fn (q GroupDelete) where_name_contains(value string) GroupDelete {
+	return q.where(group_name_contains(value))
+}
+
+// where_name_has_prefix keeps the rows where `name` starts with `value`.
+pub fn (q GroupDelete) where_name_has_prefix(value string) GroupDelete {
+	return q.where(group_name_has_prefix(value))
+}
+
+// where_name_has_suffix keeps the rows where `name` ends with `value`.
+pub fn (q GroupDelete) where_name_has_suffix(value string) GroupDelete {
+	return q.where(group_name_has_suffix(value))
+}
+
+// where_name_equal_fold keeps the rows where `name` is `value`, ignoring case.
+pub fn (q GroupDelete) where_name_equal_fold(value string) GroupDelete {
+	return q.where(group_name_equal_fold(value))
+}
+
+// where_name_contains_fold keeps the rows where `name` contains `value`, ignoring case.
+pub fn (q GroupDelete) where_name_contains_fold(value string) GroupDelete {
+	return q.where(group_name_contains_fold(value))
+}
+
+// has_users keeps the rows where it has a `users`.
+pub fn (q GroupDelete) has_users() GroupDelete {
+	return q.where(group_has_users())
+}
+
+// has_users_with keeps the rows that have a `users` that `configure` keeps.
+pub fn (q GroupDelete) has_users_with(configure fn (UserQuery) UserQuery) GroupDelete {
+	return q.where(group_has_users_with(...configure(q.graph.users()).query.conds))
+}
+
+// has_devices keeps the rows where it has a `devices`.
+pub fn (q GroupDelete) has_devices() GroupDelete {
+	return q.where(group_has_devices())
+}
+
+// has_devices_with keeps the rows that have a `devices` that `configure` keeps.
+pub fn (q GroupDelete) has_devices_with(configure fn (DeviceQuery) DeviceQuery) GroupDelete {
+	return q.where(group_has_devices_with(...configure(q.graph.devices()).query.conds))
 }
 
 // exec deletes the rows, with their join table rows, in one transaction, and

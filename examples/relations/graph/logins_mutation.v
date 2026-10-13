@@ -494,79 +494,144 @@ pub fn (b LoginUpdate) where(conds ...load.Cond) LoginUpdate {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q LoginUpdate) where_id(value int) LoginUpdate {
-	return q.where(load.eq('id', value))
+	return q.where(login_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q LoginUpdate) where_id_ne(value int) LoginUpdate {
+	return q.where(login_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q LoginUpdate) where_id_lt(value int) LoginUpdate {
-	return q.where(load.lt('id', value))
+	return q.where(login_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q LoginUpdate) where_id_le(value int) LoginUpdate {
-	return q.where(load.le('id', value))
+	return q.where(login_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q LoginUpdate) where_id_gt(value int) LoginUpdate {
-	return q.where(load.gt('id', value))
+	return q.where(login_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q LoginUpdate) where_id_ge(value int) LoginUpdate {
-	return q.where(load.ge('id', value))
+	return q.where(login_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q LoginUpdate) where_id_in(values []int) LoginUpdate {
-	return q.where(load.in_ints('id', values))
+	return q.where(login_id_in(values))
 }
 
-// where_device_id keeps the rows whose `device_id` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q LoginUpdate) where_id_not_in(values []int) LoginUpdate {
+	return q.where(login_id_not_in(values))
+}
+
+// where_device_id keeps the rows where `device_id` is `value`.
 pub fn (q LoginUpdate) where_device_id(value string) LoginUpdate {
-	return q.where(load.eq('device_id', value))
+	return q.where(login_device_id_eq(value))
 }
 
-// where_device_id_in keeps the rows whose `device_id` is one of `values`.
+// where_device_id_ne keeps the rows where `device_id` is not `value`.
+pub fn (q LoginUpdate) where_device_id_ne(value string) LoginUpdate {
+	return q.where(login_device_id_ne(value))
+}
+
+// where_device_id_in keeps the rows where `device_id` is one of `values`.
 pub fn (q LoginUpdate) where_device_id_in(values []string) LoginUpdate {
-	return q.where(load.in_strings('device_id', values))
+	return q.where(login_device_id_in(values))
 }
 
-// where_device_id_like keeps the rows whose `device_id` matches the SQL LIKE `pattern`.
+// where_device_id_not_in keeps the rows where `device_id` is none of `values`.
+pub fn (q LoginUpdate) where_device_id_not_in(values []string) LoginUpdate {
+	return q.where(login_device_id_not_in(values))
+}
+
+// where_device_id_like keeps the rows where `device_id` matches the SQL LIKE `pattern`.
 pub fn (q LoginUpdate) where_device_id_like(pattern string) LoginUpdate {
-	return q.where(load.like('device_id', pattern))
+	return q.where(login_device_id_like(pattern))
 }
 
-// where_at keeps the rows whose `at` is `value`.
+// where_device_id_contains keeps the rows where `device_id` contains `value`.
+pub fn (q LoginUpdate) where_device_id_contains(value string) LoginUpdate {
+	return q.where(login_device_id_contains(value))
+}
+
+// where_device_id_has_prefix keeps the rows where `device_id` starts with `value`.
+pub fn (q LoginUpdate) where_device_id_has_prefix(value string) LoginUpdate {
+	return q.where(login_device_id_has_prefix(value))
+}
+
+// where_device_id_has_suffix keeps the rows where `device_id` ends with `value`.
+pub fn (q LoginUpdate) where_device_id_has_suffix(value string) LoginUpdate {
+	return q.where(login_device_id_has_suffix(value))
+}
+
+// where_device_id_equal_fold keeps the rows where `device_id` is `value`, ignoring case.
+pub fn (q LoginUpdate) where_device_id_equal_fold(value string) LoginUpdate {
+	return q.where(login_device_id_equal_fold(value))
+}
+
+// where_device_id_contains_fold keeps the rows where `device_id` contains `value`, ignoring case.
+pub fn (q LoginUpdate) where_device_id_contains_fold(value string) LoginUpdate {
+	return q.where(login_device_id_contains_fold(value))
+}
+
+// where_at keeps the rows where `at` is `value`.
 pub fn (q LoginUpdate) where_at(value int) LoginUpdate {
-	return q.where(load.eq('at', value))
+	return q.where(login_at_eq(value))
 }
 
-// where_at_lt keeps the rows whose `at` comes before `value`.
+// where_at_ne keeps the rows where `at` is not `value`.
+pub fn (q LoginUpdate) where_at_ne(value int) LoginUpdate {
+	return q.where(login_at_ne(value))
+}
+
+// where_at_lt keeps the rows where `at` comes before `value`.
 pub fn (q LoginUpdate) where_at_lt(value int) LoginUpdate {
-	return q.where(load.lt('at', value))
+	return q.where(login_at_lt(value))
 }
 
-// where_at_le keeps the rows whose `at` comes at or before `value`.
+// where_at_le keeps the rows where `at` comes at or before `value`.
 pub fn (q LoginUpdate) where_at_le(value int) LoginUpdate {
-	return q.where(load.le('at', value))
+	return q.where(login_at_le(value))
 }
 
-// where_at_gt keeps the rows whose `at` comes after `value`.
+// where_at_gt keeps the rows where `at` comes after `value`.
 pub fn (q LoginUpdate) where_at_gt(value int) LoginUpdate {
-	return q.where(load.gt('at', value))
+	return q.where(login_at_gt(value))
 }
 
-// where_at_ge keeps the rows whose `at` comes at or after `value`.
+// where_at_ge keeps the rows where `at` comes at or after `value`.
 pub fn (q LoginUpdate) where_at_ge(value int) LoginUpdate {
-	return q.where(load.ge('at', value))
+	return q.where(login_at_ge(value))
 }
 
-// where_at_in keeps the rows whose `at` is one of `values`.
+// where_at_in keeps the rows where `at` is one of `values`.
 pub fn (q LoginUpdate) where_at_in(values []int) LoginUpdate {
-	return q.where(load.in_ints('at', values))
+	return q.where(login_at_in(values))
+}
+
+// where_at_not_in keeps the rows where `at` is none of `values`.
+pub fn (q LoginUpdate) where_at_not_in(values []int) LoginUpdate {
+	return q.where(login_at_not_in(values))
+}
+
+// has_device keeps the rows where it has a `device`.
+pub fn (q LoginUpdate) has_device() LoginUpdate {
+	return q.where(login_has_device())
+}
+
+// has_device_with keeps the rows that have a `device` that `configure` keeps.
+pub fn (q LoginUpdate) has_device_with(configure fn (DeviceQuery) DeviceQuery) LoginUpdate {
+	return q.where(login_has_device_with(...configure(q.graph.devices()).query.conds))
 }
 
 // set_device_id sets `device_id`.
@@ -671,79 +736,144 @@ pub fn (b LoginDelete) where(conds ...load.Cond) LoginDelete {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q LoginDelete) where_id(value int) LoginDelete {
-	return q.where(load.eq('id', value))
+	return q.where(login_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q LoginDelete) where_id_ne(value int) LoginDelete {
+	return q.where(login_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q LoginDelete) where_id_lt(value int) LoginDelete {
-	return q.where(load.lt('id', value))
+	return q.where(login_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q LoginDelete) where_id_le(value int) LoginDelete {
-	return q.where(load.le('id', value))
+	return q.where(login_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q LoginDelete) where_id_gt(value int) LoginDelete {
-	return q.where(load.gt('id', value))
+	return q.where(login_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q LoginDelete) where_id_ge(value int) LoginDelete {
-	return q.where(load.ge('id', value))
+	return q.where(login_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q LoginDelete) where_id_in(values []int) LoginDelete {
-	return q.where(load.in_ints('id', values))
+	return q.where(login_id_in(values))
 }
 
-// where_device_id keeps the rows whose `device_id` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q LoginDelete) where_id_not_in(values []int) LoginDelete {
+	return q.where(login_id_not_in(values))
+}
+
+// where_device_id keeps the rows where `device_id` is `value`.
 pub fn (q LoginDelete) where_device_id(value string) LoginDelete {
-	return q.where(load.eq('device_id', value))
+	return q.where(login_device_id_eq(value))
 }
 
-// where_device_id_in keeps the rows whose `device_id` is one of `values`.
+// where_device_id_ne keeps the rows where `device_id` is not `value`.
+pub fn (q LoginDelete) where_device_id_ne(value string) LoginDelete {
+	return q.where(login_device_id_ne(value))
+}
+
+// where_device_id_in keeps the rows where `device_id` is one of `values`.
 pub fn (q LoginDelete) where_device_id_in(values []string) LoginDelete {
-	return q.where(load.in_strings('device_id', values))
+	return q.where(login_device_id_in(values))
 }
 
-// where_device_id_like keeps the rows whose `device_id` matches the SQL LIKE `pattern`.
+// where_device_id_not_in keeps the rows where `device_id` is none of `values`.
+pub fn (q LoginDelete) where_device_id_not_in(values []string) LoginDelete {
+	return q.where(login_device_id_not_in(values))
+}
+
+// where_device_id_like keeps the rows where `device_id` matches the SQL LIKE `pattern`.
 pub fn (q LoginDelete) where_device_id_like(pattern string) LoginDelete {
-	return q.where(load.like('device_id', pattern))
+	return q.where(login_device_id_like(pattern))
 }
 
-// where_at keeps the rows whose `at` is `value`.
+// where_device_id_contains keeps the rows where `device_id` contains `value`.
+pub fn (q LoginDelete) where_device_id_contains(value string) LoginDelete {
+	return q.where(login_device_id_contains(value))
+}
+
+// where_device_id_has_prefix keeps the rows where `device_id` starts with `value`.
+pub fn (q LoginDelete) where_device_id_has_prefix(value string) LoginDelete {
+	return q.where(login_device_id_has_prefix(value))
+}
+
+// where_device_id_has_suffix keeps the rows where `device_id` ends with `value`.
+pub fn (q LoginDelete) where_device_id_has_suffix(value string) LoginDelete {
+	return q.where(login_device_id_has_suffix(value))
+}
+
+// where_device_id_equal_fold keeps the rows where `device_id` is `value`, ignoring case.
+pub fn (q LoginDelete) where_device_id_equal_fold(value string) LoginDelete {
+	return q.where(login_device_id_equal_fold(value))
+}
+
+// where_device_id_contains_fold keeps the rows where `device_id` contains `value`, ignoring case.
+pub fn (q LoginDelete) where_device_id_contains_fold(value string) LoginDelete {
+	return q.where(login_device_id_contains_fold(value))
+}
+
+// where_at keeps the rows where `at` is `value`.
 pub fn (q LoginDelete) where_at(value int) LoginDelete {
-	return q.where(load.eq('at', value))
+	return q.where(login_at_eq(value))
 }
 
-// where_at_lt keeps the rows whose `at` comes before `value`.
+// where_at_ne keeps the rows where `at` is not `value`.
+pub fn (q LoginDelete) where_at_ne(value int) LoginDelete {
+	return q.where(login_at_ne(value))
+}
+
+// where_at_lt keeps the rows where `at` comes before `value`.
 pub fn (q LoginDelete) where_at_lt(value int) LoginDelete {
-	return q.where(load.lt('at', value))
+	return q.where(login_at_lt(value))
 }
 
-// where_at_le keeps the rows whose `at` comes at or before `value`.
+// where_at_le keeps the rows where `at` comes at or before `value`.
 pub fn (q LoginDelete) where_at_le(value int) LoginDelete {
-	return q.where(load.le('at', value))
+	return q.where(login_at_le(value))
 }
 
-// where_at_gt keeps the rows whose `at` comes after `value`.
+// where_at_gt keeps the rows where `at` comes after `value`.
 pub fn (q LoginDelete) where_at_gt(value int) LoginDelete {
-	return q.where(load.gt('at', value))
+	return q.where(login_at_gt(value))
 }
 
-// where_at_ge keeps the rows whose `at` comes at or after `value`.
+// where_at_ge keeps the rows where `at` comes at or after `value`.
 pub fn (q LoginDelete) where_at_ge(value int) LoginDelete {
-	return q.where(load.ge('at', value))
+	return q.where(login_at_ge(value))
 }
 
-// where_at_in keeps the rows whose `at` is one of `values`.
+// where_at_in keeps the rows where `at` is one of `values`.
 pub fn (q LoginDelete) where_at_in(values []int) LoginDelete {
-	return q.where(load.in_ints('at', values))
+	return q.where(login_at_in(values))
+}
+
+// where_at_not_in keeps the rows where `at` is none of `values`.
+pub fn (q LoginDelete) where_at_not_in(values []int) LoginDelete {
+	return q.where(login_at_not_in(values))
+}
+
+// has_device keeps the rows where it has a `device`.
+pub fn (q LoginDelete) has_device() LoginDelete {
+	return q.where(login_has_device())
+}
+
+// has_device_with keeps the rows that have a `device` that `configure` keeps.
+pub fn (q LoginDelete) has_device_with(configure fn (DeviceQuery) DeviceQuery) LoginDelete {
+	return q.where(login_has_device_with(...configure(q.graph.devices()).query.conds))
 }
 
 // exec deletes the rows, with their join table rows, in one transaction, and

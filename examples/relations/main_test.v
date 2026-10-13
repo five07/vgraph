@@ -61,3 +61,7 @@ fn test_writes() {
 fn test_soft_delete() {
 	check_soft_delete(fixture()!)!
 }
+
+fn test_queries() {
+	check_queries(fixture()!)!
+}

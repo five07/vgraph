@@ -4,6 +4,7 @@ module graph
 import orm
 import five07.vgraph
 import five07.vgraph.graphql
+import five07.vgraph.load
 import models
 
 // Graph is the typed client for the schema: start a query with the method named
@@ -118,4 +119,37 @@ pub:
 // msg names the table that had no matching row.
 pub fn (e NotFoundError) msg() string {
 	return 'no `${e.table}` row matches'
+}
+
+// NotSingularError is the error of `only()` and `only_id()` when more than one
+// row matches.
+pub struct NotSingularError {
+	Error
+pub:
+	table string
+}
+
+// msg names the table that had more than one matching row.
+pub fn (e NotSingularError) msg() string {
+	return 'more than one `${e.table}` row matches'
+}
+
+// NotLoadedError is the error of a node's `<edge>_or_err()` when its query
+// didn't load the edge.
+pub struct NotLoadedError {
+	Error
+pub:
+	edge string
+}
+
+// msg names the edge that wasn't loaded.
+pub fn (e NotLoadedError) msg() string {
+	return "`${e.edge}` wasn't loaded: ask for it with `with_<edge>`"
+}
+
+// with_conds returns `conds` and `more`, for a subquery's conditions.
+fn with_conds(conds []load.Cond, more ...load.Cond) []load.Cond {
+	mut all := conds.clone()
+	all << more
+	return all
 }

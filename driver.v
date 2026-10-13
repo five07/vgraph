@@ -1,7 +1,7 @@
 module vgraph
 
+import load
 import orm
-import time
 
 // Driver runs the SQL that `orm.Connection` can't express, such as an insert
 // that returns the new row's key, or an upsert. vgraph builds the SQL and its
@@ -34,54 +34,41 @@ mut:
 	rollback_tx() !
 }
 
-// quote returns `name` as an SQL identifier, which SQLite and PostgreSQL both
-// read.
-fn quote(name string) string {
-	return '"${name.replace('"', '""')}"'
+// asc returns the ascending order of `column`, for `order_by`.
+pub fn asc(column string) load.Order {
+	return load.asc(column)
 }
 
-// Params collects the parameters of a statement for a dialect.
-struct Params {
-	dialect orm.SQLDialect
-mut:
-	values []string
+// desc returns the descending order of `column`, for `order_by`.
+pub fn desc(column string) load.Order {
+	return load.desc(column)
 }
 
-// add returns the placeholder for `value`, and keeps the value as a parameter.
-// A null is written into the SQL, since drivers take parameters as text.
-fn (mut p Params) add(value orm.Primitive) !string {
-	if value is orm.Null {
-		return 'NULL'
-	}
-	p.values << param_text(p.dialect, value)!
-	return if p.dialect == .pg { '\$${p.values.len}' } else { '?' }
+// count returns the number of rows of a group, named `count`.
+pub fn count() load.Aggregate {
+	return load.count()
 }
 
-// param_text returns `value` as text, stored the way V's ORM stores it: on
-// SQLite, booleans as 0 or 1 and times as Unix seconds.
-fn param_text(dialect orm.SQLDialect, value orm.Primitive) !string {
-	return match value {
-		bool {
-			if dialect == .pg {
-				if value { 'true' } else { 'false' }
-			} else {
-				if value { '1' } else { '0' }
-			}
-		}
-		time.Time {
-			if dialect == .pg { value.format_ss_micro() } else { value.unix().str() }
-		}
-		string {
-			value
-		}
-		i8, i16, int, i64, u8, u16, u32, u64 {
-			value.str()
-		}
-		f32, f64 {
-			value.str()
-		}
-		else {
-			error('vgraph cannot pass a ${value.type_name()} as a parameter')
-		}
-	}
+// sum returns the sum of `column` in a group, named `sum_<column>`.
+pub fn sum(column string) load.Aggregate {
+	return load.sum(column)
 }
+
+// mean returns the mean of `column` in a group, named `mean_<column>`.
+pub fn mean(column string) load.Aggregate {
+	return load.mean(column)
+}
+
+// min_of returns the least `column` of a group, named `min_<column>`.
+pub fn min_of(column string) load.Aggregate {
+	return load.min_of(column)
+}
+
+// max_of returns the greatest `column` of a group, named `max_<column>`.
+pub fn max_of(column string) load.Aggregate {
+	return load.max_of(column)
+}
+
+// Group is one group of a `group_by`: its columns' values, and its aggregates
+// by name.
+pub type Group = load.Group

@@ -3,78 +3,127 @@ module load
 import orm
 import time
 
-// Cond is one condition of a query, `column kind value`, such as `title = 'V'`.
-// Conditions are joined with AND.
-pub struct Cond {
-pub:
-	column string
-	kind   orm.OperationKind
-	value  orm.Primitive = orm.null_primitive
-}
-
 // eq returns the condition `column = value`.
 pub fn eq(column string, value orm.Primitive) Cond {
-	return Cond{column, .eq, value}
+	return Cond{
+		column: column
+		kind:   .eq
+		value:  value
+	}
 }
 
 // ne returns the condition `column != value`.
 pub fn ne(column string, value orm.Primitive) Cond {
-	return Cond{column, .neq, value}
+	return Cond{
+		column: column
+		kind:   .neq
+		value:  value
+	}
 }
 
 // lt returns the condition `column < value`.
 pub fn lt(column string, value orm.Primitive) Cond {
-	return Cond{column, .lt, value}
+	return Cond{
+		column: column
+		kind:   .lt
+		value:  value
+	}
 }
 
 // le returns the condition `column <= value`.
 pub fn le(column string, value orm.Primitive) Cond {
-	return Cond{column, .le, value}
+	return Cond{
+		column: column
+		kind:   .le
+		value:  value
+	}
 }
 
 // gt returns the condition `column > value`.
 pub fn gt(column string, value orm.Primitive) Cond {
-	return Cond{column, .gt, value}
+	return Cond{
+		column: column
+		kind:   .gt
+		value:  value
+	}
 }
 
 // ge returns the condition `column >= value`.
 pub fn ge(column string, value orm.Primitive) Cond {
-	return Cond{column, .ge, value}
+	return Cond{
+		column: column
+		kind:   .ge
+		value:  value
+	}
 }
 
 // like returns the condition `column LIKE pattern`.
 pub fn like(column string, pattern string) Cond {
-	return Cond{column, .orm_like, pattern}
+	return Cond{
+		column: column
+		kind:   .orm_like
+		value:  pattern
+	}
 }
 
 // in_ints returns the condition `column IN (values)`. An empty `values` matches
 // no row.
 pub fn in_ints(column string, values []int) Cond {
-	return Cond{column, .in, values}
+	return Cond{
+		column: column
+		kind:   .in
+		value:  values
+	}
 }
 
 // in_i64s returns the condition `column IN (values)`. An empty `values` matches
 // no row.
 pub fn in_i64s(column string, values []i64) Cond {
-	return Cond{column, .in, values}
+	return Cond{
+		column: column
+		kind:   .in
+		value:  values
+	}
 }
 
 // not_in_ints returns the condition `column NOT IN (values)`. An empty `values`
 // matches every row.
 pub fn not_in_ints(column string, values []int) Cond {
-	return Cond{column, .not_in, values}
+	return Cond{
+		column: column
+		kind:   .not_in
+		value:  values
+	}
 }
 
 // not_in_strings returns the condition `column NOT IN (values)`. An empty
 // `values` matches every row.
 pub fn not_in_strings(column string, values []string) Cond {
-	return Cond{column, .not_in, values}
+	return Cond{
+		column: column
+		kind:   .not_in
+		value:  values
+	}
+}
+
+// not_in_i64s returns the condition `column NOT IN (values)`. An empty `values`
+// matches every row.
+pub fn not_in_i64s(column string, values []i64) Cond {
+	return Cond{
+		column: column
+		kind:   .not_in
+		value:  values
+	}
 }
 
 // in_strings returns the condition `column IN (values)`. An empty `values`
 // matches no row.
 pub fn in_strings(column string, values []string) Cond {
-	return Cond{column, .in, values}
+	return Cond{
+		column: column
+		kind:   .in
+		value:  values
+	}
 }
 
 // is_null returns the condition `column IS NULL`.
@@ -93,116 +142,128 @@ pub fn is_not_null(column string) Cond {
 	}
 }
 
-// Query narrows, orders and limits a select.
+// Query narrows, orders, limits and locks a select.
 pub struct Query {
 pub mut:
-	conds  []Cond
-	order  string // a column to order by; none when empty
-	desc   bool
+	conds []Cond
+	// order and desc: the first order column, as before `orders`
+	order string
+	desc  bool
+	// orders: the order columns after `order`
+	orders []Order
 	limit  int // at most this many rows; no limit when 0. Edge loads ignore it.
 	offset int // skip this many rows first. Edge loads ignore it.
+	lock   Lock
+	// distinct: `scan` reads each distinct row once
+	distinct bool
+	// columns: only these columns are read, besides the key; all when empty
+	columns []string
 }
 
-// select_where returns the `T` records that match `q`, in one query.
-pub fn select_where[T](conn orm.Connection, q Query) ![]T {
-	conds := effective(q.conds)
-	if matches_nothing(conds) {
-		return []T{}
+// Nulls is where an order puts nulls.
+pub enum Nulls {
+	default // the database's way: last ascending on PostgreSQL, first on SQLite
+	first
+	last
+}
+
+// Order is one order column, or an SQL expression (`expr`), which may name the
+// table being read as `t0`.
+pub struct Order {
+pub:
+	column string
+	desc   bool
+	nulls  Nulls
+	expr   string
+}
+
+// asc returns the ascending order of `column`.
+pub fn asc(column string) Order {
+	return Order{
+		column: column
 	}
-	return run_select[T](conn, where_of(conds), q, true)
+}
+
+// desc returns the descending order of `column`.
+pub fn desc(column string) Order {
+	return Order{
+		column: column
+		desc:   true
+	}
+}
+
+// nulls_first returns `o`, with nulls before the other values.
+pub fn (o Order) nulls_first() Order {
+	return Order{
+		...o
+		nulls: .first
+	}
+}
+
+// nulls_last returns `o`, with nulls after the other values.
+pub fn (o Order) nulls_last() Order {
+	return Order{
+		...o
+		nulls: .last
+	}
+}
+
+// LockMode is the row lock a select takes, in a transaction.
+pub enum LockMode {
+	off
+	update // FOR UPDATE
+	share  // FOR SHARE
+}
+
+// Lock is a select's row lock: its mode, and what it does with rows another
+// transaction locked.
+pub struct Lock {
+pub:
+	mode        LockMode
+	no_wait     bool
+	skip_locked bool
+}
+
+// all_orders returns the order columns of `q`, `order` first.
+pub fn (q Query) all_orders() []Order {
+	mut all := []Order{}
+	if q.order != '' {
+		all << Order{
+			column: q.order
+			desc:   q.desc
+		}
+	}
+	all << q.orders
+	return all
+}
+
+// select_where returns the `T` records that match `q`: one query when the ORM
+// can run it, else, through a vgraph driver, the matching keys first and then
+// their rows.
+pub fn select_where[T](conn orm.Connection, q Query) ![]T {
+	return select_rows[T](conn, table_name[T](), q.conds, q, true)
 }
 
 // count_where returns how many `T` records match the conditions of `q`, in one
 // query. Its order, limit and offset don't apply.
 pub fn count_where[T](conn orm.Connection, q Query) !int {
-	conds := effective(q.conds)
-	if matches_nothing(conds) {
-		return 0
-	}
-	where := where_of(conds)
-	config := orm.SelectConfig{
-		table:          orm.Table{
-			name: table_name[T]()
-		}
-		aggregate_kind: .count
-		has_where:      where.fields.len > 0
-		primary:        primary_key[T]()
-		types:          [orm.type_idx['int']]
-	}
-	mut c := conn
-	rows := c.select(config, orm.QueryData{}, where)!
-	if rows.len == 0 || rows[0].len == 0 {
-		return 0
-	}
-	return int(cell_i64(rows[0][0], 'count')!)
+	return int(aggregate_where(conn, table_name[T](), primary_key[T](), q, .count, '')!)
 }
 
 // where_data returns `conds`, joined with AND, as the ORM's where data, for
-// writes. It returns `none` when they match no row, and drops the ones every
-// row matches.
+// writes. It returns `none` when they match no row. The ORM must be able to
+// run them.
 pub fn where_data(conds []Cond) ?orm.QueryData {
-	kept := effective(conds)
-	if matches_nothing(kept) {
+	root := normalize(and(...conds), false)
+	if root.junction == .false || !orm_ready(root) {
 		return none
 	}
-	return where_of(kept)
+	return orm_where(root)
 }
 
 // value_type returns the ORM's type index for `value`.
 pub fn value_type(value orm.Primitive) int {
 	return primitive_type(value)
-}
-
-// effective drops the conditions that hold for every row: `NOT IN` an empty
-// list, which isn't valid SQL.
-fn effective(conds []Cond) []Cond {
-	return conds.filter(!(it.kind == .not_in && is_empty_list(it.value)))
-}
-
-fn is_empty_list(value orm.Primitive) bool {
-	return match value {
-		[]int { value.len == 0 }
-		[]i64 { value.len == 0 }
-		[]string { value.len == 0 }
-		else { false }
-	}
-}
-
-// matches_nothing reports whether `conds` has an `IN ()` with no values, which
-// is invalid SQL, and would match no row anyway.
-fn matches_nothing(conds []Cond) bool {
-	for cond in conds {
-		if cond.kind in [.in, .not_in] {
-			empty := match cond.value {
-				[]int { cond.value.len == 0 }
-				[]i64 { cond.value.len == 0 }
-				[]string { cond.value.len == 0 }
-				else { false }
-			}
-			if empty && cond.kind == .in {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// where_of returns `conds`, joined with AND, as the ORM's where data.
-fn where_of(conds []Cond) orm.QueryData {
-	mut where := orm.QueryData{}
-	for i, cond in conds {
-		if i > 0 {
-			where.is_and << true
-		}
-		where.fields << cond.column
-		where.kinds << cond.kind
-		if cond.kind !in [.is_null, .is_not_null] {
-			// IS NULL and IS NOT NULL take no value
-			where.data << cond.value
-			where.types << primitive_type(cond.value)
-		}
-	}
-	return where
 }
 
 fn primitive_type(value orm.Primitive) int {

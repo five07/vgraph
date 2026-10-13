@@ -580,89 +580,164 @@ pub fn (b CategoryUpdate) where(conds ...load.Cond) CategoryUpdate {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q CategoryUpdate) where_id(value int) CategoryUpdate {
-	return q.where(load.eq('id', value))
+	return q.where(category_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q CategoryUpdate) where_id_ne(value int) CategoryUpdate {
+	return q.where(category_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q CategoryUpdate) where_id_lt(value int) CategoryUpdate {
-	return q.where(load.lt('id', value))
+	return q.where(category_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q CategoryUpdate) where_id_le(value int) CategoryUpdate {
-	return q.where(load.le('id', value))
+	return q.where(category_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q CategoryUpdate) where_id_gt(value int) CategoryUpdate {
-	return q.where(load.gt('id', value))
+	return q.where(category_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q CategoryUpdate) where_id_ge(value int) CategoryUpdate {
-	return q.where(load.ge('id', value))
+	return q.where(category_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q CategoryUpdate) where_id_in(values []int) CategoryUpdate {
-	return q.where(load.in_ints('id', values))
+	return q.where(category_id_in(values))
 }
 
-// where_name keeps the rows whose `name` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q CategoryUpdate) where_id_not_in(values []int) CategoryUpdate {
+	return q.where(category_id_not_in(values))
+}
+
+// where_name keeps the rows where `name` is `value`.
 pub fn (q CategoryUpdate) where_name(value string) CategoryUpdate {
-	return q.where(load.eq('name', value))
+	return q.where(category_name_eq(value))
 }
 
-// where_name_in keeps the rows whose `name` is one of `values`.
+// where_name_ne keeps the rows where `name` is not `value`.
+pub fn (q CategoryUpdate) where_name_ne(value string) CategoryUpdate {
+	return q.where(category_name_ne(value))
+}
+
+// where_name_in keeps the rows where `name` is one of `values`.
 pub fn (q CategoryUpdate) where_name_in(values []string) CategoryUpdate {
-	return q.where(load.in_strings('name', values))
+	return q.where(category_name_in(values))
 }
 
-// where_name_like keeps the rows whose `name` matches the SQL LIKE `pattern`.
+// where_name_not_in keeps the rows where `name` is none of `values`.
+pub fn (q CategoryUpdate) where_name_not_in(values []string) CategoryUpdate {
+	return q.where(category_name_not_in(values))
+}
+
+// where_name_like keeps the rows where `name` matches the SQL LIKE `pattern`.
 pub fn (q CategoryUpdate) where_name_like(pattern string) CategoryUpdate {
-	return q.where(load.like('name', pattern))
+	return q.where(category_name_like(pattern))
 }
 
-// where_parent_id keeps the rows whose `parent_id` is `value`.
+// where_name_contains keeps the rows where `name` contains `value`.
+pub fn (q CategoryUpdate) where_name_contains(value string) CategoryUpdate {
+	return q.where(category_name_contains(value))
+}
+
+// where_name_has_prefix keeps the rows where `name` starts with `value`.
+pub fn (q CategoryUpdate) where_name_has_prefix(value string) CategoryUpdate {
+	return q.where(category_name_has_prefix(value))
+}
+
+// where_name_has_suffix keeps the rows where `name` ends with `value`.
+pub fn (q CategoryUpdate) where_name_has_suffix(value string) CategoryUpdate {
+	return q.where(category_name_has_suffix(value))
+}
+
+// where_name_equal_fold keeps the rows where `name` is `value`, ignoring case.
+pub fn (q CategoryUpdate) where_name_equal_fold(value string) CategoryUpdate {
+	return q.where(category_name_equal_fold(value))
+}
+
+// where_name_contains_fold keeps the rows where `name` contains `value`, ignoring case.
+pub fn (q CategoryUpdate) where_name_contains_fold(value string) CategoryUpdate {
+	return q.where(category_name_contains_fold(value))
+}
+
+// where_parent_id keeps the rows where `parent_id` is `value`.
 pub fn (q CategoryUpdate) where_parent_id(value int) CategoryUpdate {
-	return q.where(load.eq('parent_id', value))
+	return q.where(category_parent_id_eq(value))
 }
 
-// where_parent_id_lt keeps the rows whose `parent_id` comes before `value`.
+// where_parent_id_ne keeps the rows where `parent_id` is not `value`.
+pub fn (q CategoryUpdate) where_parent_id_ne(value int) CategoryUpdate {
+	return q.where(category_parent_id_ne(value))
+}
+
+// where_parent_id_lt keeps the rows where `parent_id` comes before `value`.
 pub fn (q CategoryUpdate) where_parent_id_lt(value int) CategoryUpdate {
-	return q.where(load.lt('parent_id', value))
+	return q.where(category_parent_id_lt(value))
 }
 
-// where_parent_id_le keeps the rows whose `parent_id` comes at or before `value`.
+// where_parent_id_le keeps the rows where `parent_id` comes at or before `value`.
 pub fn (q CategoryUpdate) where_parent_id_le(value int) CategoryUpdate {
-	return q.where(load.le('parent_id', value))
+	return q.where(category_parent_id_le(value))
 }
 
-// where_parent_id_gt keeps the rows whose `parent_id` comes after `value`.
+// where_parent_id_gt keeps the rows where `parent_id` comes after `value`.
 pub fn (q CategoryUpdate) where_parent_id_gt(value int) CategoryUpdate {
-	return q.where(load.gt('parent_id', value))
+	return q.where(category_parent_id_gt(value))
 }
 
-// where_parent_id_ge keeps the rows whose `parent_id` comes at or after `value`.
+// where_parent_id_ge keeps the rows where `parent_id` comes at or after `value`.
 pub fn (q CategoryUpdate) where_parent_id_ge(value int) CategoryUpdate {
-	return q.where(load.ge('parent_id', value))
+	return q.where(category_parent_id_ge(value))
 }
 
-// where_parent_id_in keeps the rows whose `parent_id` is one of `values`.
+// where_parent_id_in keeps the rows where `parent_id` is one of `values`.
 pub fn (q CategoryUpdate) where_parent_id_in(values []int) CategoryUpdate {
-	return q.where(load.in_ints('parent_id', values))
+	return q.where(category_parent_id_in(values))
 }
 
-// where_parent_id_is_null keeps the rows whose `parent_id` is null.
+// where_parent_id_not_in keeps the rows where `parent_id` is none of `values`.
+pub fn (q CategoryUpdate) where_parent_id_not_in(values []int) CategoryUpdate {
+	return q.where(category_parent_id_not_in(values))
+}
+
+// where_parent_id_is_null keeps the rows where `parent_id` is null.
 pub fn (q CategoryUpdate) where_parent_id_is_null() CategoryUpdate {
-	return q.where(load.is_null('parent_id'))
+	return q.where(category_parent_id_is_null())
 }
 
-// where_parent_id_is_not_null keeps the rows whose `parent_id` is not null.
+// where_parent_id_is_not_null keeps the rows where `parent_id` is not null.
 pub fn (q CategoryUpdate) where_parent_id_is_not_null() CategoryUpdate {
-	return q.where(load.is_not_null('parent_id'))
+	return q.where(category_parent_id_is_not_null())
+}
+
+// has_parent keeps the rows where it has a `parent`.
+pub fn (q CategoryUpdate) has_parent() CategoryUpdate {
+	return q.where(category_has_parent())
+}
+
+// has_parent_with keeps the rows that have a `parent` that `configure` keeps.
+pub fn (q CategoryUpdate) has_parent_with(configure fn (CategoryQuery) CategoryQuery) CategoryUpdate {
+	return q.where(category_has_parent_with(...configure(q.graph.categories()).query.conds))
+}
+
+// has_children keeps the rows where it has a `children`.
+pub fn (q CategoryUpdate) has_children() CategoryUpdate {
+	return q.where(category_has_children())
+}
+
+// has_children_with keeps the rows that have a `children` that `configure` keeps.
+pub fn (q CategoryUpdate) has_children_with(configure fn (CategoryQuery) CategoryQuery) CategoryUpdate {
+	return q.where(category_has_children_with(...configure(q.graph.categories()).query.conds))
 }
 
 // set_name sets `name`.
@@ -827,89 +902,164 @@ pub fn (b CategoryDelete) where(conds ...load.Cond) CategoryDelete {
 	}
 }
 
-// where_id keeps the rows whose `id` is `value`.
+// where_id keeps the rows where `id` is `value`.
 pub fn (q CategoryDelete) where_id(value int) CategoryDelete {
-	return q.where(load.eq('id', value))
+	return q.where(category_id_eq(value))
 }
 
-// where_id_lt keeps the rows whose `id` comes before `value`.
+// where_id_ne keeps the rows where `id` is not `value`.
+pub fn (q CategoryDelete) where_id_ne(value int) CategoryDelete {
+	return q.where(category_id_ne(value))
+}
+
+// where_id_lt keeps the rows where `id` comes before `value`.
 pub fn (q CategoryDelete) where_id_lt(value int) CategoryDelete {
-	return q.where(load.lt('id', value))
+	return q.where(category_id_lt(value))
 }
 
-// where_id_le keeps the rows whose `id` comes at or before `value`.
+// where_id_le keeps the rows where `id` comes at or before `value`.
 pub fn (q CategoryDelete) where_id_le(value int) CategoryDelete {
-	return q.where(load.le('id', value))
+	return q.where(category_id_le(value))
 }
 
-// where_id_gt keeps the rows whose `id` comes after `value`.
+// where_id_gt keeps the rows where `id` comes after `value`.
 pub fn (q CategoryDelete) where_id_gt(value int) CategoryDelete {
-	return q.where(load.gt('id', value))
+	return q.where(category_id_gt(value))
 }
 
-// where_id_ge keeps the rows whose `id` comes at or after `value`.
+// where_id_ge keeps the rows where `id` comes at or after `value`.
 pub fn (q CategoryDelete) where_id_ge(value int) CategoryDelete {
-	return q.where(load.ge('id', value))
+	return q.where(category_id_ge(value))
 }
 
-// where_id_in keeps the rows whose `id` is one of `values`.
+// where_id_in keeps the rows where `id` is one of `values`.
 pub fn (q CategoryDelete) where_id_in(values []int) CategoryDelete {
-	return q.where(load.in_ints('id', values))
+	return q.where(category_id_in(values))
 }
 
-// where_name keeps the rows whose `name` is `value`.
+// where_id_not_in keeps the rows where `id` is none of `values`.
+pub fn (q CategoryDelete) where_id_not_in(values []int) CategoryDelete {
+	return q.where(category_id_not_in(values))
+}
+
+// where_name keeps the rows where `name` is `value`.
 pub fn (q CategoryDelete) where_name(value string) CategoryDelete {
-	return q.where(load.eq('name', value))
+	return q.where(category_name_eq(value))
 }
 
-// where_name_in keeps the rows whose `name` is one of `values`.
+// where_name_ne keeps the rows where `name` is not `value`.
+pub fn (q CategoryDelete) where_name_ne(value string) CategoryDelete {
+	return q.where(category_name_ne(value))
+}
+
+// where_name_in keeps the rows where `name` is one of `values`.
 pub fn (q CategoryDelete) where_name_in(values []string) CategoryDelete {
-	return q.where(load.in_strings('name', values))
+	return q.where(category_name_in(values))
 }
 
-// where_name_like keeps the rows whose `name` matches the SQL LIKE `pattern`.
+// where_name_not_in keeps the rows where `name` is none of `values`.
+pub fn (q CategoryDelete) where_name_not_in(values []string) CategoryDelete {
+	return q.where(category_name_not_in(values))
+}
+
+// where_name_like keeps the rows where `name` matches the SQL LIKE `pattern`.
 pub fn (q CategoryDelete) where_name_like(pattern string) CategoryDelete {
-	return q.where(load.like('name', pattern))
+	return q.where(category_name_like(pattern))
 }
 
-// where_parent_id keeps the rows whose `parent_id` is `value`.
+// where_name_contains keeps the rows where `name` contains `value`.
+pub fn (q CategoryDelete) where_name_contains(value string) CategoryDelete {
+	return q.where(category_name_contains(value))
+}
+
+// where_name_has_prefix keeps the rows where `name` starts with `value`.
+pub fn (q CategoryDelete) where_name_has_prefix(value string) CategoryDelete {
+	return q.where(category_name_has_prefix(value))
+}
+
+// where_name_has_suffix keeps the rows where `name` ends with `value`.
+pub fn (q CategoryDelete) where_name_has_suffix(value string) CategoryDelete {
+	return q.where(category_name_has_suffix(value))
+}
+
+// where_name_equal_fold keeps the rows where `name` is `value`, ignoring case.
+pub fn (q CategoryDelete) where_name_equal_fold(value string) CategoryDelete {
+	return q.where(category_name_equal_fold(value))
+}
+
+// where_name_contains_fold keeps the rows where `name` contains `value`, ignoring case.
+pub fn (q CategoryDelete) where_name_contains_fold(value string) CategoryDelete {
+	return q.where(category_name_contains_fold(value))
+}
+
+// where_parent_id keeps the rows where `parent_id` is `value`.
 pub fn (q CategoryDelete) where_parent_id(value int) CategoryDelete {
-	return q.where(load.eq('parent_id', value))
+	return q.where(category_parent_id_eq(value))
 }
 
-// where_parent_id_lt keeps the rows whose `parent_id` comes before `value`.
+// where_parent_id_ne keeps the rows where `parent_id` is not `value`.
+pub fn (q CategoryDelete) where_parent_id_ne(value int) CategoryDelete {
+	return q.where(category_parent_id_ne(value))
+}
+
+// where_parent_id_lt keeps the rows where `parent_id` comes before `value`.
 pub fn (q CategoryDelete) where_parent_id_lt(value int) CategoryDelete {
-	return q.where(load.lt('parent_id', value))
+	return q.where(category_parent_id_lt(value))
 }
 
-// where_parent_id_le keeps the rows whose `parent_id` comes at or before `value`.
+// where_parent_id_le keeps the rows where `parent_id` comes at or before `value`.
 pub fn (q CategoryDelete) where_parent_id_le(value int) CategoryDelete {
-	return q.where(load.le('parent_id', value))
+	return q.where(category_parent_id_le(value))
 }
 
-// where_parent_id_gt keeps the rows whose `parent_id` comes after `value`.
+// where_parent_id_gt keeps the rows where `parent_id` comes after `value`.
 pub fn (q CategoryDelete) where_parent_id_gt(value int) CategoryDelete {
-	return q.where(load.gt('parent_id', value))
+	return q.where(category_parent_id_gt(value))
 }
 
-// where_parent_id_ge keeps the rows whose `parent_id` comes at or after `value`.
+// where_parent_id_ge keeps the rows where `parent_id` comes at or after `value`.
 pub fn (q CategoryDelete) where_parent_id_ge(value int) CategoryDelete {
-	return q.where(load.ge('parent_id', value))
+	return q.where(category_parent_id_ge(value))
 }
 
-// where_parent_id_in keeps the rows whose `parent_id` is one of `values`.
+// where_parent_id_in keeps the rows where `parent_id` is one of `values`.
 pub fn (q CategoryDelete) where_parent_id_in(values []int) CategoryDelete {
-	return q.where(load.in_ints('parent_id', values))
+	return q.where(category_parent_id_in(values))
 }
 
-// where_parent_id_is_null keeps the rows whose `parent_id` is null.
+// where_parent_id_not_in keeps the rows where `parent_id` is none of `values`.
+pub fn (q CategoryDelete) where_parent_id_not_in(values []int) CategoryDelete {
+	return q.where(category_parent_id_not_in(values))
+}
+
+// where_parent_id_is_null keeps the rows where `parent_id` is null.
 pub fn (q CategoryDelete) where_parent_id_is_null() CategoryDelete {
-	return q.where(load.is_null('parent_id'))
+	return q.where(category_parent_id_is_null())
 }
 
-// where_parent_id_is_not_null keeps the rows whose `parent_id` is not null.
+// where_parent_id_is_not_null keeps the rows where `parent_id` is not null.
 pub fn (q CategoryDelete) where_parent_id_is_not_null() CategoryDelete {
-	return q.where(load.is_not_null('parent_id'))
+	return q.where(category_parent_id_is_not_null())
+}
+
+// has_parent keeps the rows where it has a `parent`.
+pub fn (q CategoryDelete) has_parent() CategoryDelete {
+	return q.where(category_has_parent())
+}
+
+// has_parent_with keeps the rows that have a `parent` that `configure` keeps.
+pub fn (q CategoryDelete) has_parent_with(configure fn (CategoryQuery) CategoryQuery) CategoryDelete {
+	return q.where(category_has_parent_with(...configure(q.graph.categories()).query.conds))
+}
+
+// has_children keeps the rows where it has a `children`.
+pub fn (q CategoryDelete) has_children() CategoryDelete {
+	return q.where(category_has_children())
+}
+
+// has_children_with keeps the rows that have a `children` that `configure` keeps.
+pub fn (q CategoryDelete) has_children_with(configure fn (CategoryQuery) CategoryQuery) CategoryDelete {
+	return q.where(category_has_children_with(...configure(q.graph.categories()).query.conds))
 }
 
 // exec deletes the rows, with their join table rows, in one transaction, and
