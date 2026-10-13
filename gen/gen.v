@@ -32,6 +32,15 @@ pub:
 	kind         string
 	nullable     bool
 	graphql_skip bool
+	serial       bool
+	optional     bool
+	immutable    bool
+	sensitive    bool
+	unique       bool
+	comment      string
+	deprecated   string
+	has_default  bool
+	auto_update  bool
 }
 
 // Edge mirrors `vgraph.Edge`, as the loader prints it.

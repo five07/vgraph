@@ -7,7 +7,10 @@ module vgraph
 // `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD` and `PGDATABASE` set if the
 // defaults below don't match the server.
 import db.pg
+import load
+import orm
 import os
+import pg as vpg
 import time
 import v.migrations
 
@@ -131,6 +134,11 @@ fn pg_schema() !Schema {
 }
 
 fn pg_client() !Client {
+	return Client.new(pg_seeded()!, pg_schema()!)!
+}
+
+// pg_seeded returns a pool on a database with the tests' tables, seeded.
+fn pg_seeded() !&pg.DB {
 	mut db := pg.connect(pg_config(), pg.PoolConfig{})!
 	db.exec('SET client_min_messages = warning')!
 	for table in pg_tables {
@@ -192,7 +200,7 @@ fn pg_client() !Client {
 			insert link into PgArticleTag
 		}!
 	}
-	return Client.new(db, pg_schema()!)!
+	return db
 }
 
 fn test_postgres_edges() {
@@ -279,4 +287,66 @@ fn test_postgres_migration_helpers() {
 	assert s.foreign_keys()!.map(it.name) == keys.map(it.vals[0] or { '' })
 	m.rollback(1)!
 	assert db.exec(indexes)!.len == 0
+}
+
+// Writes through the driver on a pool: a multi-row insert returns its keys in
+// order, and a transaction holds one connection of the pool, whose writes
+// the pool's other connections don't see until it commits.
+fn test_postgres_writes_on_a_pool() {
+	db := pg_seeded()!
+	c := Client.new(vpg.pool(db), pg_schema()!)!
+	keys := c.create_bulk(['go', 'zig', 'odin'].map(MutationData{
+		op:     .create
+		table:  'vg_tags'
+		values: {
+			'name': orm.Primitive(it)
+		}
+	}))!
+	assert keys == ['3', '4', '5']
+	article := c.create(MutationData{
+		op:     .create
+		table:  'vg_articles'
+		values: {
+			'user_id': orm.Primitive(2)
+			'title':   'new'
+		}
+		added:  {
+			'tags': ['3', '5']
+		}
+	})!
+	assert article == '4'
+	links := load.select_where[PgArticleTag](c.conn, load.Query{
+		conds: [load.eq('article_id', 4)]
+		order: 'tag_id'
+	})!
+	assert links.map(it.tag_id) == [3, 5]
+	tx := c.begin()!
+	assert tx.update(MutationData{
+		op:     .update
+		table:  'vg_articles'
+		conds:  [load.eq('user_id', 1)]
+		values: {
+			'title': orm.Primitive('renamed')
+		}
+	})! == 2
+	inside := load.count_where[PgArticle](tx.conn, load.Query{
+		conds: [load.eq('title', 'renamed')]
+	})!
+	outside := load.count_where[PgArticle](c.conn, load.Query{
+		conds: [load.eq('title', 'renamed')]
+	})!
+	assert [inside, outside] == [2, 0]
+	tx.rollback()!
+	assert load.count_where[PgArticle](c.conn, load.Query{
+		conds: [load.eq('title', 'renamed')]
+	})! == 0
+	// a delete takes the article's join rows
+	assert c.delete_one(MutationData{
+		op:    .delete_one
+		table: 'vg_articles'
+		key:   article
+	})!
+	assert load.count_where[PgArticleTag](c.conn, load.Query{
+		conds: [load.eq('article_id', 4)]
+	})! == 0
 }

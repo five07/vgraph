@@ -57,9 +57,11 @@ fn (mut c Counting) execute(query string) ![]orm.Row {
 	return c.inner.execute(query)
 }
 
-// Fixture is a seeded database, its client, and the log of its selects.
+// Fixture is a seeded database, its client, and the log of its selects, and a
+// client on a vgraph driver for writes.
 struct Fixture {
 	g   graph.Graph
+	w   graph.Graph
 	db  orm.Connection
 	log &Log
 }
@@ -120,8 +122,9 @@ fn migrate(mut db orm.TransactionalConnection, dialect migrations.Dialect) ! {
 
 // seed fills the tables that `migrate` created on `db`. It takes `db` as an
 // `orm.Connection`: `sql` blocks reject a `TransactionalConnection`
-// (regressions/sql_transactional_connection.vv).
-fn seed(db orm.Connection) !Fixture {
+// (regressions/sql_transactional_connection.vv). `driver` is `db` in a vgraph
+// driver, for writes.
+fn seed(db orm.Connection, driver orm.Connection) !Fixture {
 	for name in ['ada', 'bob', 'cy', 'dee'] {
 		user := models.User{
 			name: name
@@ -254,6 +257,7 @@ fn seed(db orm.Connection) !Fixture {
 	})!
 	return Fixture{
 		g:   g
+		w:   graph.Graph.new(driver)!
 		db:  db
 		log: log
 	}
@@ -491,4 +495,138 @@ fn check_graphql(f Fixture) ! {
 	// errors
 	assert gql(f, '{ users(where: {id: "abc"}) { name } }')! == '{"errors":[{"message":"invalid ID \\"abc\\"","locations":[{"line":1,"column":3}],"path":["users"]}],"data":null}'
 	assert gql(f, '{ users { nope } }')! == '{"errors":[{"message":"Cannot query field \\"nope\\" on type \\"User\\". Did you mean \\"name\\"?","locations":[{"line":1,"column":11}]}]}'
+}
+
+const watch = '3c2b1a09-8f7e-4d6c-9b5a-4e3d2c1b0a9f'
+
+fn user_names(g graph.Graph, ids []int) ![]string {
+	return g.users().where_id_in(ids).order_by_id().all()!.map(it.user.name)
+}
+
+// Writes: each relationship kind through the generated builders, on a vgraph
+// driver.
+fn check_writes(f Fixture) ! {
+	w := f.w
+	// O2O two types: a new user, and a card for her; then the card moves
+	eve := w.users().create().set_name('eve').save()!
+	assert eve.user.id == 5
+	card := w.cards().create().set_number('7777').set_owner(eve).save()!
+	assert card.card.owner_id == 5
+	assert w.users().where_id(5).with_card().first()!.card or { return error('no card') }.card.number == '7777'
+	// `cards.owner_id` is not nullable, so a card can't be taken from its owner
+	// first: the unique index refuses eve a second one, and nothing changes
+	if _ := w.users().update_one_id(5).set_card_id(2).exec() {
+		assert false
+	}
+	assert w.cards().order_by_id().all()!.map(it.card.owner_id) == [1, 2, 5]
+	// with her card deleted, bob's moves to her
+	card.update().exec()!
+	w.cards().delete_one(card).exec()!
+	w.users().update_one_id(5).set_card_id(2).exec()!
+	assert w.cards().order_by_id().all()!.map(it.card.owner_id) == [1, 5]
+	// O2O same type: a node after 3, then 4 set as the next of 2's previous
+	four := w.nodes().create().set_value(4).save()!
+	w.nodes().update_one_id(3).set_next(four).exec()!
+	assert w.nodes().where_id(3).with_next().first()!.next or { return error('no next') }.node.value == 4
+	// `prev` is one_to_one, and `nodes.next_id` is nullable: 4 has one previous
+	// node, so 3 stops pointing at it, and 1 does
+	w.nodes().update_one_id(4).set_prev_id(1).exec()!
+	nodes := w.nodes().order_by_id().all()!
+	assert nodes.map(it.node.next_id or { 0 }) == [4, 3, 0, 0]
+	w.nodes().update_one_id(4).clear_prev().exec()!
+	assert w.nodes().where_next_id(4).count()! == 0
+	// O2O bidirectional: both sides, in one transaction
+	w.tx(fn (tx graph.Graph) ! {
+		tx.users().update_one_id(3).set_spouse_id(4).exec()!
+		tx.users().update_one_id(4).set_spouse_id(3).exec()!
+	})!
+	assert w.users().where_id_in([3, 4]).order_by_id().all()!.map(it.user.spouse_id or { 0 }) == [
+		4,
+		3,
+	]
+	w.users().update_one_id(3).clear_spouse().exec()!
+	assert w.users().where_id(3).first()!.user.spouse_id == none
+	// O2M two types: add the stray, remove one, clear
+	w.users().update_one_id(2).add_pets_ids(3).exec()!
+	assert w.pets().where_owner_id(2).count()! == 1
+	ada := w.users().where_id(1).first()!
+	ada.update().remove_pets_ids(1).exec()!
+	assert w.pets().where_owner_id(1).all()!.map(it.pet.name) == ['tom']
+	ada.update().clear_pets().add_pets_ids(1).exec()!
+	assert w.pets().where_owner_id(1).all()!.map(it.pet.name) == ['rex']
+	// O2M same type: a new category under b, then a1 moved under it
+	b2 := w.categories().create().set_name('b2').set_parent_id(3).save()!
+	w.categories().update_one(b2).add_children_ids(4).exec()!
+	tree := w.categories().where_id(3).with_children(fn (q graph.CategoryQuery) graph.CategoryQuery {
+		return q.with_children()
+	}).first()!
+	assert tree.children.map(it.category.name) == ['b2']
+	assert tree.children[0].children.map(it.category.name) == ['a1']
+	// M2M two types, from both sides; a deleted group takes its join rows
+	w.users().update_one_id(3).add_groups_ids(1, 2).exec()!
+	assert user_names(w, w.groups().where_id(1).first()!.query_users()!.all()!.map(it.user.id))! == [
+		'ada',
+		'cy',
+	]
+	w.groups().update_one_id(2).remove_users_ids(1).exec()!
+	assert w.users().where_id(1).first()!.query_groups()!.all()!.map(it.group.name) == ['admins']
+	w.groups().delete_one_id(1).exec()!
+	assert w.users().where_id_in([1, 3]).with_groups().order_by_id().all()!.map(it.groups.map(it.group.name)) == [
+		[]string{},
+		['devs'],
+	]
+	// M2M same type: dee follows ada; ada now has a follower
+	w.users().update_one_id(4).add_following_ids(1).exec()!
+	assert w.users().where_id(1).first()!.query_followers()!.all()!.map(it.user.name) == ['dee']
+	// M2M bidirectional: a friendship, stored both ways
+	w.tx(fn (tx graph.Graph) ! {
+		tx.users().update_one_id(1).add_friends_ids(3).exec()!
+		tx.users().update_one_id(3).add_friends_ids(1).exec()!
+	})!
+	friends := w.users().where_id_in([1, 3]).with_friends(fn (q graph.UserQuery) graph.UserQuery {
+		return q.order_by_id()
+	}).order_by_id().all()!
+	assert friends.map(it.friends.map(it.user.name)) == [['bob', 'cy'], ['ada', 'dee']]
+	// UUID keys: a device with its groups, and a login on it
+	device := w.devices().create().set_id(watch).set_name('watch').set_owner_id(4).add_groups_ids(2).save()!
+	assert device.device.id == watch
+	login := w.logins().create().set_device(device).set_at(9).save()!
+	assert login.query_device().first()!.device.name == 'watch'
+	assert w.devices().where_id(watch).first()!.query_groups()!.all()!.map(it.group.name) == ['devs']
+	// an upsert on the key renames the phone, and keeps its key
+	renamed := w.devices().create().set_id(phone).set_name('mobile').set_owner_id(1).on_conflict_columns('id').update_new_values().save()!
+	assert renamed.device.name == 'mobile'
+	assert w.devices().count()! == 4
+	if _ := w.devices().create().set_id(phone).set_name('x').set_owner_id(1).on_conflict_columns('id').do_nothing().save() {
+		assert false
+	} else {
+		assert err is graph.NotFoundError
+	}
+	// bulk creates, in order
+	pets := w.pets().create_bulk(w.pets().create().set_name('a'), w.pets().create().set_name('b').set_owner_id(4)).save()!
+	assert pets.map(it.pet.name) == ['a', 'b']
+	more := w.pets().map_create_bulk(['c', 'd'], fn (b graph.PetCreate, name string) graph.PetCreate {
+		return b.set_name(name)
+	}).save()!
+	assert more.map(it.pet.id) == [pets[1].pet.id + 1, pets[1].pet.id + 2]
+	// updates and deletes of many rows count them
+	// tom, whom ada's pets were cleared of, and the three created without an owner
+	assert w.pets().where_owner_id_is_null().update().set_owner_id(4).exec()! == 4
+	assert w.pets().update().where_owner_id(4).where_name_in(['a', 'b']).set_name('ab').exec()! == 2
+	assert w.pets().delete().where_name('ab').exec()! == 2
+	assert w.pets().where_owner_id(4).order_by_id().all()!.map(it.pet.name) == ['tom', 'c', 'd']
+	// a write to a missing row
+	if _ := w.users().update_one_id(99).set_name('x').save() {
+		assert false
+	} else {
+		assert err is graph.NotFoundError
+	}
+	// a failed transaction leaves nothing
+	w.tx(fn (tx graph.Graph) ! {
+		tx.users().create().set_name('zed').exec()!
+		return error('stop')
+	}) or { assert err.msg() == 'stop' }
+	assert w.users().where_name('zed').count()! == 0
+	// the read client sees the writes
+	assert f.g.users().count()! == 5
 }

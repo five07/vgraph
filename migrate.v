@@ -17,6 +17,7 @@ import v.migrations
 //   columns, so that a pair is stored once.
 // - many_to_one: none; it looks targets up by their primary key.
 //
+// A field whose options (`fields()`) say `unique` gets a unique index too.
 // Each is named `<table>_<columns>_idx`.
 pub fn (s Schema) migration_indexes() []migrations.Index {
 	mut found := map[string]migrations.Index{}
@@ -53,6 +54,20 @@ pub fn (s Schema) migration_indexes() []migrations.Index {
 					}
 				}
 				found[index.name] = index
+			}
+		}
+	}
+	// unique fields; a unique index serves an edge too
+	for table in s.tables() {
+		for o in s.options[table.name] or { [] } {
+			if !o.unique {
+				continue
+			}
+			for column in table.columns {
+				if column.field == o.name {
+					index := new_index(table.name, [column.name], true)
+					found[index.name] = index
+				}
 			}
 		}
 	}

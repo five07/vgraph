@@ -490,20 +490,20 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	mut s := graphql.Server.new(schema_sdl)!
 
 	// Card
-	s.resolve('Query', 'cards', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.cards().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'cards', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).cards().graphql_args(info.args)!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
-	s.resolve('Query', 'cardsCount', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		n := g.cards().graphql_args(info.args)!.count()!
+	s.resolve('Query', 'cardsCount', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		n := g.with_ctx(ctx).cards().graphql_args(info.args)!.count()!
 		return parents.map(graphql.Resolved(graphql.Value(n)))
 	})
 	for name in ['id', 'number', 'ownerID'] {
 		s.resolve('Card', name, resolve_card_field)
 	}
-	s.resolve('Card', 'owner', fn [g] (_ graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		loaded := g.cards().with_owner().nodes(parents.map((it as CardNode).card))!
+	s.resolve('Card', 'owner', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).cards().with_owner().nodes(parents.map((it as CardNode).card))!
 		return loaded.map(fn (n CardNode) graphql.Resolved {
 			if target := n.owner {
 				return graphql.obj(*target)
@@ -513,20 +513,20 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Category
-	s.resolve('Query', 'categories', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.categories().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'categories', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).categories().graphql_args(info.args)!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
-	s.resolve('Query', 'categoriesCount', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		n := g.categories().graphql_args(info.args)!.count()!
+	s.resolve('Query', 'categoriesCount', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		n := g.with_ctx(ctx).categories().graphql_args(info.args)!.count()!
 		return parents.map(graphql.Resolved(graphql.Value(n)))
 	})
 	for name in ['id', 'name', 'parentID'] {
 		s.resolve('Category', name, resolve_category_field)
 	}
-	s.resolve('Category', 'parent', fn [g] (_ graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		loaded := g.categories().with_parent().nodes(parents.map((it as CategoryNode).category))!
+	s.resolve('Category', 'parent', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).categories().with_parent().nodes(parents.map((it as CategoryNode).category))!
 		return loaded.map(fn (n CategoryNode) graphql.Resolved {
 			if target := n.parent {
 				return graphql.obj(*target)
@@ -534,9 +534,10 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			return graphql.null
 		})
 	})
-	s.resolve('Category', 'children', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		sub := g.categories().graphql_args(info.args)!
-		loaded := g.categories().with_children(fn [sub] (_ CategoryQuery) CategoryQuery {
+	s.resolve('Category', 'children', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.categories().graphql_args(info.args)!
+		loaded := cg.categories().with_children(fn [sub] (_ CategoryQuery) CategoryQuery {
 			return sub
 		}).nodes(parents.map((it as CategoryNode).category))!
 		mut out := []graphql.Resolved{cap: loaded.len}
@@ -547,20 +548,20 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Device
-	s.resolve('Query', 'devices', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.devices().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'devices', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).devices().graphql_args(info.args)!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
-	s.resolve('Query', 'devicesCount', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		n := g.devices().graphql_args(info.args)!.count()!
+	s.resolve('Query', 'devicesCount', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		n := g.with_ctx(ctx).devices().graphql_args(info.args)!.count()!
 		return parents.map(graphql.Resolved(graphql.Value(n)))
 	})
 	for name in ['id', 'name', 'ownerID'] {
 		s.resolve('Device', name, resolve_device_field)
 	}
-	s.resolve('Device', 'owner', fn [g] (_ graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		loaded := g.devices().with_owner().nodes(parents.map((it as DeviceNode).device))!
+	s.resolve('Device', 'owner', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).devices().with_owner().nodes(parents.map((it as DeviceNode).device))!
 		return loaded.map(fn (n DeviceNode) graphql.Resolved {
 			if target := n.owner {
 				return graphql.obj(*target)
@@ -568,9 +569,10 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			return graphql.null
 		})
 	})
-	s.resolve('Device', 'logins', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		sub := g.logins().graphql_args(info.args)!
-		loaded := g.devices().with_logins(fn [sub] (_ LoginQuery) LoginQuery {
+	s.resolve('Device', 'logins', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.logins().graphql_args(info.args)!
+		loaded := cg.devices().with_logins(fn [sub] (_ LoginQuery) LoginQuery {
 			return sub
 		}).nodes(parents.map((it as DeviceNode).device))!
 		mut out := []graphql.Resolved{cap: loaded.len}
@@ -579,9 +581,10 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('Device', 'groups', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		sub := g.groups().graphql_args(info.args)!
-		loaded := g.devices().with_groups(fn [sub] (_ GroupQuery) GroupQuery {
+	s.resolve('Device', 'groups', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.groups().graphql_args(info.args)!
+		loaded := cg.devices().with_groups(fn [sub] (_ GroupQuery) GroupQuery {
 			return sub
 		}).nodes(parents.map((it as DeviceNode).device))!
 		mut out := []graphql.Resolved{cap: loaded.len}
@@ -592,21 +595,22 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Group
-	s.resolve('Query', 'groups', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.groups().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'groups', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).groups().graphql_args(info.args)!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
-	s.resolve('Query', 'groupsCount', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		n := g.groups().graphql_args(info.args)!.count()!
+	s.resolve('Query', 'groupsCount', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		n := g.with_ctx(ctx).groups().graphql_args(info.args)!.count()!
 		return parents.map(graphql.Resolved(graphql.Value(n)))
 	})
 	for name in ['id', 'name'] {
 		s.resolve('Group', name, resolve_group_field)
 	}
-	s.resolve('Group', 'users', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		sub := g.users().graphql_args(info.args)!
-		loaded := g.groups().with_users(fn [sub] (_ UserQuery) UserQuery {
+	s.resolve('Group', 'users', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.users().graphql_args(info.args)!
+		loaded := cg.groups().with_users(fn [sub] (_ UserQuery) UserQuery {
 			return sub
 		}).nodes(parents.map((it as GroupNode).group))!
 		mut out := []graphql.Resolved{cap: loaded.len}
@@ -615,9 +619,10 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('Group', 'devices', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		sub := g.devices().graphql_args(info.args)!
-		loaded := g.groups().with_devices(fn [sub] (_ DeviceQuery) DeviceQuery {
+	s.resolve('Group', 'devices', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.devices().graphql_args(info.args)!
+		loaded := cg.groups().with_devices(fn [sub] (_ DeviceQuery) DeviceQuery {
 			return sub
 		}).nodes(parents.map((it as GroupNode).group))!
 		mut out := []graphql.Resolved{cap: loaded.len}
@@ -628,20 +633,20 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Login
-	s.resolve('Query', 'logins', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.logins().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'logins', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).logins().graphql_args(info.args)!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
-	s.resolve('Query', 'loginsCount', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		n := g.logins().graphql_args(info.args)!.count()!
+	s.resolve('Query', 'loginsCount', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		n := g.with_ctx(ctx).logins().graphql_args(info.args)!.count()!
 		return parents.map(graphql.Resolved(graphql.Value(n)))
 	})
 	for name in ['id', 'deviceID', 'at'] {
 		s.resolve('Login', name, resolve_login_field)
 	}
-	s.resolve('Login', 'device', fn [g] (_ graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		loaded := g.logins().with_device().nodes(parents.map((it as LoginNode).login))!
+	s.resolve('Login', 'device', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).logins().with_device().nodes(parents.map((it as LoginNode).login))!
 		return loaded.map(fn (n LoginNode) graphql.Resolved {
 			if target := n.device {
 				return graphql.obj(*target)
@@ -651,20 +656,20 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Node
-	s.resolve('Query', 'nodes', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.nodes().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'nodes', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).nodes().graphql_args(info.args)!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
-	s.resolve('Query', 'nodesCount', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		n := g.nodes().graphql_args(info.args)!.count()!
+	s.resolve('Query', 'nodesCount', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		n := g.with_ctx(ctx).nodes().graphql_args(info.args)!.count()!
 		return parents.map(graphql.Resolved(graphql.Value(n)))
 	})
 	for name in ['id', 'value', 'nextID'] {
 		s.resolve('Node', name, resolve_node_field)
 	}
-	s.resolve('Node', 'next', fn [g] (_ graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		loaded := g.nodes().with_next().nodes(parents.map((it as NodeNode).node))!
+	s.resolve('Node', 'next', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).nodes().with_next().nodes(parents.map((it as NodeNode).node))!
 		return loaded.map(fn (n NodeNode) graphql.Resolved {
 			if target := n.next {
 				return graphql.obj(*target)
@@ -672,8 +677,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			return graphql.null
 		})
 	})
-	s.resolve('Node', 'prev', fn [g] (_ graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		loaded := g.nodes().with_prev().nodes(parents.map((it as NodeNode).node))!
+	s.resolve('Node', 'prev', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).nodes().with_prev().nodes(parents.map((it as NodeNode).node))!
 		return loaded.map(fn (n NodeNode) graphql.Resolved {
 			if target := n.prev {
 				return graphql.obj(*target)
@@ -683,20 +688,20 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Pet
-	s.resolve('Query', 'pets', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.pets().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'pets', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).pets().graphql_args(info.args)!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
-	s.resolve('Query', 'petsCount', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		n := g.pets().graphql_args(info.args)!.count()!
+	s.resolve('Query', 'petsCount', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		n := g.with_ctx(ctx).pets().graphql_args(info.args)!.count()!
 		return parents.map(graphql.Resolved(graphql.Value(n)))
 	})
 	for name in ['id', 'name', 'ownerID'] {
 		s.resolve('Pet', name, resolve_pet_field)
 	}
-	s.resolve('Pet', 'owner', fn [g] (_ graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		loaded := g.pets().with_owner().nodes(parents.map((it as PetNode).pet))!
+	s.resolve('Pet', 'owner', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).pets().with_owner().nodes(parents.map((it as PetNode).pet))!
 		return loaded.map(fn (n PetNode) graphql.Resolved {
 			if target := n.owner {
 				return graphql.obj(*target)
@@ -706,20 +711,20 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// User
-	s.resolve('Query', 'users', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.users().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'users', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).users().graphql_args(info.args)!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
-	s.resolve('Query', 'usersCount', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		n := g.users().graphql_args(info.args)!.count()!
+	s.resolve('Query', 'usersCount', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		n := g.with_ctx(ctx).users().graphql_args(info.args)!.count()!
 		return parents.map(graphql.Resolved(graphql.Value(n)))
 	})
 	for name in ['id', 'name', 'spouseID'] {
 		s.resolve('User', name, resolve_user_field)
 	}
-	s.resolve('User', 'card', fn [g] (_ graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		loaded := g.users().with_card().nodes(parents.map((it as UserNode).user))!
+	s.resolve('User', 'card', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).users().with_card().nodes(parents.map((it as UserNode).user))!
 		return loaded.map(fn (n UserNode) graphql.Resolved {
 			if target := n.card {
 				return graphql.obj(*target)
@@ -727,8 +732,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			return graphql.null
 		})
 	})
-	s.resolve('User', 'spouse', fn [g] (_ graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		loaded := g.users().with_spouse().nodes(parents.map((it as UserNode).user))!
+	s.resolve('User', 'spouse', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).users().with_spouse().nodes(parents.map((it as UserNode).user))!
 		return loaded.map(fn (n UserNode) graphql.Resolved {
 			if target := n.spouse {
 				return graphql.obj(*target)
@@ -736,9 +741,10 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			return graphql.null
 		})
 	})
-	s.resolve('User', 'pets', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		sub := g.pets().graphql_args(info.args)!
-		loaded := g.users().with_pets(fn [sub] (_ PetQuery) PetQuery {
+	s.resolve('User', 'pets', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.pets().graphql_args(info.args)!
+		loaded := cg.users().with_pets(fn [sub] (_ PetQuery) PetQuery {
 			return sub
 		}).nodes(parents.map((it as UserNode).user))!
 		mut out := []graphql.Resolved{cap: loaded.len}
@@ -747,9 +753,10 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('User', 'groups', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		sub := g.groups().graphql_args(info.args)!
-		loaded := g.users().with_groups(fn [sub] (_ GroupQuery) GroupQuery {
+	s.resolve('User', 'groups', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.groups().graphql_args(info.args)!
+		loaded := cg.users().with_groups(fn [sub] (_ GroupQuery) GroupQuery {
 			return sub
 		}).nodes(parents.map((it as UserNode).user))!
 		mut out := []graphql.Resolved{cap: loaded.len}
@@ -758,9 +765,10 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('User', 'following', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		sub := g.users().graphql_args(info.args)!
-		loaded := g.users().with_following(fn [sub] (_ UserQuery) UserQuery {
+	s.resolve('User', 'following', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.users().graphql_args(info.args)!
+		loaded := cg.users().with_following(fn [sub] (_ UserQuery) UserQuery {
 			return sub
 		}).nodes(parents.map((it as UserNode).user))!
 		mut out := []graphql.Resolved{cap: loaded.len}
@@ -769,9 +777,10 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('User', 'followers', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		sub := g.users().graphql_args(info.args)!
-		loaded := g.users().with_followers(fn [sub] (_ UserQuery) UserQuery {
+	s.resolve('User', 'followers', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.users().graphql_args(info.args)!
+		loaded := cg.users().with_followers(fn [sub] (_ UserQuery) UserQuery {
 			return sub
 		}).nodes(parents.map((it as UserNode).user))!
 		mut out := []graphql.Resolved{cap: loaded.len}
@@ -780,9 +789,10 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('User', 'friends', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		sub := g.users().graphql_args(info.args)!
-		loaded := g.users().with_friends(fn [sub] (_ UserQuery) UserQuery {
+	s.resolve('User', 'friends', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.users().graphql_args(info.args)!
+		loaded := cg.users().with_friends(fn [sub] (_ UserQuery) UserQuery {
 			return sub
 		}).nodes(parents.map((it as UserNode).user))!
 		mut out := []graphql.Resolved{cap: loaded.len}
@@ -791,9 +801,10 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('User', 'devices', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		sub := g.devices().graphql_args(info.args)!
-		loaded := g.users().with_devices(fn [sub] (_ DeviceQuery) DeviceQuery {
+	s.resolve('User', 'devices', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.devices().graphql_args(info.args)!
+		loaded := cg.users().with_devices(fn [sub] (_ DeviceQuery) DeviceQuery {
 			return sub
 		}).nodes(parents.map((it as UserNode).user))!
 		mut out := []graphql.Resolved{cap: loaded.len}

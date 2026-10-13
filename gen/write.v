@@ -59,6 +59,7 @@ pub fn generate(out_module string, entities []Entity, tables []Table) !map[strin
 	files['graph.v'] = graph_file(out_module, entities)
 	for table in tables {
 		files['${table.name}.v'] = table_file(out_module, infos[table.name], infos)!
+		files['${table.name}_mutation.v'] = mutation_file(out_module, infos[table.name], infos)!
 	}
 	return files
 }
@@ -67,11 +68,11 @@ pub fn generate(out_module string, entities []Entity, tables []Table) !map[strin
 // something else.
 fn check_names(info Info) ! {
 	t := info.table
-	if t.name in ['client', 'new'] {
+	if t.name in ['client', 'new', 'with_ctx', 'ctx', 'tx', 'graphql'] {
 		return error('table `${t.name}`: `Graph.${t.name}` is taken; rename the table')
 	}
 	for edge in t.edges {
-		if edge.name in ['graph', info.field()] {
+		if edge.name in ['graph', 'update', info.field()] {
 			return error('`${t.name}.${edge.name}`: `${info.node()}.${edge.name}` is taken; rename the edge')
 		}
 	}
@@ -83,6 +84,7 @@ fn graph_file(out_module string, entities []Entity) string {
 	b.writeln('module ${out_module}\n')
 	b.writeln('import orm')
 	b.writeln('import five07.vgraph')
+	b.writeln('import five07.vgraph.graphql')
 	for path in imports_of(entities) {
 		b.writeln('import ${import_line(path)}')
 	}
@@ -113,7 +115,34 @@ pub fn schema() !vgraph.Schema {
 	b.writeln('	return s
 }
 
-// NotFoundError is the error of `first()` when no row matches.
+// with_ctx returns a graph whose queries and writes carry `ctx`, a value the
+// app defines, such as its user, to hooks and privacy rules. The GraphQL server
+// passes each request\'s context on.
+pub fn (g Graph) with_ctx(ctx graphql.Context) Graph {
+	return Graph{
+		client: g.client.with_ctx(ctx)
+	}
+}
+
+// ctx returns the value `with_ctx` gave, or a `vgraph.NoContext`.
+pub fn (g Graph) ctx() graphql.Context {
+	return g.client.ctx
+}
+
+// tx runs `f` in a transaction: it commits when `f` succeeds, and rolls back
+// when it fails. The graph `f` gets runs every query and write in the
+// transaction; inside one already, `f` joins it.
+pub fn (g Graph) tx(f fn (tx Graph) !) ! {
+	client := g.client.begin()!
+	f(Graph{ client: client }) or {
+		client.rollback() or {}
+		return err
+	}
+	client.commit()!
+}
+
+// NotFoundError is the error of `first()` when no row matches, and of a write
+// to one row that doesn\'t exist.
 pub struct NotFoundError {
 	Error
 pub:
@@ -235,7 +264,7 @@ pub fn (q ${q}) offset(count int) ${q} {
 pub fn (q ${q}) count() !int {
 	return load.count_where[${info.typ()}](q.graph.client.conn, q.query)
 }')
-	write_predicates(mut b, t, q)
+	write_predicates(mut b, t, q, true)
 	for i, edge in t.edges {
 		target := targets[i]
 		b.writeln('
@@ -284,7 +313,9 @@ pub fn (q ${q}) nodes(rows []${info.typ()}) ![]${n} {
 	return b.str()
 }
 
-fn write_predicates(mut b strings.Builder, t Table, q string) {
+// write_predicates writes the predicate methods of the builder `q`, which has
+// a `where(conds ...load.Cond)` method, and with `orders` its order methods.
+fn write_predicates(mut b strings.Builder, t Table, q string, orders bool) {
 	for c in t.columns {
 		base := c.typ.trim_left('?')
 		if base !in ['int', 'i64', 'f64', 'bool', 'string', 'time.Time'] {
@@ -339,6 +370,9 @@ pub fn (q ${q}) where_${c.field}_is_null() ${q} {
 pub fn (q ${q}) where_${c.field}_is_not_null() ${q} {
 	return q.where(load.is_not_null(\'${c.name}\'))
 }')
+		}
+		if !orders {
+			continue
 		}
 		b.writeln('
 // order_by_${c.field} orders the rows by `${c.name}`, ascending.

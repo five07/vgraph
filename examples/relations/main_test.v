@@ -2,11 +2,12 @@ module main
 
 // Every Ent relationship kind on SQLite. The checks are in `checks.v`.
 import db.sqlite
+import five07.vgraph.sqlite as vsqlite
 
 fn fixture() !Fixture {
 	mut db := sqlite.connect(':memory:')!
 	migrate(mut db, .sqlite)!
-	return seed(db)!
+	return seed(db, vsqlite.new(db))!
 }
 
 fn test_o2o_two_types() {
@@ -51,4 +52,8 @@ fn test_uuid_keys() {
 
 fn test_graphql() {
 	check_graphql(fixture()!)!
+}
+
+fn test_writes() {
+	check_writes(fixture()!)!
 }

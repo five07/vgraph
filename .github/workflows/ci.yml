@@ -34,7 +34,7 @@ jobs:
       - name: Check formatting
         run: v fmt -verify vgraph
       - name: Check doc comments
-        run: v vet vgraph/edge.v vgraph/schema.v vgraph/client.v vgraph/migrate.v vgraph/load vgraph/gen vgraph/cmd/vgraph vgraph/graphql
+        run: v vet vgraph/edge.v vgraph/schema.v vgraph/client.v vgraph/migrate.v vgraph/field.v vgraph/driver.v vgraph/mutation.v vgraph/write.v vgraph/load vgraph/gen vgraph/cmd/vgraph vgraph/graphql vgraph/sqlite vgraph/pg
       - name: Check that the examples' clients are generated from their current models
         run: |
           v run vgraph/cmd/vgraph gen vgraph/examples/service

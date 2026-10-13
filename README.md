@@ -114,6 +114,78 @@ variants by type, `order_by_<field>`, `limit`, `offset`, `with_<edge>`, `all`,
 `query_<edge>` to traverse. Regenerate it after changing a model; it is checked in,
 like any code.
 
+## Writes
+
+The generated client writes too. Each table gets builders, as Ent's:
+
+```v ignore
+import five07.vgraph.sqlite as vsqlite
+
+g := graph.Graph.new(vsqlite.new(db))! // or pg.pool(db), pg.direct(conn)
+art := g.articles().create()
+	.set_title('V')
+	.set_author_id(user.id)  // or .set_author(user_node)
+	.add_tags_ids(1, 2)      // writes the join rows
+	.save()!                 // graph.ArticleNode, read back
+art.update().set_title('W').clear_deleted_at().remove_tags_ids(2).exec()!
+n := g.articles().update().where_user_id(3).set_title('Draft').exec()! // rows changed
+g.articles().delete_one(art).exec()!                              // its join rows too
+g.tags().create().set_name('v').on_conflict_columns('name').update_new_values().exec()!
+g.tx(fn (tx graph.Graph) ! {
+	tx.users().update_one_id(3).set_spouse_id(4).exec()!
+	tx.users().update_one_id(4).set_spouse_id(3).exec()!
+})!
+```
+
+- **Builders:** `create`, `create_bulk`, `map_create_bulk`, `update_one`,
+  `update_one_id` (or `node.update()`), `update`, `delete_one`, `delete_one_id`,
+  `delete`. `update()` and `delete()` start from the query's conditions and take
+  the same `where_<field>` predicates.
+- **Setters:** `set_<field>`, `set_nillable_<field>` and `clear_<field>` for
+  nullable fields, `add_<field>` to increment a number in the database. Edges:
+  `set_<edge>_id` / `set_<edge>` / `clear_<edge>` for unique edges, and
+  `add_` / `remove_<edge>_ids`, `add_` / `remove_<edge>` and `clear_<edge>` for the
+  others. A polymorphic edge sets its type column as well.
+- **Transactions:** a write and its edge writes run in one transaction when the
+  connection can run one; `g.tx` runs several, and writes inside it join it.
+  `save()` and `exec()` on one row return `graph.NotFoundError` when it is missing.
+- **Context:** `g.with_ctx(ctx)` carries an app value (its user, its request) for
+  hooks and privacy rules (Phase 6c). The generated GraphQL server passes each
+  request's context on.
+
+Fields that need options list them in a `fields()` method beside `edges()`; the
+others are inferred: an option type is optional, a `@[sql: serial]` key is set by the
+database, and anything else is required on create.
+
+```v ignore
+pub fn (a Article) fields() []vgraph.Field {
+	return [
+		vgraph.Field{name: 'title', not_empty: true, max_len: 200},
+		vgraph.Field{name: 'slug', immutable: true, unique: true, default: fn () orm.Primitive {
+			return new_slug()
+		}},
+		vgraph.Field{name: 'created_at', default_now: true, immutable: true},
+		vgraph.Field{name: 'updated_at', default_now: true, update_now: true},
+		vgraph.Field{name: 'password_hash', sensitive: true}, // not in GraphQL
+	]
+}
+```
+
+Checks: `not_empty`, `min_len`, `max_len`, `pattern`, `min`, `max`, `positive`, and
+`validate: fn (value orm.Primitive) !` for anything else; a failed one is a
+`vgraph.ValidationError`. `unique` gives the field a unique index in the migration
+helpers.
+
+**Drivers.** `orm.Connection` can't run everything a write needs, so the adapters in
+`five07.vgraph.sqlite` and `five07.vgraph.pg` wrap V's connections: inserts read
+their keys back with `RETURNING`, upserts use `ON CONFLICT`, and on PostgreSQL a
+bulk create is one statement. Every ORM call passes through. On a plain
+`orm.Connection`, writes still work: a new key comes from `last_id()` (`int` keys
+only, so a string key must be set or have a default), upserts are refused, and
+without `orm.TransactionalConnection` statements run one by one. On a pool,
+`pg.pool(db)` holds one connection for each transaction. The adapters pass values
+as text, stored the way V's ORM stores them (on SQLite, times as Unix seconds).
+
 ## GraphQL
 
 `vgraph gen` also writes a GraphQL schema for the tables, `graph/schema.graphql`,
@@ -203,7 +275,9 @@ SQLite and PostgreSQL.
 
 ## Layout
 
-- `edge.v`, `schema.v`, `client.v`, `migrate.v`: the `vgraph` module.
+- `edge.v`, `schema.v`, `field.v`, `client.v`, `driver.v`, `mutation.v`, `write.v`,
+  `migrate.v`: the `vgraph` module.
+- `sqlite/`, `pg/`: the drivers, `five07.vgraph.sqlite` and `five07.vgraph.pg`.
 - `gen/`, `cmd/vgraph/`: the generator and the `vgraph` command.
 - `load/`: `vgraph.load`, the batched loads that `Client` runs.
 - `graphql/`: the GraphQL server library, independent of the rest of vgraph.

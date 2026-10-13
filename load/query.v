@@ -137,6 +137,22 @@ pub fn count_where[T](conn orm.Connection, q Query) !int {
 	return int(cell_i64(rows[0][0], 'count')!)
 }
 
+// where_data returns `conds`, joined with AND, as the ORM's where data, for
+// writes. It returns `none` when they match no row, and drops the ones every
+// row matches.
+pub fn where_data(conds []Cond) ?orm.QueryData {
+	kept := effective(conds)
+	if matches_nothing(kept) {
+		return none
+	}
+	return where_of(kept)
+}
+
+// value_type returns the ORM's type index for `value`.
+pub fn value_type(value orm.Primitive) int {
+	return primitive_type(value)
+}
+
 // effective drops the conditions that hold for every row: `NOT IN` an empty
 // list, which isn't valid SQL.
 fn effective(conds []Cond) []Cond {

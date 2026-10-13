@@ -1,23 +1,116 @@
 module vgraph
 
+import graphql
 import load
 import orm
 
-// Client loads edges declared in a checked schema, over any ORM connection.
+// Client loads edges declared in a checked schema, and writes rows, over any
+// ORM connection.
 pub struct Client {
 pub:
 	conn   orm.Connection
 	schema Schema
+	// ctx is the app's value for the queries and writes of this client, set
+	// with `with_ctx`.
+	ctx graphql.Context = NoContext{}
+	// in_tx: the client runs inside a transaction (`begin`).
+	in_tx bool
+mut:
+	owns_tx bool
 }
 
+// NoContext is the context of a client that `with_ctx` hasn't given one.
+pub struct NoContext {}
+
 // Client.new checks `schema`, and returns a client that loads its edges through
-// `conn`.
+// `conn`. When `conn` is a `Driver`, writes use it.
 pub fn Client.new(conn orm.Connection, schema Schema) !Client {
 	schema.validate()!
 	return Client{
 		conn:   conn
 		schema: schema
 	}
+}
+
+// with_ctx returns a client whose queries and writes carry `ctx`, a value the
+// app defines (its user, its request), to hooks and privacy rules. It is a
+// `graphql.Context`, so the GraphQL server passes each request's context on:
+// V can't convert one interface into another, so vgraph and its GraphQL module
+// share the one type.
+pub fn (c Client) with_ctx(ctx graphql.Context) Client {
+	return Client{
+		...c
+		ctx: ctx
+	}
+}
+
+// begin starts a transaction, and returns the client that runs in it. Inside a
+// transaction already, it returns a client in the same one, whose `commit` and
+// `rollback` leave it to the outer client.
+pub fn (c Client) begin() !Client {
+	if c.in_tx {
+		return Client{
+			...c
+			owns_tx: false
+		}
+	}
+	if c.conn is Driver {
+		mut d := c.conn as Driver
+		inner := d.begin_tx()!
+		return Client{
+			...c
+			conn:    inner
+			in_tx:   true
+			owns_tx: true
+		}
+	}
+	if c.conn is orm.TransactionalConnection {
+		mut t := c.conn as orm.TransactionalConnection
+		t.orm_begin()!
+		return Client{
+			...c
+			in_tx:   true
+			owns_tx: true
+		}
+	}
+	return error('this connection runs no transactions: pass a vgraph driver (five07.vgraph.sqlite or five07.vgraph.pg), or an orm.TransactionalConnection')
+}
+
+// commit commits the transaction that `begin` started.
+pub fn (c Client) commit() ! {
+	if !c.owns_tx {
+		return
+	}
+	if c.conn is TxConnection {
+		mut t := c.conn as TxConnection
+		t.commit_tx()!
+	} else if c.conn is orm.TransactionalConnection {
+		mut t := c.conn as orm.TransactionalConnection
+		t.orm_commit()!
+	}
+}
+
+// rollback rolls back the transaction that `begin` started.
+pub fn (c Client) rollback() ! {
+	if !c.owns_tx {
+		return
+	}
+	if c.conn is TxConnection {
+		mut t := c.conn as TxConnection
+		t.rollback_tx()!
+	} else if c.conn is orm.TransactionalConnection {
+		mut t := c.conn as orm.TransactionalConnection
+		t.orm_rollback()!
+	}
+}
+
+// atomic returns a client in a transaction when the connection can run one,
+// and else `c`, whose statements then run one by one.
+fn (c Client) atomic() !Client {
+	if c.in_tx || c.conn is Driver || c.conn is orm.TransactionalConnection {
+		return c.begin()
+	}
+	return c
 }
 
 // load_one follows the many_to_one edge `edge` of `C` from each of `children`,

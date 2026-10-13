@@ -680,21 +680,21 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	s.scalar('Time', time_scalar)
 
 	// Article
-	s.resolve('Query', 'articles', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.articles().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'articles', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).articles().graphql_args(info.args)!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
-	s.resolve('Query', 'articlesCount', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		n := g.articles().graphql_args(info.args)!.count()!
+	s.resolve('Query', 'articlesCount', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		n := g.with_ctx(ctx).articles().graphql_args(info.args)!.count()!
 		return parents.map(graphql.Resolved(graphql.Value(n)))
 	})
 	for name in ['id', 'slug', 'userID', 'title', 'summary', 'body', 'publishedAt', 'createdAt',
 		'updatedAt', 'deletedAt'] {
 		s.resolve('Article', name, resolve_article_field)
 	}
-	s.resolve('Article', 'author', fn [g] (_ graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		loaded := g.articles().with_author().nodes(parents.map((it as ArticleNode).article))!
+	s.resolve('Article', 'author', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).articles().with_author().nodes(parents.map((it as ArticleNode).article))!
 		return loaded.map(fn (n ArticleNode) graphql.Resolved {
 			if target := n.author {
 				return graphql.obj(*target)
@@ -702,9 +702,10 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			return graphql.null
 		})
 	})
-	s.resolve('Article', 'comments', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		sub := g.comments().graphql_args(info.args)!
-		loaded := g.articles().with_comments(fn [sub] (_ CommentQuery) CommentQuery {
+	s.resolve('Article', 'comments', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.comments().graphql_args(info.args)!
+		loaded := cg.articles().with_comments(fn [sub] (_ CommentQuery) CommentQuery {
 			return sub
 		}).nodes(parents.map((it as ArticleNode).article))!
 		mut out := []graphql.Resolved{cap: loaded.len}
@@ -715,21 +716,21 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Comment
-	s.resolve('Query', 'comments', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.comments().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'comments', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).comments().graphql_args(info.args)!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
-	s.resolve('Query', 'commentsCount', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		n := g.comments().graphql_args(info.args)!.count()!
+	s.resolve('Query', 'commentsCount', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		n := g.with_ctx(ctx).comments().graphql_args(info.args)!.count()!
 		return parents.map(graphql.Resolved(graphql.Value(n)))
 	})
 	for name in ['id', 'slug', 'userID', 'ownerType', 'ownerID', 'parentID', 'body', 'createdAt',
 		'updatedAt', 'deletedAt'] {
 		s.resolve('Comment', name, resolve_comment_field)
 	}
-	s.resolve('Comment', 'author', fn [g] (_ graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		loaded := g.comments().with_author().nodes(parents.map((it as CommentNode).comment))!
+	s.resolve('Comment', 'author', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).comments().with_author().nodes(parents.map((it as CommentNode).comment))!
 		return loaded.map(fn (n CommentNode) graphql.Resolved {
 			if target := n.author {
 				return graphql.obj(*target)
@@ -737,8 +738,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			return graphql.null
 		})
 	})
-	s.resolve('Comment', 'parent', fn [g] (_ graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		loaded := g.comments().with_parent().nodes(parents.map((it as CommentNode).comment))!
+	s.resolve('Comment', 'parent', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).comments().with_parent().nodes(parents.map((it as CommentNode).comment))!
 		return loaded.map(fn (n CommentNode) graphql.Resolved {
 			if target := n.parent {
 				return graphql.obj(*target)
@@ -746,8 +747,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			return graphql.null
 		})
 	})
-	s.resolve('Comment', 'article', fn [g] (_ graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		loaded := g.comments().with_article().nodes(parents.map((it as CommentNode).comment))!
+	s.resolve('Comment', 'article', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).comments().with_article().nodes(parents.map((it as CommentNode).comment))!
 		return loaded.map(fn (n CommentNode) graphql.Resolved {
 			if target := n.article {
 				return graphql.obj(*target)
@@ -755,8 +756,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			return graphql.null
 		})
 	})
-	s.resolve('Comment', 'post', fn [g] (_ graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		loaded := g.comments().with_post().nodes(parents.map((it as CommentNode).comment))!
+	s.resolve('Comment', 'post', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).comments().with_post().nodes(parents.map((it as CommentNode).comment))!
 		return loaded.map(fn (n CommentNode) graphql.Resolved {
 			if target := n.post {
 				return graphql.obj(*target)
@@ -764,9 +765,10 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			return graphql.null
 		})
 	})
-	s.resolve('Comment', 'replies', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		sub := g.comments().graphql_args(info.args)!
-		loaded := g.comments().with_replies(fn [sub] (_ CommentQuery) CommentQuery {
+	s.resolve('Comment', 'replies', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.comments().graphql_args(info.args)!
+		loaded := cg.comments().with_replies(fn [sub] (_ CommentQuery) CommentQuery {
 			return sub
 		}).nodes(parents.map((it as CommentNode).comment))!
 		mut out := []graphql.Resolved{cap: loaded.len}
@@ -777,20 +779,20 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Post
-	s.resolve('Query', 'posts', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.posts().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'posts', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).posts().graphql_args(info.args)!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
-	s.resolve('Query', 'postsCount', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		n := g.posts().graphql_args(info.args)!.count()!
+	s.resolve('Query', 'postsCount', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		n := g.with_ctx(ctx).posts().graphql_args(info.args)!.count()!
 		return parents.map(graphql.Resolved(graphql.Value(n)))
 	})
 	for name in ['id', 'slug', 'userID', 'body', 'createdAt', 'updatedAt', 'deletedAt'] {
 		s.resolve('Post', name, resolve_post_field)
 	}
-	s.resolve('Post', 'author', fn [g] (_ graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		loaded := g.posts().with_author().nodes(parents.map((it as PostNode).post))!
+	s.resolve('Post', 'author', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).posts().with_author().nodes(parents.map((it as PostNode).post))!
 		return loaded.map(fn (n PostNode) graphql.Resolved {
 			if target := n.author {
 				return graphql.obj(*target)
@@ -798,9 +800,10 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			return graphql.null
 		})
 	})
-	s.resolve('Post', 'comments', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		sub := g.comments().graphql_args(info.args)!
-		loaded := g.posts().with_comments(fn [sub] (_ CommentQuery) CommentQuery {
+	s.resolve('Post', 'comments', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.comments().graphql_args(info.args)!
+		loaded := cg.posts().with_comments(fn [sub] (_ CommentQuery) CommentQuery {
 			return sub
 		}).nodes(parents.map((it as PostNode).post))!
 		mut out := []graphql.Resolved{cap: loaded.len}
@@ -811,21 +814,22 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// User
-	s.resolve('Query', 'users', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.users().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'users', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).users().graphql_args(info.args)!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
-	s.resolve('Query', 'usersCount', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		n := g.users().graphql_args(info.args)!.count()!
+	s.resolve('Query', 'usersCount', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		n := g.with_ctx(ctx).users().graphql_args(info.args)!.count()!
 		return parents.map(graphql.Resolved(graphql.Value(n)))
 	})
 	for name in ['id', 'slug', 'name', 'email', 'createdAt', 'updatedAt', 'deletedAt'] {
 		s.resolve('User', name, resolve_user_field)
 	}
-	s.resolve('User', 'articles', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		sub := g.articles().graphql_args(info.args)!
-		loaded := g.users().with_articles(fn [sub] (_ ArticleQuery) ArticleQuery {
+	s.resolve('User', 'articles', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.articles().graphql_args(info.args)!
+		loaded := cg.users().with_articles(fn [sub] (_ ArticleQuery) ArticleQuery {
 			return sub
 		}).nodes(parents.map((it as UserNode).user))!
 		mut out := []graphql.Resolved{cap: loaded.len}
@@ -834,9 +838,10 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('User', 'posts', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		sub := g.posts().graphql_args(info.args)!
-		loaded := g.users().with_posts(fn [sub] (_ PostQuery) PostQuery {
+	s.resolve('User', 'posts', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.posts().graphql_args(info.args)!
+		loaded := cg.users().with_posts(fn [sub] (_ PostQuery) PostQuery {
 			return sub
 		}).nodes(parents.map((it as UserNode).user))!
 		mut out := []graphql.Resolved{cap: loaded.len}
@@ -845,9 +850,10 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('User', 'comments', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		sub := g.comments().graphql_args(info.args)!
-		loaded := g.users().with_comments(fn [sub] (_ CommentQuery) CommentQuery {
+	s.resolve('User', 'comments', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.comments().graphql_args(info.args)!
+		loaded := cg.users().with_comments(fn [sub] (_ CommentQuery) CommentQuery {
 			return sub
 		}).nodes(parents.map((it as UserNode).user))!
 		mut out := []graphql.Resolved{cap: loaded.len}

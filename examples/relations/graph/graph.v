@@ -3,6 +3,7 @@ module graph
 
 import orm
 import five07.vgraph
+import five07.vgraph.graphql
 import models
 
 // Graph is the typed client for the schema: start a query with the method named
@@ -36,7 +37,34 @@ pub fn schema() !vgraph.Schema {
 	return s
 }
 
-// NotFoundError is the error of `first()` when no row matches.
+// with_ctx returns a graph whose queries and writes carry `ctx`, a value the
+// app defines, such as its user, to hooks and privacy rules. The GraphQL server
+// passes each request's context on.
+pub fn (g Graph) with_ctx(ctx graphql.Context) Graph {
+	return Graph{
+		client: g.client.with_ctx(ctx)
+	}
+}
+
+// ctx returns the value `with_ctx` gave, or a `vgraph.NoContext`.
+pub fn (g Graph) ctx() graphql.Context {
+	return g.client.ctx
+}
+
+// tx runs `f` in a transaction: it commits when `f` succeeds, and rolls back
+// when it fails. The graph `f` gets runs every query and write in the
+// transaction; inside one already, `f` joins it.
+pub fn (g Graph) tx(f fn (tx Graph) !) ! {
+	client := g.client.begin()!
+	f(Graph{ client: client }) or {
+		client.rollback() or {}
+		return err
+	}
+	client.commit()!
+}
+
+// NotFoundError is the error of `first()` when no row matches, and of a write
+// to one row that doesn't exist.
 pub struct NotFoundError {
 	Error
 pub:

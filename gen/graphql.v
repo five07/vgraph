@@ -467,13 +467,13 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		root := info.gql_root()
 		b.writeln('
 	// ${t}
-	s.resolve(\'Query\', \'${root}\', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.${info.table.name}().graphql_args(info.args)!.all()!
+	s.resolve(\'Query\', \'${root}\', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).${info.table.name}().graphql_args(info.args)!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
-	s.resolve(\'Query\', \'${root}Count\', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		n := g.${info.table.name}().graphql_args(info.args)!.count()!
+	s.resolve(\'Query\', \'${root}Count\', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		n := g.with_ctx(ctx).${info.table.name}().graphql_args(info.args)!.count()!
 		return parents.map(graphql.Resolved(graphql.Value(n)))
 	})')
 		fields := info.gql_fields()
@@ -486,9 +486,10 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			target := infos[e.to] or { continue }
 			rows := 'parents.map((it as ${info.node()}).${info.field()})'
 			if is_list_edge(e) {
-				b.writeln('	s.resolve(\'${t}\', \'${camel(e.name)}\', fn [g] (_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		sub := g.${target.table.name}().graphql_args(info.args)!
-		loaded := g.${info.table.name}().with_${e.name}(fn [sub] (_ ${target.query()}) ${target.query()} {
+				b.writeln('	s.resolve(\'${t}\', \'${camel(e.name)}\', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.${target.table.name}().graphql_args(info.args)!
+		loaded := cg.${info.table.name}().with_${e.name}(fn [sub] (_ ${target.query()}) ${target.query()} {
 			return sub
 		}).nodes(${rows})!
 		mut out := []graphql.Resolved{cap: loaded.len}
@@ -498,8 +499,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		return out
 	})')
 			} else {
-				b.writeln('	s.resolve(\'${t}\', \'${camel(e.name)}\', fn [g] (_ graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		loaded := g.${info.table.name}().with_${e.name}().nodes(${rows})!
+				b.writeln('	s.resolve(\'${t}\', \'${camel(e.name)}\', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).${info.table.name}().with_${e.name}().nodes(${rows})!
 		return loaded.map(fn (n ${info.node()}) graphql.Resolved {
 			if target := n.${e.name} {
 				return graphql.obj(*target)

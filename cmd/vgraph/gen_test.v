@@ -356,6 +356,27 @@ fn test_graphql() {
 	}, unsafe { nil })
 	assert failed.errors.map(it.message) == [\'not now\']
 }
+
+// Writes on a connection without a vgraph driver, which runs no transactions:
+// a polymorphic edge sets its type column too.
+fn test_polymorphic_writes() {
+	g, _ := setup()!
+	e := g.comments().create().set_body(\'e\').set_article_id(2).save()!
+	assert e.comment.owner_type == \'Article\'
+	assert e.query_article().first()!.article.title == \'SQL\'
+	// comment 3, on a Post, moves to article 2
+	g.articles().update_one_id(2).add_comments_ids(3).exec()!
+	assert g.articles().where_id(2).first()!.query_comments().order_by_id().all()!.map(it.comment.body) == [
+		\'c\',
+		\'e\',
+	]
+	// a comment always has an owner
+	g.articles().update_one_id(2).remove_comments_ids(3).exec() or {
+		assert err.msg() == \'`comments.owner_id` is not nullable, so `comments` can\\\'t lose a target; delete it, or point it elsewhere\'
+		return
+	}
+	assert false
+}
 '
 
 fn test_gen_writes_a_working_client() {
@@ -371,8 +392,9 @@ fn test_gen_writes_a_working_client() {
 
 	os.write_file(os.join_path(root, 'api.graphql'), api_sdl)!
 	run(root, 'graph')!
-	assert os.ls(os.join_path(root, 'graph'))!.sorted() == ['articles.v', 'audits.v', 'comments.v',
-		'graph.v', 'graphql.v', 'resolvers.v', 'schema.graphql', 'tags.v', 'users.v']
+	assert os.ls(os.join_path(root, 'graph'))!.sorted() == ['articles.v', 'articles_mutation.v',
+		'audits.v', 'audits_mutation.v', 'comments.v', 'comments_mutation.v', 'graph.v', 'graphql.v',
+		'resolvers.v', 'schema.graphql', 'tags.v', 'tags_mutation.v', 'users.v', 'users_mutation.v']
 	// a stub for each field api.graphql adds
 	stubs := os.read_file(os.join_path(root, 'graph', 'resolvers.v'))!
 	for method in ['query_hello', 'article_url', 'mutation_touch'] {

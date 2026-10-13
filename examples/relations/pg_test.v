@@ -5,6 +5,7 @@ module main
 // runs only with `-d vgraph_pg`, and reads `PGHOST`, `PGPORT`, `PGUSER`,
 // `PGPASSWORD` and `PGDATABASE`. It drops and recreates the tables it uses.
 import db.pg
+import five07.vgraph.pg as vpg
 import os
 
 const relation_tables = ['schema_migrations', 'users', 'cards', 'pets', 'groups', 'group_users',
@@ -24,7 +25,7 @@ fn fixture() !Fixture {
 		db.exec('DROP TABLE IF EXISTS "${table}"')!
 	}
 	migrate(mut db, .pg)!
-	return seed(db)!
+	return seed(db, vpg.direct(db))!
 }
 
 fn test_o2o_two_types() {
@@ -69,4 +70,8 @@ fn test_uuid_keys() {
 
 fn test_graphql() {
 	check_graphql(fixture()!)!
+}
+
+fn test_writes() {
+	check_writes(fixture()!)!
 }

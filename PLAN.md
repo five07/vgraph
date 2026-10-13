@@ -622,23 +622,40 @@ Decisions (2026-10-13):
   interceptors and privacy rules. The GraphQL handler sets it per request. Hooks
   depend on it, so 6c's design starts from it.
 
+Decisions before 6a (Q51–Q60, 2026-10-13):
+- **SQL layer** (Q51): vgraph writes its own parameterized SQL where `orm.Connection`
+  can't, through a `vgraph.Driver` with adapters for SQLite and PostgreSQL only. A
+  plain `orm.Connection` still works, with workarounds, or an error naming the
+  adapter. An upstream `orm.RawConnection` is future state (`TODO.md`).
+- **Order** (Q52): 6a → 6c → 6b → 6d → 6e. **Exit** (Q59): the default, per sub-phase.
+- **Context** (Q53): `vgraph.Context`, an empty interface; `g.with_ctx(ctx)`.
+- **Hooks** (Q54): untyped schema hooks in `hooks()` on the models, on
+  `vgraph.Mutation`, and typed runtime hooks on the `Graph`.
+- **Field options** (Q55), **write results** (Q56) and **upsert** (Q57): the defaults.
+- **`examples/service`** (Q58): unchanged until Phase 6 is complete. Then its REST API
+  is removed and it runs on vgraph alone: generated queries, writes, hooks and
+  mutations. This replaces Q40's plan to move its stores into hooks along the way,
+  and Q35's REST-to-GraphQL query-count comparison ends with it.
+- **`TODO.md`** (Q60): held. Its items wait for a new plan after `v0.1.0`; Phase 6
+  doesn't take them on.
+
 Inventory (2026-10-13), checked against Ent's docs. "Extra" marks what vgraph has
 that Ent doesn't.
 
 | Area | Ent feature | vgraph today | Phase |
 |---|---|---|---|
 | **Fields** | types: ints of every size, floats, bool, string/text, time, bytes, JSON, enum, UUID, `Other` | `int`, `i64`, `f64`, `bool`, `string`, `time.Time`, and options of these | 6d |
-| | `Optional`, `Nillable` | option types are nullable; nothing marks a field optional on create | 6a |
-| | `Default`, `DefaultFunc`, `UpdateDefault` | none | 6a |
-| | `Immutable`, `Sensitive` | none (Q29 hides fields from GraphQL in Phase 4) | 6a |
+| | `Optional`, `Nillable` | `Field.optional`; option types are nullable; `set_nillable_<field>` | 6a (done) |
+| | `Default`, `DefaultFunc`, `UpdateDefault` | `default`, `default_now`, `update_default`, `update_now` | 6a (done) |
+| | `Immutable`, `Sensitive` | `immutable` (no update setter); `sensitive` leaves GraphQL only, as V's `str()` can't be changed | 6a (done) |
 | | `Unique`, `StorageKey`, `SchemaType`, `Comment`, `Deprecated` | through V's ORM attributes: `@[unique]`, `@[sql: 'col']`, `sql_type` | 6d |
-| | validators: `Validate`, `MinLen`, `MaxLen`, `NotEmpty`, `Match`, `Range`, `Positive` | none | 6a |
+| | validators: `Validate`, `MinLen`, `MaxLen`, `NotEmpty`, `Match`, `Range`, `Positive` | `validate`, `min_len`, `max_len`, `not_empty`, `pattern`, `min` / `max`, `positive` | 6a (done) |
 | | custom types: `GoType`, `ValueScanner` | none | 6d |
 | | id types: `i64`, string (UUID) | `int` only (Q6) | 3.2 (Q43) |
 | | id types: custom (`GoType`, `ValueScanner`) | none | 6d |
 | **Edges** | `To` / `From` with `Ref` (an edge and its inverse, checked together) | each direction declared on its own, with no link between them | 6d |
 | | `Unique`, `Field` (the column holding the key) | the kind and `column` | done |
-| | `Required`, `Immutable`, `StorageKey` | none | 6a / 6d |
+| | `Required`, `Immutable`, `StorageKey` | none | 6d (moved from 6a: edge options are schema work) |
 | | `Through`: edge schemas, join tables with fields of their own | join tables have only the two keys | 6d |
 | | — | polymorphic edges, per-edge soft delete (extra) | done |
 | **Schema** | declared indexes (fields, edges, unique, partial) | edge columns and join pairs, through the migration helpers | 5 (done) / 6d |
@@ -663,17 +680,17 @@ that Ent doesn't.
 | | named edges (`WithNamed<Edge>`) | none | 6b |
 | | `Edges.<X>OrErr`: "not loaded" told apart from "empty" | option fields and lists | 6b |
 | | `entql`, generic filtering at runtime | none | 6b |
-| **Writes** | `Create`, `CreateBulk`, `MapCreateBulk` | none | 6a |
-| | upsert (`OnConflict`, `UpdateNewValues`, `Ignore`, `DoNothing`) | none | 6a |
-| | `Update`, `UpdateOne`, `UpdateOneID`: `Set`, `Add` (increment), `Clear`, `Append` | none | 6a |
-| | edge writes: `Add<Edge>IDs`, `Remove<Edge>`, `Clear<Edge>`, `Set<Edge>ID` | none | 6a |
-| | `Delete`, `DeleteOne`, `DeleteOneID` | none | 6a |
-| | the `Mutation` interface (changed fields, old values) | none | 6a (hooks need it) |
-| | transactions: `Tx`, `Commit`, `Rollback`, transaction hooks | none; `orm.TransactionalConnection` exists | 6a |
+| **Writes** | `Create`, `CreateBulk`, `MapCreateBulk` | `create`, `create_bulk`, `map_create_bulk` | 6a (done) |
+| | upsert (`OnConflict`, `UpdateNewValues`, `Ignore`, `DoNothing`) | `on_conflict_columns`, `update_new_values`, `ignore`, `do_nothing`, with a driver | 6a (done) |
+| | `Update`, `UpdateOne`, `UpdateOneID`: `Set`, `Add` (increment), `Clear`, `Append` | `update`, `update_one`, `update_one_id`; `set_`, `add_`, `clear_` | 6a (done); `Append` 6d, with JSON fields |
+| | edge writes: `Add<Edge>IDs`, `Remove<Edge>`, `Clear<Edge>`, `Set<Edge>ID` | `add_` / `remove_<edge>_ids`, `add_` / `remove_<edge>`, `clear_<edge>`, `set_<edge>_id`, `set_<edge>` | 6a (done) |
+| | `Delete`, `DeleteOne`, `DeleteOneID` | `delete`, `delete_one`, `delete_one_id` | 6a (done) |
+| | the `Mutation` interface (changed fields, old values) | `vgraph.Mutation`, `MutationData`, and a typed `<T>Mutation` per table | 6a (done); old values 6c |
+| | transactions: `Tx`, `Commit`, `Rollback`, transaction hooks | `g.tx`, `Client.begin` / `commit` / `rollback` | 6a (done); transaction hooks 6c |
 | **Runtime** | hooks: schema and runtime, `On` / `If` / `Unless` | none | 6c |
 | | interceptors: `Intercept`, `Traverse`, soft delete as an interceptor | per-edge `soft_del` | 6c |
 | | privacy: policies, rules, viewer context | none | 6c |
-| | `context.Context` on every call | none | 6c (Q41) |
+| | `context.Context` on every call | `g.with_ctx(ctx)`, passed on by the GraphQL server | 6a (done); its use 6c |
 | | debug logging of queries | `CountingConnection` in tests; `app/trace.v` in `service` | 6c (`vgraph.trace`, Q16) |
 | **Codegen** | `entc` feature flags, external templates, extensions | `vgraph gen`, no options | 6d |
 | | `ent describe` | none | 6d (`vgraph describe`) |
@@ -689,6 +706,162 @@ that Ent doesn't.
 | | annotations: `Skip`, `Type`, `QueryField`, `RelayConnection`, `Mutations`, `OrderField`, `Directives` | none | 4 (`Skip`, Q29); rest 6e |
 | | `Transactioner` (a transaction per request) | none | 4 (Q34) |
 | **Other** | Gremlin driver; entproto, entoas/ogent | none | §8 (Q37) |
+
+*Readiness review (2026-10-13), after Phase 5.* What Phase 6 builds on, and what
+stands in its way. Questions: Q51–Q60.
+
+What's there to build on:
+- `load` reads through `orm.Connection.select` with `Cond` / `Query`; `count_where`
+  uses the ORM's aggregate. Nothing in the package writes.
+- `Schema.add[T]` reflects columns (type, nullability, `sql_type`, `graphql_skip`) and
+  calls `edges()` through `$for method`; `fields()` and `hooks()` can be found the
+  same way.
+- `vgraph gen` gets the schema as JSON from a loader program. Closures (validators,
+  default functions, hooks) can't go through JSON, so the generator only learns
+  which options a field *has*; the generated code calls `fields()` and `hooks()` at
+  runtime, through `schema()`.
+- `graphql` already has `Context` (an empty interface passed to every resolver) and
+  `Transaction` (begin, commit, rollback around a request's mutations).
+- The ORM has `orm.TransactionalConnection`, `orm.Tx` with savepoints, `JoinConfig`
+  (inner and left joins), `QueryData.parentheses` and `is_and` (so OR and grouping
+  can be expressed), aggregates (`count`, `sum`, `avg`, `min`, `max`, one per
+  select), `has_distinct`, and raw expressions in `select_exprs`.
+
+What `orm.Connection` can't do (V master `53dd72c`), and which Ent features need it:
+
+| Missing | Needed by |
+|---|---|
+| a row count from `update` / `delete` (both return `!`) | `update().exec()` / `delete().exec()` returning rows changed (Q38) |
+| `RETURNING`; `last_id()` is an `int` (pg: `LASTVAL()`, stashed per thread on a pool) | `RETURNING id` on PostgreSQL (Q38), `i64` keys past 32 bits |
+| parameters in raw SQL: `execute(query string)` takes none | anything vgraph writes as SQL itself |
+| `NOT`, `NOT LIKE`, `ESCAPE` | `not`, `Contains` without wildcards, the `Fold` forms on SQLite |
+| subqueries, `EXISTS` | `has<Edge>`, `has<Edge>With`, traversal from a query in one statement |
+| `GROUP BY`, more than one `ORDER BY` column, `NULLS FIRST/LAST` | `GroupBy`, multi-field ordering, ordering by an edge's count |
+| window functions | per-parent `limit` in SQL (Q32), connections' `first` per parent |
+| `FOR UPDATE` / `FOR SHARE`, `ON CONFLICT` (upsert lives in the deprecated function API) | locking, upsert |
+
+Every driver has a parameterized raw call, `exec_param_many(query, params)`
+(`sqlite.DB`, `pg.DB` / `pg.Conn` / `pg.Tx`, `mysql.DB`), but it isn't on the interface,
+and each returns its own `Row` type. Q51 decides how vgraph reaches it.
+
+Other findings:
+- **An import cycle shapes hooks.** The generated `graph` module imports the models;
+  a model's `hooks()` can't import `graph`, so a schema hook can't see the generated
+  `ArticleMutation`. Ent avoids this because `entc` generates the entity structs
+  itself. Q54.
+- **`Field` can't hold a typed validator per field.** `[]vgraph.Field` is one list,
+  so `validate: fn (v string) !` (Q39's sketch) only fits string fields. Q55.
+- **`examples/service` writes by slug and reads back by slug** (to avoid `last_id()`
+  races, §5). Its store logic (normalize, validate, slug, timestamps, publish time,
+  soft delete) maps onto field options and hooks; the `Owner` registry's `id_of`
+  stays app code. *(Q58: it changes only once Phase 6 is complete.)*
+- **Order.** Hooks (6c) need the `Mutation` that 6a defines, and Q41 puts the context
+  first. Generated mutations (6e) replace `examples/service`'s hand-written ones only
+  once hooks hold its logic (Q40), and `Node` (6e) needs globally unique ids (6d).
+  So the order is 6a → 6c → 6b → 6d → 6e (Q52), not the letters' order.
+- **Size.** 6a alone roughly doubles each generated table file (a create, update and
+  delete builder, a mutation type, setters per field and edge). Generated code
+  rather than generics keeps to what has compiled reliably (seven compiler bugs so
+  far, all in generics or comptime).
+- **`TODO.md` overlaps Phase 6:** pagination by config with a `pagination` example
+  (6e), a hooks example with a JWT bearer token and access checks (6c privacy), OTel
+  (6c, with `vgraph.trace`), polymorphic foreign keys (6d), and docs. Federation is
+  already §8. *(Q60: held until after `v0.1.0`.)*
+
+Work per sub-phase (Q51–Q60 answered):
+- **6a, writes:** the SQL layer: `vgraph.Driver` and the SQLite and PostgreSQL
+  adapters (Q51); `vgraph.Field` and `fields()` reflected by
+  `Schema.add`, `@[graphql: '-']` folded in (Q39, Q55); `Context` and `g.with_ctx`
+  (Q41, Q53); `g.tx(fn (tx Graph) !)` on `orm.TransactionalConnection`, with the
+  GraphQL `Transaction` adapter built on it; the `Mutation` interface and a generated
+  `<Table>Mutation` (op, set fields, cleared fields, edge ids added and removed, old
+  values for update one) (Q54); generated `create` / `create_bulk` / `update_one` /
+  `update` / `delete_one` / `delete` with `set_` / `add_` / `clear_` and edge setters,
+  validators and defaults applied (Q38, Q56); upsert (Q57); migration helpers for
+  field defaults and unique fields (Q36); tests on SQLite and PostgreSQL.
+- **6c, runtime:** schema and runtime hooks with `on` / `if` / `unless` (Q40, Q54);
+  interceptors on queries and traversals, with per-edge `soft_del` re-expressed as
+  one; privacy policies (allow, deny, skip) on queries and mutations; `vgraph.trace`
+  (Q16).
+- **6b, queries:** `and` / `or` / `not`; `NEQ`, `NotIn`, escaped `Contains` /
+  `HasPrefix` / `HasSuffix`, `EqualFold` / `ContainsFold`; `has_<edge>` /
+  `has_<edge>_with`; traversal from a query; `only`, `ids`, `first_id`, `only_id`,
+  `exist`; `select` / `scan`, `unique`; `group_by` / `aggregate`; several order
+  fields and order by edge; `for_update` / `for_share`; named edges; "not loaded"
+  told apart from "empty"; raw predicates and modifiers.
+- **6d, schema:** more field types (sized ints, `u*`, `f32`, bytes, JSON, enums),
+  custom key types, globally unique ids through the migration helpers, edge
+  inverses (`ref`) checked together, `required` / `immutable` edges, edge schemas,
+  mixins (embedded structs), declared indexes, views, `vgraph describe`, generator
+  options.
+- **6e, entgql:** `Node` / `node` / `nodes`; generated `create<T>` / `update<T>` /
+  `delete<T>` mutations with `Create<T>Input` / `Update<T>Input`; Relay connections
+  with cursors, `totalCount` and per-parent pagination in SQL; the full
+  `WhereInput`; multi-field `orderBy`; the remaining annotations.
+- **After 6e** (Q58): `examples/service` drops its REST API and stores, and runs on
+  vgraph alone.
+
+*6a result (2026-10-13, done):*
+- **Drivers** (Q51): `vgraph.Driver` (`orm.Connection`, `dialect()`,
+  `exec_params(query, params)`, `begin_tx()`) and `TxConnection`. Adapters:
+  `five07.vgraph.sqlite` (`sqlite.new(db)`), and `five07.vgraph.pg` for a pool
+  (`pg.pool(db)`: a transaction pins one connection through `pg.DB.begin`), a direct
+  connection (`pg.direct(conn)`) and a transaction. Parameters go as text, stored as
+  the ORM stores them (SQLite: booleans 0/1, times as Unix seconds); nulls are written
+  into the SQL, since the drivers' raw calls take strings only. PostgreSQL
+  transactions run at READ COMMITTED. `Client` finds the driver with `conn is Driver`.
+- **Field options** (Q39, Q55): `vgraph.Field` and `fields()`, reflected by
+  `Schema.add` and checked by `validate` (a missing field, an option the type can't
+  have, an immutable field with an update default). `Column` gained `serial`,
+  `optional`, `immutable`, `sensitive`, `unique`, `comment`, `deprecated`,
+  `has_default`, `auto_update`. The closures stay out of `Table`, in `Schema.options`:
+  `json2` can't encode a struct with function fields, even with `@[json: '-']`, and
+  `vgraph gen` prints the tables as JSON. `sensitive` and `graphql_skip` hide a field
+  from GraphQL, as `@[graphql: '-']` does.
+- **Writes:** `MutationData` (values, increments, edge keys added, removed and
+  cleared, conditions, upsert) implements `vgraph.Mutation`; `Client.create`,
+  `create_bulk`, `update_one`, `update`, `delete_one`, `delete` run it. A create
+  applies defaults, reports required columns, runs the checks, inserts, then writes
+  edges; an update reads the matching keys, updates by key, then writes edges; a
+  delete removes the rows' join-table rows first. All in one transaction where the
+  connection has one. Counts come from the keys read in that transaction, which
+  works with or without a driver (Q56 said `RETURNING`; the result is the same).
+  Without a driver a new key comes from `last_id()`, and upserts are refused.
+- **Bulk inserts:** one statement with `RETURNING` on PostgreSQL; one per row on
+  SQLite, whose `RETURNING` doesn't promise the rows' order, and for `do_nothing`.
+- **Generator:** `<table>_mutation.v` per table: `<T>Mutation` with typed getters;
+  `<T>Create` / `<T>CreateBulk` (with `map_create_bulk[T]`), `<T>UpdateOne`,
+  `<T>Update`, `<T>DeleteOne`, `<T>Delete`, as in README.md. Immutable fields have no
+  update setter; foreign keys have no `add_`; a polymorphic `set_<edge>_id` sets the
+  type column too; a one_to_one `set_<edge>_id` on an update first unlinks the row's
+  current target, when the target's column is nullable; when it isn't, the unique
+  index refuses a second target. Two setters of one name are an error.
+  `graph.v` gained `with_ctx`, `ctx` and `tx`.
+- **Context** (Q53): `with_ctx` takes a `graphql.Context`, not a `vgraph.Context`. V
+  can't convert one interface to another, or smartcast through an interface alias,
+  so vgraph and its GraphQL module share one type, and the generated resolvers pass
+  the request's context to the queries they run.
+- **Migration helpers** (Q36): a field with `unique` gets a unique index.
+- **Tests:** `write_test.v`: every operation, check and default, edges of every
+  kind, rollback of a failed edge write, transactions, bulk, upsert, on SQLite with and
+  without the driver. `examples/relations` `check_writes`: each relationship kind
+  written through the generated builders, UUID keys, an upsert on the key, bulk
+  creates, updates and deletes of many rows, a rolled-back `g.tx`, on SQLite and
+  PostgreSQL. `pg_test.v`: the pool driver, a multi-row insert's keys in order, and a
+  transaction's writes unseen by the pool's other connections until it ends.
+  `cmd/vgraph/gen_test.v`: polymorphic writes on a connection without a driver or
+  transactions. All 19 test files pass, and both PostgreSQL tests against PostgreSQL
+  18. `examples/service`'s code is unchanged (Q58); only its generated client is
+  regenerated, and its tests and GraphQL schema are unchanged.
+- **Compiler bug found:** an eighth, `regressions/fn_var_shadows_module_fn/`: a local
+  variable holding a function, named like a function of an imported module
+  (`validate`, which `graphql` declares), is called as that function, and the C
+  doesn't compile.
+- **Moved on:** old values in `Mutation` to 6c, with the hooks that read them; edge
+  `required` / `immutable` to 6d; `Append` to 6d, with JSON fields; field `comment` and
+  `deprecated` as GraphQL descriptions to 6e. A `graphql.Transaction` built on `g.tx`
+  waits for 6e's generated mutations: the generated resolvers use the graph they were
+  built with, so on a pool a request's transaction needs a per-request graph.
 
 ## 7. Questions
 
@@ -1147,6 +1320,134 @@ vgraph.
 A command that writes a migration file (`vgraph migrate new`), or diffs the schema
 against the database as Atlas does, stays out (Q10).
 > A: accept default
+
+### Phase 6 (Ent parity): answer before 6a starts
+
+Background: the readiness review under Phase 6. Q51–Q57 shape 6a; Q58–Q60 cover the
+rest. Each later sub-phase gets its own short round of questions before it starts,
+as Phase 5 did.
+
+**Q51. The SQL that `orm.Connection` can't run.** Row counts, `RETURNING`, `NOT`,
+`ESCAPE`, subqueries, `GROUP BY`, window functions, locking and upsert all need SQL
+the interface can't express, and `execute` takes no parameters. **Default:** (b).
+- (a) Stay on `orm.Connection` only. Each gap gets a workaround (a count select
+  before an update, two queries for `has<Edge>`, a select by a unique key after an
+  insert) or is left out. No new dependencies, but parity stops short: no locking,
+  upsert, `GROUP BY` or per-parent pagination in SQL.
+- (b) vgraph builds its own parameterized SQL per dialect, and runs it through a
+  `vgraph.Driver` interface: `orm.Connection` plus `exec(query, params) ![][]?string`
+  and `dialect()`. Small adapters live in their own modules
+  (`five07.vgraph.sqlite`, `.pg`, `.mysql`) so an app only links the driver it
+  imports. `load` keeps `orm.Connection.select` for what it already does. A plain
+  `orm.Connection` still works; the features that need a driver return an error
+  naming the adapter to use.
+- (c) Like (b), but everything, the existing loads included, moves to vgraph's SQL,
+  and `orm.Connection` is only used for its connection.
+>  A:  For now, create the workarounds for sqlite and postgres only (a)
+>
+> *Clarified in chat (2026-10-13): (b), with adapters for SQLite and PostgreSQL only.
+> (d), the upstream `orm.RawConnection`, is future state, recorded in `TODO.md`.*
+
+**Q52. Sub-phase order.** **Default:** 6a writes → 6c runtime → 6b queries → 6d
+schema → 6e entgql, each with its own exit criteria and a result recorded here. 6a
+includes the context (Q41) and transactions, since writes and hooks need both.
+>  A: agreed
+
+**Q53. The context's type.** **Default:** `vgraph.Context`, an empty interface like
+`graphql.Context`; the app passes its own struct and smartcasts it in hooks and
+rules. `g.with_ctx(ctx)` returns a copy of the `Graph`. The generated GraphQL server
+passes its request context through, so one value reaches resolvers, hooks and
+privacy rules. The other choice, a generic `Graph[C]`, types the context but puts a
+type parameter on every generated query, which is where the compiler bugs have been.
+>  A: agreed
+
+**Q54. Typed and untyped hooks.** A model's `hooks()` can't import the generated
+`graph` module (a cycle), so it can't take the typed `ArticleMutation`.
+**Default:** both, as Ent has both:
+- schema hooks in `fn (Article) hooks() []vgraph.Hook`, on the untyped
+  `vgraph.Mutation` interface: `op()`, `table()`, `field(name) ?orm.Primitive`,
+  `set_field(name, value) !`, `clear_field(name)`, `old_field(name) !?orm.Primitive`,
+  `added_ids(edge)`, `removed_ids(edge)`;
+- runtime hooks registered on the `Graph` in the app, typed:
+  `g.articles().use(fn (next ArticleMutator) ArticleMutator { ... })`, where the
+  generated `ArticleMutation` has `title() ?string`, `set_title(string)`, and so on.
+
+The other choice moves the schema out of the model structs, as Ent does: `vgraph gen`
+writes the row structs too, and schema hooks can be typed. That reverses Q18.
+>  A: both, as Ent has both
+
+**Q55. Field options' shape** (refines Q39). One `[]vgraph.Field` list can't hold a
+`fn (string) !` for one field and a `fn (int) !` for another. **Default:**
+```v ignore
+vgraph.Field{
+	name: 'title'
+	// built-in checks, stored as data, also used for the GraphQL schema's docs
+	not_empty: true
+	max_len:   200
+	// anything else; the value as the ORM sees it
+	validate:  fn (v orm.Primitive) ! { ... }
+}
+vgraph.Field{name: 'slug', immutable: true, default: fn () orm.Primitive { return app.new_slug() }}
+vgraph.Field{name: 'created_at', default_now: true, immutable: true}
+vgraph.Field{name: 'updated_at', default_now: true, update_now: true}
+vgraph.Field{name: 'password_hash', sensitive: true} // never printed or exposed
+```
+Built-ins: `not_empty`, `min_len`, `max_len`, `match` (a regex), `min`, `max`,
+`positive`; flags: `optional`, `immutable`, `sensitive`, `unique`, `comment`,
+`deprecated`. The generated setters stay typed; the checks run in `save()`, after
+the hooks, as Ent runs them. Normalizing (trimming a title) is a hook's job.
+>  A: use the default 
+
+**Q56. What a write returns, and how ids come back.** **Default:**
+- `save()` on a create or `update_one` returns the node, read back by its key in one
+  select, so database defaults and hooks' changes show; `exec()` skips the read;
+- `update().exec()` and `delete().exec()` return the rows changed, through
+  `RETURNING` (SQLite 3.35+, PostgreSQL), or a count in the same transaction where the
+  driver lacks it (MySQL, a plain `orm.Connection`);
+- a new key comes from `RETURNING` with a driver, else `last_id()` inside the
+  create's transaction (`int` keys only); a `string` key, such as a UUID, must be set
+  or have a `default`;
+- `create_bulk` is one multi-row insert with a driver, else one insert per row, in
+  one transaction either way.
+>  A: agreed
+
+**Q57. Upsert, and what stays out of 6a.** **Default:** 6a has
+`create().on_conflict_columns('slug').update_new_values()` / `.ignore()` /
+`.do_nothing()` on SQLite and PostgreSQL through the driver (Q51). `Add` (increment),
+`Append` and `MapCreateBulk` are in 6a too; transaction hooks are in 6c.
+>  A: agreed
+
+**Q58. `examples/service` through Phase 6.** **Default:** in 6a its stores' writes
+become builder calls, still behind the same store methods and REST handlers, and it
+keeps its slugs. The write endpoints' selects get new baselines, written down with
+the reason; the read endpoints' must not change. In 6c the store logic moves into
+field options and hooks (Q40), and the stores shrink to reads by slug. In 6e its
+`api.graphql` mutations are replaced by generated ones, with REST's messages kept.
+>  A: don't update service until all of Phase 6 is complete, then remove all REST functionality and implement only vgraph
+
+**Q59. Exit criteria for each sub-phase.** **Default:** every inventory row for that
+sub-phase is done, or moved on purpose with a reason; each feature has tests on
+SQLite and PostgreSQL (MySQL untested, Q49); `examples/relations` exercises it per
+relationship kind where that applies; generated code is checked in CI; the
+graphql-js check still passes on the generated schemas; `v vet` and `v fmt -verify`
+are clean.
+>  A: agreed
+
+**Q60. `TODO.md` items.** **Default:** fold them into Phase 6 and delete them from
+`TODO.md`:
+- pagination by config (offset or Relay connections, chosen per table or per field),
+  and a `pagination` example showing both: 6e;
+- a hooks example with a JWT bearer token and a hook or privacy rule that allows or
+  denies access: 6c, using the context (Q53);
+- OTel: 6c, on `vgraph.trace`, in its own module so the core needs no OTel dependency;
+- polymorphic foreign keys on related tables: 6d. What did you mean: a check that a
+  polymorphic edge's `owner_id` points at a row of the table its `owner_type` names
+  (a trigger, or a check in a hook)?
+- schema discovery and validation: what did you mean? `vgraph describe` (6d), or
+  checking the database against the schema?
+- docs section: after 6e, before `v0.1.0`;
+- federation: already §8.
+>  A: Hold on TODO. Once we complete v0.1.0, we will work on these in a new PLAN.md
 
 ## 8. Future state
 

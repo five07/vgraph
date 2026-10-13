@@ -23,8 +23,21 @@ pub:
 	// sql_type is the field's `sql_type` attribute, such as `uuid`, or empty.
 	sql_type string
 	// graphql_skip leaves the column out of the GraphQL schema: the field has
-	// `@[graphql: '-']`.
+	// `@[graphql: '-']`, or its options say so.
 	graphql_skip bool
+	// serial: the database sets the column, a `@[sql: serial]` key.
+	serial bool
+	// optional: a create may leave the column unset. It is nullable, serial,
+	// has a default, or is marked optional.
+	optional bool
+	// the field's options (`Field`), as data
+	immutable   bool
+	sensitive   bool
+	unique      bool // `@[unique]`, or the `unique` option
+	comment     string
+	deprecated  string
+	has_default bool // a default on create
+	auto_update bool // a default on update
 }
 
 // Table is a registered struct: its table, key, columns (in field order) and
@@ -57,6 +70,9 @@ pub struct Schema {
 mut:
 	tables map[string]Table
 	order  []string
+	// the options each table's `fields()` gave, kept apart from `tables`,
+	// which `vgraph gen` prints as JSON: functions can't be printed
+	options map[string][]Field
 }
 
 // tables returns the registered tables, in the order they were added.
@@ -104,6 +120,7 @@ pub fn (mut s Schema) add[T]() ! {
 			} $else $if field.typ is ?time.Time {
 				typ = '?time.Time'
 			}
+			serial := is_serial(field.attrs)
 			columns << Column{
 				name:         load.column_name(field.name, field.attrs)
 				field:        field.name
@@ -117,14 +134,28 @@ pub fn (mut s Schema) add[T]() ! {
 				nullable:     typ.starts_with('?')
 				sql_type:     sql_type_of(field.attrs)
 				graphql_skip: is_graphql_skip(field.attrs)
+				serial:       serial
+				optional:     serial || typ.starts_with('?')
+				unique:       'unique' in field.attrs
 			}
 		}
 	}
 	mut edges := []Edge{}
+	mut options := []Field{}
 	$for method in T.methods {
 		$if method.name == 'edges' {
 			record := T{}
 			edges = record.$method()
+		} $else $if method.name == 'fields' {
+			record := T{}
+			options = record.$method()
+		}
+	}
+	for i, column in columns {
+		for o in options {
+			if o.name == column.field {
+				columns[i] = column.with_options(o)
+			}
 		}
 	}
 	mut skip := false
@@ -134,6 +165,7 @@ pub fn (mut s Schema) add[T]() ! {
 		}
 	}
 	s.order << name
+	s.options[name] = options
 	s.tables[name] = Table{
 		name:         name
 		struct_:      T.name
@@ -153,6 +185,25 @@ fn is_graphql_skip(attrs []string) bool {
 		}
 	}
 	return false
+}
+
+// is_serial reports whether a field's attributes include `@[sql: serial]`.
+fn is_serial(attrs []string) bool {
+	for attr in attrs {
+		if attr.starts_with('sql:') && attr.all_after('sql:').trim(" '") == 'serial' {
+			return true
+		}
+	}
+	return false
+}
+
+// options returns the options that `table`'s `fields()` gives, by field name.
+pub fn (s Schema) options(table string) map[string]Field {
+	mut found := map[string]Field{}
+	for o in s.options[table] or { [] } {
+		found[o.name] = o
+	}
+	return found
 }
 
 // sql_type_of returns the value of a field's `sql_type` attribute, or ''.
@@ -186,6 +237,7 @@ pub fn (s Schema) validate() ! {
 	mut problems := []string{}
 	for name in s.order {
 		table := s.tables[name]
+		check_options(mut problems, table, s.options[name] or { [] })
 		mut seen := map[string]bool{}
 		for edge in table.edges {
 			at := '${name}.${edge.name}'
