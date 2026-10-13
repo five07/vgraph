@@ -2,6 +2,7 @@ module models
 
 import orm
 import time
+import five07.vgraph
 
 const max_name_len = 100
 const max_email_len = 254
@@ -17,6 +18,33 @@ pub:
 	created_at time.Time
 	updated_at time.Time
 	deleted_at ?time.Time
+}
+
+// edges declares a user's articles, posts and comments, deleted ones left out.
+pub fn (u User) edges() []vgraph.Edge {
+	return [
+		vgraph.Edge{
+			name:     'articles'
+			kind:     .one_to_many
+			to:       'articles'
+			column:   'user_id'
+			soft_del: 'deleted_at'
+		},
+		vgraph.Edge{
+			name:     'posts'
+			kind:     .one_to_many
+			to:       'posts'
+			column:   'user_id'
+			soft_del: 'deleted_at'
+		},
+		vgraph.Edge{
+			name:     'comments'
+			kind:     .one_to_many
+			to:       'comments'
+			column:   'user_id'
+			soft_del: 'deleted_at'
+		},
+	]
 }
 
 // UserInput is the body of `POST /users` and `PUT /users/:slug`.

@@ -2,6 +2,7 @@ module models
 
 import orm
 import time
+import five07.vgraph
 
 const max_body_len = 5_000
 
@@ -24,6 +25,49 @@ pub:
 	created_at time.Time
 	updated_at time.Time
 	deleted_at ?time.Time
+}
+
+// edges declares a comment's author, parent and owner, deleted or not, and its replies,
+// deleted ones left out. Its owner is reached through `article` or `post`, as its
+// `owner_type` says.
+pub fn (c Comment) edges() []vgraph.Edge {
+	return [
+		vgraph.Edge{
+			name:   'author'
+			kind:   .many_to_one
+			to:     'users'
+			column: 'user_id'
+		},
+		vgraph.Edge{
+			name:   'parent'
+			kind:   .many_to_one
+			to:     'comments'
+			column: 'parent_id'
+		},
+		vgraph.Edge{
+			name:     'article'
+			kind:     .many_to_one
+			to:       'articles'
+			column:   'owner_id'
+			type_col: 'owner_type'
+			type_val: 'Article'
+		},
+		vgraph.Edge{
+			name:     'post'
+			kind:     .many_to_one
+			to:       'posts'
+			column:   'owner_id'
+			type_col: 'owner_type'
+			type_val: 'Post'
+		},
+		vgraph.Edge{
+			name:     'replies'
+			kind:     .one_to_many
+			to:       'comments'
+			column:   'parent_id'
+			soft_del: 'deleted_at'
+		},
+	]
 }
 
 // owner_type returns what comments on a `T` store as their `owner_type`: the

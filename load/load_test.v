@@ -24,12 +24,49 @@ pub:
 	created_at time.Time
 }
 
+@[table: 'tags']
+pub struct Tag {
+pub:
+	id         int @[primary; sql: serial]
+	name       string
+	deleted_at ?time.Time
+}
+
+@[table: 'note_tags']
+pub struct NoteTag {
+pub:
+	id      int @[primary; sql: serial]
+	note_id int
+	tag_id  int
+}
+
 fn seed() !sqlite.DB {
 	mut db := sqlite.connect(':memory:')!
 	sql db {
 		create table Author
 		create table Note
+		create table Tag
+		create table NoteTag
 	}!
+	for name in ['red', 'blue', 'old'] {
+		tag := Tag{
+			name:       name
+			deleted_at: if name == 'old' { ?time.Time(time.now()) } else { none }
+		}
+		sql db {
+			insert tag into Tag
+		}!
+	}
+	// note 1: red, blue, old; note 2: blue; note 3: none
+	for pair in [[1, 1], [1, 2], [1, 3], [2, 2]] {
+		link := NoteTag{
+			note_id: pair[0]
+			tag_id:  pair[1]
+		}
+		sql db {
+			insert link into NoteTag
+		}!
+	}
 	for name in ['ada', 'bob', 'cy'] {
 		author := Author{
 			name: name
@@ -171,6 +208,38 @@ fn test_load_many_groups_by_parent() {
 	)!
 	assert owned[1].map(it.id) == [1, 2]
 	assert 2 !in owned
+}
+
+fn test_load_many_skips_soft_deleted_rows() {
+	db := seed()!
+	conn, _ := counting(db)
+	authors := select_in[Author](conn, 'id', [1, 2, 3, 4])!
+	notes := select_in[Note](conn, 'id', [3])!
+	assert notes[0].author == 4
+	// note 3 is by author 4, who is deleted
+	assert load_one[Note, Author](conn, notes, 'author_id', soft_del: 'deleted_at')!.len == 0
+	assert load_one[Note, Author](conn, notes, 'author_id')!.len == 1
+	assert select_in[Author](conn, 'id', [1, 4], soft_del: 'deleted_at')!.map(it.id) == [1]
+	assert authors.len == 4
+}
+
+fn test_load_through_a_join_table() {
+	db := seed()!
+	conn, log := counting(db)
+	notes := select_in[Note](conn, 'id', [1, 2, 3])!
+	log.tables.clear()
+	tags := load_through[Note, Tag](conn, notes, 'note_tags', 'note_id', 'tag_id')!
+	assert log.tables == ['note_tags', 'tags']
+	assert tags[1].map(it.name) == ['red', 'blue', 'old']
+	assert tags[2].map(it.name) == ['blue']
+	assert 3 !in tags
+	live := load_through[Note, Tag](conn, notes, 'note_tags', 'note_id', 'tag_id',
+		soft_del: 'deleted_at'
+	)!
+	assert live[1].map(it.name) == ['red', 'blue']
+	log.tables.clear()
+	assert load_through[Note, Tag](conn, notes[2..], 'note_tags', 'note_id', 'tag_id')!.len == 0
+	assert log.tables == ['note_tags'], 'no links, no second query'
 }
 
 fn test_select_in_maps_every_field() {

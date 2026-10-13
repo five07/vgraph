@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+env:
+  # The V commit vgraph is built against: V master, until a 0.5.x release
+  # includes `v.migrations` (PLAN.md, Q13). Bump it on purpose.
+  V_COMMIT: 53dd72c843f46d614acbf13b7f737be6890c6578
+
+jobs:
+  sqlite:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: vgraph
+          persist-credentials: false
+      - name: Install SQLite headers
+        run: sudo apt-get update && sudo apt-get install --quiet -y libsqlite3-dev
+      - name: Build V
+        run: |
+          git clone --filter=blob:none https://github.com/vlang/v vlang
+          git -C vlang checkout "$V_COMMIT"
+          make -C vlang -j4
+          sudo ./vlang/v symlink
+      - name: Install vgraph as five07.vgraph, for the example app
+        run: |
+          mkdir -p ~/.vmodules/five07
+          ln -s "$GITHUB_WORKSPACE/vgraph" ~/.vmodules/five07/vgraph
+      - name: Check formatting
+        run: v fmt -verify vgraph
+      - name: Check doc comments
+        run: v vet vgraph/edge.v vgraph/schema.v vgraph/client.v vgraph/load
+      - name: Test
+        run: v test vgraph
+
+  postgres:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: 12345678
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=24
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: vgraph
+          persist-credentials: false
+      - name: Install PostgreSQL and SQLite headers
+        run: sudo apt-get update && sudo apt-get install --quiet -y libpq-dev libsqlite3-dev
+      - name: Build V
+        run: |
+          git clone --filter=blob:none https://github.com/vlang/v vlang
+          git -C vlang checkout "$V_COMMIT"
+          make -C vlang -j4
+          sudo ./vlang/v symlink
+      - name: Test on PostgreSQL
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: 12345678
+          PGDATABASE: postgres
+        run: v -d started_postgres test vgraph/pg_test.v

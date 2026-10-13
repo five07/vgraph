@@ -42,6 +42,7 @@ pub mut:
 	log   &QueryLog = &QueryLog{}
 }
 
+// select records the select, then runs it on the wrapped connection.
 pub fn (mut c CountingConnection) select(config orm.SelectConfig, data orm.QueryData, where orm.QueryData) ![][]orm.Primitive {
 	mut conditions := []string{}
 	for i, field in where.fields {
@@ -52,30 +53,37 @@ pub fn (mut c CountingConnection) select(config orm.SelectConfig, data orm.Query
 	return c.inner.select(config, data, where)
 }
 
+// insert runs on the wrapped connection.
 pub fn (mut c CountingConnection) insert(table orm.Table, data orm.QueryData) ! {
 	c.inner.insert(table, data)!
 }
 
+// update runs on the wrapped connection.
 pub fn (mut c CountingConnection) update(table orm.Table, data orm.QueryData, where orm.QueryData) ! {
 	c.inner.update(table, data, where)!
 }
 
+// delete runs on the wrapped connection.
 pub fn (mut c CountingConnection) delete(table orm.Table, where orm.QueryData) ! {
 	c.inner.delete(table, where)!
 }
 
+// create runs on the wrapped connection.
 pub fn (mut c CountingConnection) create(table orm.Table, fields []orm.TableField) ! {
 	c.inner.create(table, fields)!
 }
 
+// drop runs on the wrapped connection.
 pub fn (mut c CountingConnection) drop(table orm.Table) ! {
 	c.inner.drop(table)!
 }
 
+// last_id returns the wrapped connection's last inserted id.
 pub fn (mut c CountingConnection) last_id() int {
 	return c.inner.last_id()
 }
 
+// execute runs `query` on the wrapped connection.
 pub fn (mut c CountingConnection) execute(query string) ![]orm.Row {
 	return c.inner.execute(query)
 }

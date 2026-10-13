@@ -1,8 +1,7 @@
 module comments
 
-import orm
+import five07.vgraph
 import app
-import vgraph.load
 import comments.models as comment_models
 import users.models as user_models
 
@@ -10,7 +9,7 @@ import users.models as user_models
 // comment handler, and the handlers of the records comments are on. Its
 // methods return values, not veb.Result, so veb doesn't serve them as routes.
 pub struct Service {
-	db     orm.Connection
+	graph  vgraph.Client
 	store  comment_models.CommentStore
 	users  user_models.UserStore
 	owners map[string]Owner
@@ -18,10 +17,10 @@ pub struct Service {
 
 // Service.new returns a service that keeps comments in `store`, their authors
 // in `users`, and allows comments only on the kinds of records in `owners`,
-// keyed by `owner_type`. It loads related records through `db`.
-pub fn Service.new(db orm.Connection, store comment_models.CommentStore, users user_models.UserStore, owners map[string]Owner) Service {
+// keyed by `owner_type`. It loads related records through `graph`.
+pub fn Service.new(graph vgraph.Client, store comment_models.CommentStore, users user_models.UserStore, owners map[string]Owner) Service {
 	return Service{
-		db:     db
+		graph:  graph
 		store:  store
 		users:  users
 		owners: owners
@@ -100,9 +99,9 @@ pub fn (s Service) view(comment comment_models.Comment) !comment_models.CommentV
 // views returns `list` as the API returns it. It loads the authors, the
 // parents and the owners of each type in one query each, not one per comment.
 pub fn (s Service) views(list []comment_models.Comment) ![]comment_models.CommentView {
-	users := load.load_one[comment_models.Comment, user_models.User](s.db, list, 'user_id')!
-	parents := load.load_one[comment_models.Comment, comment_models.Comment](s.db, list,
-		'parent_id')!
+	users := s.graph.load_one[comment_models.Comment, user_models.User](list, 'author')!
+	parents := s.graph.load_one[comment_models.Comment, comment_models.Comment](list,
+		'parent')!
 	mut owners := map[string]map[int]string{}
 	for c in list {
 		if c.owner_type !in owners {

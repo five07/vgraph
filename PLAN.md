@@ -110,38 +110,46 @@ its own (Q10: `v.migrations` runs them).
 
 ### Edges
 
+As built in Phase 2 (`edge.v`):
+
 ```v ignore
 pub enum EdgeKind {
-	one_to_many  // Article.comments: the child table holds the parent's id
-	many_to_one  // Comment.author: this table holds the other record's id
+	one_to_many  // Article.comments: the target table holds this record's id
+	many_to_one  // Comment.author: this table holds the target's id
 	many_to_many // Article.tags: through a join table
-	polymorphic  // Article.comments when Comment has owner_type + owner_id
 }
 
 pub struct Edge {
 pub:
-	name      string   // 'comments'
-	kind      EdgeKind
-	from      string   // table: 'articles'
-	to        string   // table: 'comments'
-	column    string   // the foreign key column: 'owner_id', 'user_id'
-	type_col  string   // polymorphic only: 'owner_type'
-	type_val  string   // polymorphic only: 'Article'
-	through   string   // many_to_many only: the join table
-	soft_del  string   // optional: 'deleted_at', filtered as IS NULL (Q7)
+	name       string   @[required] // 'comments'
+	kind       EdgeKind @[required]
+	to         string   @[required] // target table: 'comments'
+	column     string   @[required] // 'owner_id', 'user_id'; for many_to_many, the join column for this record
+	type_col   string   // polymorphic: 'owner_type'
+	type_val   string   // polymorphic: 'Article'
+	through    string   // many_to_many: the join table
+	through_to string   // many_to_many: the join column for the target
+	soft_del   string   // optional: 'deleted_at', filtered as IS NULL (Q7)
 }
 ```
 
-`rest-api` maps onto this directly: `users → articles` (one-to-many),
-`comments → users` (many-to-one), `comments.parent_id` (a one-to-many self-edge), and
-`articles/posts → comments` (polymorphic).
+Changes from the first draft:
+- **No `polymorphic` kind.** `type_col` / `type_val` work on both directions: on a
+  `one_to_many` edge they filter the targets (`Article.comments`), and on a
+  `many_to_one` edge they filter the records followed (`Comment.article`).
+- **No `from` field.** `Schema.add[T]()` knows the declaring table.
+- **`through_to` is new.** A join table has two key columns.
+
+`example` declares `users → articles/posts/comments`, `articles/posts → author`,
+`articles/posts → comments` (polymorphic), and `comments → author/parent/article/post`
+plus `replies`.
 
 ### Layers, in build order
 
 | Layer | What | How | Phase |
 |-------|------|-----|-------|
-| `vgraph.load` | `load_many[P, C](conn, parents, edge) !map[int][]C` and `load_one[P, C](…) !map[int]C`: one `WHERE col IN (…)` per edge, de-duplicated ids | compile-time reflection (`$for field in T.fields`) plus the ORM function API | 1–2 |
-| `vgraph.schema` | each entity declares `fn (Article) edges() []vgraph.Edge` (Default, see Q4); `Client.new` checks the edges against the struct fields | plain V, checked at startup | 2 |
+| `vgraph.load` | `load_one[C, P](conn, children, fk)`, `load_many[P, C](conn, parents, fk)`, `load_through` (join table): one `WHERE col IN (…)` per edge, de-duplicated ids | compile-time reflection (`$for field in T.fields`) plus `orm.Connection.select` (Q17) | 1–2 |
+| `vgraph` (`Schema`, `Client`) | each entity declares `fn (Article) edges() []vgraph.Edge` (Q4); `Schema.add[T]()` reflects it; `Client.new` checks every edge; `client.load_one` / `load_many` load by edge name | plain V, checked at startup | 2 |
 | `vgraph gen` | a CLI that reads the schema and writes `client/*.v`: typed `with_<edge>()`, `query_<edge>()`, field predicates | code generation, like `entc` | 3 |
 | GraphQL adapter | resolvers backed by `vgraph.load` batching | a separate `five07.graphql` package, maybe on top of `luizfonseca.graphql` | 4 (Q9) |
 | migration helpers | turn declared edges into `v.migrations` steps: an index on every edge column, foreign keys, the join tables for many-to-many | helpers that return `migrations.Index` / `ForeignKey` / `Table`; `v.migrations` runs them | 5 (Q10) |
@@ -227,6 +235,30 @@ Before publishing, pin to a `0.5.x` release that includes `v.migrations` (Q13), 
 record it in the README and CI. Then publish `v0.1.0` to VPM from
 `github.com/five07/vgraph`.
 *Exit:* `v install five07.vgraph` works in a fresh project, and `example` imports it.
+
+*Result (2026-10-12, built; not yet published):*
+- **Package:** `v.mod` (with `repo_url`) and the template's `.editorconfig` and
+  `.gitattributes` are at the root.
+- **`vgraph` module:** `Edge`, `Schema` and `Client` (`edge.v`, `schema.v`,
+  `client.v`). `load/` moved up from `example/vgraph/load`. Inside the package the
+  root imports it as plain `import load`: `import vgraph.load` fails in the repo's own
+  tests, and `import five07.vgraph.load` only works through the `~/.vmodules` link.
+- **`example`:** imports `five07.vgraph` through `~/.vmodules/five07/vgraph` (a link
+  to this repo), declares `edges()` on its four models, and loads through
+  `vgraph.Client`. Its query-count test is unchanged.
+- **Tests:** `vgraph_test.v` (schema, validation, every edge kind),
+  `load/load_test.v` (soft delete, join tables), and `pg_test.v` on PostgreSQL. All
+  14 test files pass, `pg_test.v` against a local PostgreSQL 18.
+- **CI:** `.github/workflows/ci.yml` runs `v fmt -verify`, `v vet` on the package,
+  `v test` on SQLite, and `pg_test.v` against a `postgres:16` service, with V built
+  at `53dd72c`. It hasn't run yet: it first runs on push.
+- **Left for you:**
+  - push `github.com/five07/vgraph` and check that CI passes;
+  - pin a `0.5.x` release that has `v.migrations` (Q13), or decide to publish
+    against master;
+  - tag `v0.1.0`, and submit it at <https://vpm.vlang.io/new> (the name can't be
+    changed afterwards);
+  - check the exit test: `v install five07.vgraph` in a fresh project.
 
 **Phase 3: generator.** First, the schema comparison from Q4: write the `example`
 entities both as (a) `edges()` methods and as (c) a schema file, and choose one before

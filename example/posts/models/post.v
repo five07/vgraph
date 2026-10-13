@@ -2,6 +2,7 @@ module models
 
 import orm
 import time
+import five07.vgraph
 
 const max_body_len = 2_000
 
@@ -17,6 +18,28 @@ pub:
 	created_at time.Time
 	updated_at time.Time
 	deleted_at ?time.Time
+}
+
+// edges declares a post's author, deleted or not, and its comments, deleted ones left
+// out.
+pub fn (p Post) edges() []vgraph.Edge {
+	return [
+		vgraph.Edge{
+			name:   'author'
+			kind:   .many_to_one
+			to:     'users'
+			column: 'user_id'
+		},
+		vgraph.Edge{
+			name:     'comments'
+			kind:     .one_to_many
+			to:       'comments'
+			column:   'owner_id'
+			type_col: 'owner_type'
+			type_val: 'Post'
+			soft_del: 'deleted_at'
+		},
+	]
 }
 
 // PostInput is the body of `POST /posts`. `user_slug` names the author, and

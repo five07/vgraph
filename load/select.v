@@ -3,11 +3,12 @@ module load
 import orm
 import time
 
-// select_in returns the `T` records whose `column` is one of `ids`, in one query.
-// It calls `orm.Connection.select` directly: `orm.new_query`, which could do this,
-// leaves the standard library after 2027-08-17 (PLAN.md, Q17). Fields may be
-// `int`, `i64`, `f64`, `bool`, `string` or `time.Time`, or options of those.
-pub fn select_in[T](conn orm.Connection, column string, ids []int) ![]T {
+// select_in returns the `T` records whose `column` is one of `ids`, in one query,
+// narrowed by `opts.type_col` and `opts.soft_del`. It calls
+// `orm.Connection.select` directly: `orm.new_query`, which could do this, leaves
+// the standard library after 2027-08-17 (PLAN.md, Q17). Fields may be `int`,
+// `i64`, `f64`, `bool`, `string` or `time.Time`, or options of those.
+pub fn select_in[T](conn orm.Connection, column string, ids []int, opts Options) ![]T {
 	mut fields := []string{}
 	mut types := []int{}
 	$for field in T.fields {
@@ -44,19 +45,60 @@ pub fn select_in[T](conn orm.Connection, column string, ids []int) ![]T {
 		select_exprs: fields
 		types:        types
 	}
-	where := orm.QueryData{
-		fields: [column]
-		data:   [orm.Primitive(ids)]
-		types:  [typeof[[]int]().idx]
-		kinds:  [.in]
-	}
 	mut c := conn
-	rows := c.select(config, orm.QueryData{}, where)!
+	rows := c.select(config, orm.QueryData{}, where_in(column, ids, opts))!
 	mut result := []T{cap: rows.len}
 	for row in rows {
 		result << map_row[T](row)!
 	}
 	return result
+}
+
+// select_pairs returns the `[from_col, to_col]` pairs of the join table `table`
+// whose `from_col` is one of `ids`, in one query.
+fn select_pairs(conn orm.Connection, table string, from_col string, to_col string, ids []int) ![][]int {
+	config := orm.SelectConfig{
+		table:        orm.Table{
+			name: table
+		}
+		has_where:    true
+		primary:      from_col
+		fields:       [from_col, to_col]
+		select_exprs: [from_col, to_col]
+		types:        [orm.type_idx['int'], orm.type_idx['int']]
+	}
+	mut c := conn
+	rows := c.select(config, orm.QueryData{}, where_in(from_col, ids, Options{}))!
+	mut pairs := [][]int{cap: rows.len}
+	for row in rows {
+		pairs << [cell_int(row[0], from_col)!, cell_int(row[1], to_col)!]
+	}
+	return pairs
+}
+
+// where_in returns `column IN (ids)`, and `type_col = type_val` and
+// `soft_del IS NULL` when `opts` has them.
+fn where_in(column string, ids []int, opts Options) orm.QueryData {
+	mut where := orm.QueryData{
+		fields: [column]
+		data:   [orm.Primitive(ids)]
+		types:  [typeof[[]int]().idx]
+		kinds:  [.in]
+	}
+	if opts.type_col != '' {
+		where.fields << opts.type_col
+		where.data << orm.Primitive(opts.type_val)
+		where.types << orm.type_string
+		where.kinds << .eq
+		where.is_and << true
+	}
+	if opts.soft_del != '' {
+		// IS NULL takes no value
+		where.fields << opts.soft_del
+		where.kinds << .is_null
+		where.is_and << true
+	}
+	return where
 }
 
 // map_row builds a `T` from the cells of one selected row, in field order.
@@ -135,7 +177,7 @@ pub fn table_name[T]() string {
 
 // column_name returns the column a field is stored in: its `@[sql: 'name']`
 // attribute when it has one, or else its name.
-fn column_name(name string, attrs []string) string {
+pub fn column_name(name string, attrs []string) string {
 	for attr in attrs {
 		if attr.starts_with('sql:') {
 			value := attr.all_after('sql:').trim(" '")
