@@ -101,10 +101,16 @@ around line 7664, "Publish package" around line 7912), `cmd/tools/vpm/README.md`
    `article.query_comments().query_author().all()!`, through code generation.
 4. **Built on `orm.Connection`**, so any adapter the ORM has (SQLite, Postgres, MySQL)
    works.
+5. **GraphQL** (Phase 4): a schema, parser, validator, executor and HTTP handler of
+   its own, in a module that can move to `five07.graphql` (Q19–Q24).
+6. **Parity with Ent and entgql** (Q19, Q26): every Ent feature is planned. The ones
+   vgraph lacks, the write API included, are Phase 6; the inventory is there.
 
-**Non-goals for v1:** Gremlin or other graph databases, hooks/privacy policies, GraphQL
-execution (Q9: a separate `five07.graphql` package if wanted), and a migration engine of
-its own (Q10: `v.migrations` runs them).
+**Non-goals for v1:** a migration engine of its own (Q10: `v.migrations` runs them),
+Ent's Gremlin driver and its extensions other than entgql (Q37). Those are listed in
+§8 for later.
+*(2026-10-13: hooks, privacy and GraphQL execution were non-goals; Q19 and Q26 moved
+them into scope.)*
 
 ## 4. Design
 
@@ -170,8 +176,10 @@ plus `replies`.
 | `vgraph.load` | `load_one[C, P](conn, children, fk)`, `load_many[P, C](conn, parents, fk)`, `load_through` (join table): one `WHERE col IN (…)` per edge, de-duplicated ids | compile-time reflection (`$for field in T.fields`) plus `orm.Connection.select` (Q17) | 1–2 |
 | `vgraph` (`Schema`, `Client`) | each entity declares `fn (Article) edges() []vgraph.Edge` (Q4); `Schema.add[T]()` reflects it; `Client.new` checks every edge; `client.load_one` / `load_many` load by edge name | plain V, checked at startup | 2 |
 | `vgraph gen` | a CLI that reads the schema and writes `client/*.v`: typed `with_<edge>()`, `query_<edge>()`, field predicates | code generation, like `entc` | 3 |
-| GraphQL adapter | resolvers backed by `vgraph.load` batching | a separate `five07.graphql` package, maybe on top of `luizfonseca.graphql` | 4 (Q9) |
+| `graphql` | lexer, parser, validator, executor, introspection, HTTP handler | our own, in a module that never imports vgraph, so it can become `five07.graphql` (Q20, Q24) | 4 |
+| `vgraph gen` GraphQL output | the SDL and the V resolvers for every table, batched through the generated client | code generation, like `entgql` (Q21) | 4 |
 | migration helpers | turn declared edges into `v.migrations` steps: an index on every edge column, foreign keys, the join tables for many-to-many | helpers that return `migrations.Index` / `ForeignKey` / `Table`; `v.migrations` runs them | 5 (Q10) |
+| Ent parity | the write API, transactions, field options, hooks, interceptors, privacy, the rest of Ent's query API, and entgql's generated mutations and connections | the core, `load` and the generator | 6 (Q26) |
 
 **Why split reflection and code generation:** V's compile-time reflection reads fields
 and attributes, which is enough for generic loading. It **can't create methods**, so
@@ -379,15 +387,187 @@ pub fn (n ArticleNode) query_comments() CommentQuery                  // travers
 - **CI:** the PostgreSQL job runs both PostgreSQL tests. The generated-code check
   covers both examples.
 
+**Phase 3.2: non-int keys** (Q43). Before GraphQL, because Phase 4's generated
+resolvers sit on the load API. `load` keys everything by the key's string form
+internally (`map[string]`) and accepts `int`, `i64` and `string` primary and foreign
+keys; `Schema.validate` checks that an edge column's type matches its target's key.
+The generated client stays typed: `where_id(value string)` on a UUID table. No third
+generic key parameter, since generics are where the compiler bugs in `regressions/`
+came from. A UUID is a `string` field (`TEXT`, or `uuid` through `sql_type` on
+PostgreSQL), as V has no UUID type.
+*Exit:* `examples/relations` gains a UUID-keyed table with edges in both directions,
+tested on SQLite and PostgreSQL, and everything else passes unchanged.
+
 **Phase 4: GraphQL.** Without it, vgraph can't serve GraphQL to a client at all:
 it has no GraphQL schema, parser or executor, and V's standard library has none.
 So it is built here, in this repo, and moved to its own package (`five07.graphql`)
-later if that's needed (2026-10-12; revises Q9). Scope questions: Q19.
+later if that's needed (2026-10-12; revises Q9).
+
+Decisions, from Q19–Q35 (2026-10-13):
+- **GraphQL only.** Phase 4 builds on what vgraph does today. The Ent features vgraph
+  lacks, the write API included, are Phase 6 (Q26).
+- **`graphql/` module:** our own lexer, parser, validator and executor, never
+  importing vgraph, so it can move to `five07.graphql` (Q20, Q24). The parser reads
+  the whole spec: executable documents, and the type system (SDL), including
+  `extend type`, since `vgraph gen` merges hand-written `.graphql` files (Q30, Q33).
+- **Schemas follow the spec, as Apollo and graphql-js read and write them** (Q30). The
+  generated SDL loads in graphql-js's `buildSchema`, and our parser reads SDL that
+  graphql-js prints. Apollo's runtime extras (Sandbox page, error codes, persisted
+  queries, Federation) are future state (§8).
+- **Validation:** every rule in the spec, tested with cases ported from graphql-js,
+  plus a maximum depth and number of selections (Q31).
+- **Queries and mutations** (Q19, Q27). The executor runs both, mutations serially.
+  Until Phase 6e generates them, the app declares mutations in `.graphql` files and
+  writes their resolvers; `examples/service`'s call its stores.
+- **Generated schema, entgql's conventions** (Q21, Q28): see "GraphQL naming" below.
+- **Arguments:** list fields take `where`, `orderBy` and `limit` / `offset`, and each
+  table gets a count. The generated V queries gain `count()` and `offset()`, the only
+  additions to vgraph's query API in this phase. Relay connections are Phase 6e (Q22).
+- **Hidden fields and tables:** `@[graphql: '-']` on a field or struct (Q29).
+- **Batching:** level by level; resolvers receive every parent at once, and the
+  generated ones run one load per edge per level. Nested `limit` / `offset` is cut
+  per parent in V until 6e moves it into SQL (Q32).
+- **Hand-written fields and operations** in `*.graphql` files, merged by `vgraph gen`,
+  with resolver stubs in a file it never overwrites (Q33).
+- **Transactions:** the HTTP handler takes an optional transaction wrapper; a
+  request's mutations then share one transaction (Q34).
+- **Introspection** (Q23), and an HTTP handler any framework can call, with
+  `POST /graphql` in `examples/service` on veb. No subscriptions (Q24).
+- **Cleanup:** delete `spike/` (Q25).
+
+GraphQL naming, from entgql (Q28):
+- types are named after the struct (`Article`); fields are the Go-style camelCase
+  entgql produces from Ent's field names, so `created_at` is `createdAt` and
+  `owner_id` is `ownerID`;
+- ids are `ID!`. A foreign key column is a field (`ownerID: ID`), as entgql exposes
+  a field that an edge is bound to, and in vgraph every edge column is one;
+- edges are fields: unique edges (one_to_one, many_to_one) nullable, the others
+  `[T!]!`; polymorphic edges stay separate fields;
+- `time.Time` is the `Time` scalar;
+- `where: ArticleWhereInput` uses entgql's names: `title`, `titleNEQ`, `titleIn`,
+  `titleNotIn`, `titleGT` / `GTE` / `LT` / `LTE`, `titleContains`, `titleHasPrefix`,
+  `titleHasSuffix`, `titleIsNil` / `titleNotNil`. Only the ones vgraph can run in
+  Phase 4 are generated (`Contains` and the prefix/suffix forms are LIKE patterns);
+  `and` / `or` / `not` and `has<Edge>` come with 6b and 6e;
+- `orderBy: ArticleOrder` is `{ field: ArticleOrderField!, direction: OrderDirection }`,
+  as entgql's; `limit` / `offset` are vgraph's own until connections (6e);
+- root fields: one list per table, named as entgql's `QueryField` names it
+  (`articles`). One row is read with `articles(where: {id: 3})`. `Node`, `node` and
+  `nodes` wait for globally unique ids in 6d (Q42).
+
+Exit (Q35): `examples/service` serves `POST /graphql` beside its REST routes, with a
+query or mutation for every REST endpoint, asserting the same selects as REST;
+`examples/relations` tests each relationship kind through GraphQL; the parser and
+validator pass the graphql-js cases; the introspection result matches a checked-in
+copy, and Apollo Sandbox and GraphiQL load the schema (by hand, once); SQLite and
+PostgreSQL pass in CI, which also checks the generated schema and resolvers are up to
+date.
 
 **Phase 5: migration helpers** for `v.migrations` (Q10): from the declared edges,
 produce the indexes, foreign keys and join tables as `migrations.Index` /
 `ForeignKey` / `Table` values, for migrations written by hand. `examples/service` moves its
 table setup to `v.migrations`.
+
+**Phase 6: Ent parity** (Q19, Q26). Everything in Ent and entgql that vgraph doesn't
+have yet. The sub-phases are a proposal, in dependency order:
+- **6a, writes:** create, bulk create, update, delete, edge writes, transactions,
+  field options and validators (Q38, Q39);
+- **6b, queries:** the rest of Ent's query API (OR/NOT, edge predicates, query-level
+  traversal, `select`, aggregates, locking);
+- **6c, runtime:** hooks, interceptors, privacy, and passing a context (Q40, Q41);
+- **6d, schema:** more field types, custom id types, globally unique ids (each table's
+  ids in their own range, set by the migration helpers) and GraphQL's `Node` with
+  them (Q42), edge schemas, mixins, declared indexes, views;
+- **6e, entgql:** generated mutations, Relay connections, the full `WhereInput`,
+  multi-field ordering and per-parent pagination;
+- migration helpers (Phase 5) grow with each sub-phase's schema options (Q36).
+
+Decisions (2026-10-13):
+- **Order:** Phase 5 comes first and covers edges; each Phase 6 sub-phase extends the
+  migration helpers for what it adds (Q36).
+- **Writes** (Q38): generated builders per table, `create()`, `update_one()`,
+  `update()`, `delete_one()`, `delete()`, with `set_` / `clear_` / `add_<edge>_ids` /
+  `remove_<edge>_ids`. A create runs its insert, `last_id()` and edge writes in one
+  transaction, and uses `RETURNING id` on PostgreSQL.
+- **Field options** (Q39): an optional `fields()` method beside `edges()`, listing
+  only the fields that need options; the rest are inferred. It absorbs
+  `@[graphql: '-']` (Q29), which keeps working.
+- **Hooks** (Q40): `fn (Article) hooks() []vgraph.Hook`, plus runtime hooks on the
+  `Graph`. `examples/service` moves its store logic (validation, slugs, timestamps,
+  soft delete) into hooks, and its hand-written GraphQL mutations become generated
+  ones.
+- **Context** (Q41): `g.with_ctx(ctx)` returns a `Graph` whose queries and writes
+  pass `ctx`, a value the app defines (its user, request, and so on), to hooks,
+  interceptors and privacy rules. The GraphQL handler sets it per request. Hooks
+  depend on it, so 6c's design starts from it.
+
+Inventory (2026-10-13), checked against Ent's docs. "Extra" marks what vgraph has
+that Ent doesn't.
+
+| Area | Ent feature | vgraph today | Phase |
+|---|---|---|---|
+| **Fields** | types: ints of every size, floats, bool, string/text, time, bytes, JSON, enum, UUID, `Other` | `int`, `i64`, `f64`, `bool`, `string`, `time.Time`, and options of these | 6d |
+| | `Optional`, `Nillable` | option types are nullable; nothing marks a field optional on create | 6a |
+| | `Default`, `DefaultFunc`, `UpdateDefault` | none | 6a |
+| | `Immutable`, `Sensitive` | none (Q29 hides fields from GraphQL in Phase 4) | 6a |
+| | `Unique`, `StorageKey`, `SchemaType`, `Comment`, `Deprecated` | through V's ORM attributes: `@[unique]`, `@[sql: 'col']`, `sql_type` | 6d |
+| | validators: `Validate`, `MinLen`, `MaxLen`, `NotEmpty`, `Match`, `Range`, `Positive` | none | 6a |
+| | custom types: `GoType`, `ValueScanner` | none | 6d |
+| | id types: `i64`, string (UUID) | `int` only (Q6) | 3.2 (Q43) |
+| | id types: custom (`GoType`, `ValueScanner`) | none | 6d |
+| **Edges** | `To` / `From` with `Ref` (an edge and its inverse, checked together) | each direction declared on its own, with no link between them | 6d |
+| | `Unique`, `Field` (the column holding the key) | the kind and `column` | done |
+| | `Required`, `Immutable`, `StorageKey` | none | 6a / 6d |
+| | `Through`: edge schemas, join tables with fields of their own | join tables have only the two keys | 6d |
+| | — | polymorphic edges, per-edge soft delete (extra) | done |
+| **Schema** | declared indexes (fields, edges, unique, partial) | `ensure_indexes` on edge columns | 5 / 6d |
+| | mixins (shared fields, edges, hooks) | none; V's embedded structs may serve | 6d |
+| | annotations (`entsql`, `entgql`) | `@[table]`; `@[graphql]` in Phase 4 (Q29) | 4 / 6d |
+| | views, multiple database schemas | none | 6d |
+| **Queries** | predicates `EQ`, `NEQ`, `In`, `NotIn`, `GT`/`GTE`/`LT`/`LTE`, `IsNil`, `NotNil` | all but `NEQ` and `NotIn` generated (`load` has `ne`) | 6b |
+| | `Contains`, `HasPrefix`, `HasSuffix`, `EqualFold`, `ContainsFold` | `_like` only | 6b |
+| | `And`, `Or`, `Not` | AND only | 6b |
+| | `Has<Edge>`, `Has<Edge>With` | none | 6b |
+| | custom SQL predicates | `where(load.Cond...)`, column conditions only | 6b |
+| | order by several fields, by an edge's count or field, nulls first/last | one field | 6b |
+| | `Limit`, `Offset` | `limit` | `offset` in 4 |
+| | `All`, `First`, `Only`, `IDs`, `FirstID`, `OnlyID`, `Count`, `Exist` | `all`, `first` | `count` in 4; rest 6b |
+| | `Select`, `Scan`, `Unique` | none | 6b |
+| | `GroupBy`, `Aggregate` (count, sum, min, max, mean) | none | 6b |
+| | `Modify`, raw SQL (`sql/modifier`, `sql/execquery`) | none | 6b |
+| | `ForUpdate`, `ForShare` (`sql/lock`) | none | 6b |
+| | traversal from a query (`users().where_…().query_pets()`) | from a node only | 6b |
+| | traversal from a node | `query_<edge>` | done |
+| | eager loading, nested and configured (`With<Edge>`) | `with_<edge>` | done |
+| | named edges (`WithNamed<Edge>`) | none | 6b |
+| | `Edges.<X>OrErr`: "not loaded" told apart from "empty" | option fields and lists | 6b |
+| | `entql`, generic filtering at runtime | none | 6b |
+| **Writes** | `Create`, `CreateBulk`, `MapCreateBulk` | none | 6a |
+| | upsert (`OnConflict`, `UpdateNewValues`, `Ignore`, `DoNothing`) | none | 6a |
+| | `Update`, `UpdateOne`, `UpdateOneID`: `Set`, `Add` (increment), `Clear`, `Append` | none | 6a |
+| | edge writes: `Add<Edge>IDs`, `Remove<Edge>`, `Clear<Edge>`, `Set<Edge>ID` | none | 6a |
+| | `Delete`, `DeleteOne`, `DeleteOneID` | none | 6a |
+| | the `Mutation` interface (changed fields, old values) | none | 6a (hooks need it) |
+| | transactions: `Tx`, `Commit`, `Rollback`, transaction hooks | none; `orm.TransactionalConnection` exists | 6a |
+| **Runtime** | hooks: schema and runtime, `On` / `If` / `Unless` | none | 6c |
+| | interceptors: `Intercept`, `Traverse`, soft delete as an interceptor | per-edge `soft_del` | 6c |
+| | privacy: policies, rules, viewer context | none | 6c |
+| | `context.Context` on every call | none | 6c (Q41) |
+| | debug logging of queries | `CountingConnection` in tests; `app/trace.v` in `service` | 6c (`vgraph.trace`, Q16) |
+| **Codegen** | `entc` feature flags, external templates, extensions | `vgraph gen`, no options | 6d |
+| | `ent describe` | none | 6d (`vgraph describe`) |
+| | schema visualization (entviz) | none | §8 |
+| **Migrations** | automatic and versioned migrations, diffing through Atlas | none; Phase 5 uses `v.migrations`, migrations written by hand (Q10) | 5 |
+| **entgql** | schema generation | none | 4 |
+| | `Node` interface, global ids, `node` / `nodes` | none | 6d, with globally unique ids (Q42) |
+| | `CollectFields`: eager loads from the selection set | none | 4 (Q32) |
+| | `WhereInput`: every predicate, `and`/`or`/`not`, `has<Edge>` | none | 4 (generated predicates, ANDed); rest 6e |
+| | `OrderBy` inputs, multi-field ordering | none | 4 (one field); 6e |
+| | Relay connections, cursors, `totalCount`, per-parent pagination | none | 6e (Q22) |
+| | mutation inputs (`CreateXInput`, `UpdateXInput`, `SetInput`), generated mutations | none | 6e (needs 6a) |
+| | annotations: `Skip`, `Type`, `QueryField`, `RelayConnection`, `Mutations`, `OrderField`, `Directives` | none | 4 (`Skip`, Q29); rest 6e |
+| | `Transactioner` (a transaction per request) | none | 4 (Q34) |
+| **Other** | Gremlin driver; entproto, entoas/ogent | none | §8 (Q37) |
 
 ## 7. Questions
 
@@ -507,14 +687,14 @@ yet: a GraphQL schema, a parser, an executor, and an HTTP endpoint.
 Mutations need a write API first: create, update and delete, plus writing edges,
 including both directions of a bidirectional edge. **Default:** queries only for
 Phase 4, with the write API and mutations as a later phase.
-> A:
+> A: The goal of this project is 1:1 feature parity with Ent. mutations are part of that scope. we also need a GraphQL schema, a parser, an executor, and an HTTP endpoint
 
 **Q20. Parser and executor: our own, or `luizfonseca.graphql`?** That package is a
 parser only, unfinished, and untouched for about 3 years. **Default:** our own: a
 lexer and parser for the executable subset of the spec (queries, fields, arguments,
 aliases, variables, fragments and inline fragments, `@include` / `@skip`), and an
 executor that resolves each level of a query with the generated `with_<edge>` loads.
-> A:
+> A: Build our own. it's a hard requirement. But build it into a way that we could extract it into a new package (`five07/graphql`).
 
 **Q21. Schema: generated, or written by hand?** **Default:** generated by `vgraph gen`
 (a flag such as `--graphql`, or always), like Ent's `entgql`. Each table becomes an
@@ -522,7 +702,7 @@ object type with its scalar fields and its edges as fields, plus root query fiel
 for each table. The output is both the SDL (`schema.graphql`) and the V resolvers.
 Field names stay snake_case (`created_at`), or are converted to camelCase
 (`createdAt`) as GraphQL tooling expects.
-> A: (and snake_case or camelCase?)
+> A: (and snake_case or camelCase?) generated and camelCase field names
 
 **Q22. Arguments, pagination and counts.** **Default:** list fields take `where`
 (one input type per table, built from the same predicates as the generated
@@ -530,19 +710,244 @@ queries: `eq`, `lt`/`gt`, `in`, `like`, `is_null`), `order_by` and `limit` /
 `offset`, and each table gets a `count`. Relay-style cursor connections
 (`edges { node }`, `pageInfo`, as `entgql` does) come later, if needed. The
 generated V queries gain `count()` and `offset()` for this.
-> A:
+> A:default choice
 
 **Q23. Introspection.** Tools such as GraphiQL, Apollo and code generators need
 `__schema` / `__type`. **Default:** yes: it's mostly static data generated with the
 schema, and without it the endpoint is hard to use from standard tools.
-> A:
+> A: yes, and let's try to keep to the Apollo standard
 
 **Q24. Transport and where it lives.** **Default:** a `graphql` module in this repo
 (moved to `five07.graphql` later, if needed), with an HTTP handler that any web
 framework can call (request body in, JSON out), and a `POST /graphql` route in
 `examples/service` built on veb. No subscriptions.
-> A:
+> A: agreed on all points
 
 **Q25. Delete `spike/`?** The `load/` module replaced it, and its tests still run in
 every `v test .`. **Default:** delete it; git history keeps it.
-> A:
+> A: yes
+
+### Phase 4: new questions from your answers (2026-10-13)
+
+**Q26. What "1:1 parity with Ent" covers, and what lands in Phase 4.** Q19 made Ent
+parity the goal, and vgraph has no write API. Should Phase 4 build the missing Ent
+features too? *(The feature table that was here is now the Phase 6 inventory.)*
+> A: i didn't mean to infer that the missing Ent functionality must be done in phase 4, in fact, that should be pushed to a new phase. This phase should simply focus on the GraphQL layer and its implementation. Plan for all Ent features AND create a new Phase to address the missing vgraph functionality.
+>
+> *Done: Phase 4 is GraphQL only, Phase 6 is Ent parity with the full inventory, and
+> §3 and the layers table say so. Q27 onward were reframed around it; Q27–Q41 replace
+> the earlier Q27–Q37, none of which had answers.*
+
+#### Phase 4 (GraphQL)
+
+**Q27. Mutations before the write API.** Q19 puts mutations in scope, but generating
+them (`createArticle`, `updateArticle`) needs Phase 6's write API. **Default:** Phase 4
+builds everything a mutation needs except the generated ones: the `Mutation` root type,
+serial execution as the spec requires, input object types and variables, and a way for
+the app to declare mutations and write their resolvers (Q33). `examples/service`
+declares one mutation per REST write endpoint, with resolvers calling its existing
+stores, so the validation, slugs and soft deletes it already has stay in one place.
+Phase 6e then generates mutations for every table.
+> A: agreed
+
+**Q28. GraphQL types and names.** **Default:**
+- type names come from the struct (`Article`); the root list field from the table
+  (`articles`), plus a single-row field `article(id: ID!)`;
+- primary keys are `ID!` (strings on the wire, as the spec and Relay expect);
+- `time.Time` is a custom `Time` scalar (RFC 3339), as in entgql;
+- every type implements `Node`, with root `node(id: ID!)` and `nodes(ids: [ID!]!)`.
+  Ids are only unique per table, so a global id names its type;
+- polymorphic edges stay separate fields (`Comment.article`, `Comment.post`). A union
+  (`owner: Owner`, `union Owner = Article | Post`) can come in 6e;
+- one_to_one and many_to_one edges are nullable object fields, the others `[T!]!`.
+
+Two choices to confirm: are **global ids** base64-encoded, as Relay recommends
+(`QXJ0aWNsZToz`), or plain (`Article:3`)? And are **foreign key columns** fields
+(`Comment.userId`), or only their edges (`Comment.author`)? entgql leaves them out
+unless the edge is bound to the field.
+> A: stick with entql standard
+
+**Q29. Hiding tables and fields from GraphQL.** Phase 6's field options include
+`Sensitive` and entgql's `Skip`, but Phase 4 already needs a way to keep a field
+(a password hash) or a whole table (a join table with a struct) out of the schema.
+**Default:** a `@[graphql: '-']` attribute on a field or struct, like `@[json: '-']`.
+Phase 6 folds it into the field options (Q39) and keeps the attribute working.
+> A: Yes, that is a good annotation choice
+
+**Q30. "The Apollo standard" (Q23).** Which of these did you mean? **Default:** (a) and
+(b) in Phase 4, (c) and (d) in Phase 6e or later.
+- (a) spec introspection that Apollo Sandbox, Apollo Client codegen and GraphiQL read,
+  with descriptions (from the doc comments) and `@deprecated`, plus a `GET /graphql`
+  page that opens Sandbox or GraphiQL;
+- (b) [GraphQL over HTTP](https://graphql.github.io/graphql-over-http/) responses with
+  Apollo Server's error codes in `extensions.code` (`GRAPHQL_PARSE_FAILED`,
+  `GRAPHQL_VALIDATION_FAILED`, `BAD_USER_INPUT`, `INTERNAL_SERVER_ERROR`);
+- (c) automatic persisted queries (APQ, `extensions.persistedQuery.sha256Hash`);
+- (d) Apollo Federation v2 subgraph support (`_service { sdl }`, `_entities`, `@key`),
+  so vgraph can sit behind an Apollo Router.
+> A: sorry, all of that would be future state. I meant the Apollo standard for generating and parsing schemas.
+
+**Q31. Validation and limits.** The spec has about 30 validation rules (unknown
+fields, argument types, fragment cycles, variable usage, and so on). **Default:** all
+of them, tested against cases ported from graphql-js's test suite, plus a configurable
+maximum query depth and number of selections, since nested queries fan out.
+> A: agreed
+
+**Q32. How the executor batches.** entgql reads the whole selection set first
+(`CollectFields`) and builds one Ent query with every nested `With<Edge>`. The other
+route is level by level: the executor hands each field every parent at once, as a
+dataloader does. **Default:** level by level. The `graphql` module's resolvers take a
+list of parents, so any backend can batch, and the module never imports vgraph. The
+generated resolvers run one `load_one` / `load_many` per edge per level, with that
+field's `where` and `orderBy` applied, and aliases of the same edge with different
+arguments load separately. `examples/service`'s query-count assertions then cover
+GraphQL too. 
+
+Nested `limit` / `offset` (`articles { comments(limit: 3) }`) is per parent, which one
+`IN (…)` query can't do without window functions. **Default:** Phase 4 loads the
+edge's rows in one query and cuts each parent's list in V: correct, batched, but it
+reads every row of the edge. Phase 6e moves it into SQL
+(`ROW_NUMBER() OVER (PARTITION BY …)`) where the database supports it.
+> A: agree with default
+
+**Q33. Hand-written fields and operations.** Apps need fields the schema doesn't
+generate (`Article.url`, a root `me`) and, until 6e, all their mutations (Q27).
+**Default:** `vgraph gen` also reads any `*.graphql` files in the project
+(`extend type Article { url: String! }`, `extend type Mutation { … }`), merges them
+into the schema, and writes resolver stubs for the app to fill in, in a file it never
+overwrites, as gqlgen does.
+> A: yes, agree
+
+**Q34. Transactions for mutations.** The spec runs a request's mutation fields in
+order. vgraph has no transactions until 6a, but `orm.TransactionalConnection` does
+(SQLite and PostgreSQL implement it). **Default:** the HTTP handler takes an optional
+transaction wrapper; when it's set, all of a request's mutation fields run in one
+transaction and any error rolls the request back, as entgql's `Transactioner` does.
+`examples/service` sets it. The other choice is one transaction per mutation field,
+with partial success reported in `errors`.
+> A: yes agree
+
+**Q35. Exit criteria for Phase 4.** **Default:**
+- `examples/service` serves `POST /graphql` (and `GET` for Sandbox) beside its REST
+  routes, with a query or mutation for every REST endpoint, and its tests assert that
+  each GraphQL query runs the same selects as the matching REST endpoint;
+- `examples/relations` has a GraphQL test for each relationship kind;
+- the parser and validator pass the cases ported from graphql-js;
+- the standard introspection query's result matches a checked-in copy, and Apollo
+  Sandbox and GraphiQL load the schema (checked by hand once);
+- everything passes on SQLite and PostgreSQL in CI, and CI checks that the generated
+  schema and resolvers are up to date.
+> A: perfect
+
+#### Phase order and scope
+
+**Q36. Phase 5 before Phase 6?** Phase 5 (migration helpers from edges) is small and
+doesn't depend on Phase 6. Phase 6 adds schema options (unique fields, defaults,
+declared indexes, edge schemas) that migrations then need to cover. **Default:** keep
+the order; Phase 5 covers edges, and each Phase 6 sub-phase extends the helpers for
+what it adds. The other choice is Phase 6 first, so the migration helpers are written
+once against the full schema.
+> A: yes that is fine
+
+**Q37. Ent features outside the core.** The inventory covers Ent and entgql. Ent also
+has a Gremlin driver (graph databases) and extensions: entproto (protobuf / gRPC),
+entoas and ogent (OpenAPI), entviz (schema diagrams). **Default:** out of scope for
+v1, listed in §3 as non-goals; `vgraph describe` (a text dump of the schema, like
+`ent describe`) is in 6d.
+> A: out of scope, but add to a list for future state, especially entproto.
+
+#### Phase 6 (Ent parity): answer before Phase 6 starts
+
+**Q38. The write API's shape.** Generated per table, like Ent's builders:
+
+```v ignore
+art := g.articles().create()
+	.set_title('V')
+	.set_author_id(user.id)  // or .set_author(user_node)
+	.add_tag_ids(1, 2)       // writes join rows
+	.save()!                 // ArticleNode
+g.articles().update_one(art).set_title('W').clear_published_at().remove_tag_ids(2).save()!
+g.articles().update().where_user_id(3).set_summary('').exec()! // rows changed
+g.articles().delete_one(art.article.id).exec()!
+g.articles().delete().where_deleted_at_is_not_null().exec()!
+```
+
+Writes go through `orm.Connection.insert` / `update` / `delete`. Reading back a new id
+is the risk from §5: `last_id()` races when threads share a connection. **Default:**
+this shape; a create runs its insert, `last_id()` and edge writes in one transaction,
+uses `RETURNING id` on PostgreSQL, and the docs say a connection isn't to be shared
+across threads without a pool.
+> A: agreed
+
+**Q39. Field options.** Writes need to know which fields are required on create, have
+defaults, can't change, or must stay hidden. Reflection gives only the type and
+nullability. **Default:** an optional `fields()` method beside `edges()`, listing only
+the fields that need options:
+
+```v ignore
+pub fn (a Article) fields() []vgraph.Field {
+	return [
+		vgraph.Field{name: 'slug', immutable: true},
+		vgraph.Field{name: 'created_at', default_now: true, immutable: true},
+		vgraph.Field{name: 'updated_at', default_now: true, update_now: true},
+		vgraph.Field{name: 'body', validate: fn (v string) ! { ... }},
+	]
+}
+```
+
+Fields not listed are inferred: an option type is optional, `@[sql: serial]` is set by
+the database, and every other field is required on create.
+> A: sounds good
+
+**Q40. Hooks, and where business logic lives.** `examples/service`'s stores validate,
+make slugs, set timestamps and soft-delete. In Ent that logic lives in hooks, so every
+write, generated GraphQL mutations included, runs it. **Default:** hooks declared like
+edges, `fn (Article) hooks() []vgraph.Hook`, each a function that receives the mutation
+and the next step, with `on` (create, update, delete) conditions; runtime hooks
+registered on the `Graph`. `examples/service` moves its store logic into hooks and its
+GraphQL mutations become generated ones.
+> A: yes we want that as hooks
+
+**Q41. Context, for privacy and hooks.** Ent passes a `context.Context` to every call,
+which is how privacy rules see the viewer and hooks see the request. vgraph's API has
+none. **Default:** `g.with_ctx(ctx)` returns a `Graph` whose queries and writes pass
+`ctx` to hooks, interceptors and privacy rules, and the GraphQL handler sets it per
+request. Leaving it out keeps the API as it is.
+> A: yes, especially with hooks to logic, passing a user defined context is critical
+
+#### Phase 4 follow-up (2026-10-13)
+
+**Q42. `Node` and global ids, given entgql's convention (Q28).** entgql's `node(id: ID!)`
+finds a row from its id alone. With integer ids that relies on Ent's globally unique
+ids (`sql/globalid`): each table's ids start at its own multiple of 2^32, recorded in
+an `ent_types` table, so an id says which table it belongs to. vgraph's tables each
+count from 1, so `3` could be an article or a user. **Default:** (a).
+- (a) Phase 4 leaves out `Node`, `node` and `nodes`. Clients read one row with
+  `articles(where: {id: 3})`. Globally unique ids come in 6d, with the migration
+  helpers setting each table's starting id, and `Node` with them.
+- (b) Add globally unique ids in Phase 4. Only new tables can start at their range;
+  `examples/service`'s existing rows keep their ids, so it needs a data migration.
+- (c) `Node` now with type-prefixed ids (`Article:3`, or base64 as Relay suggests),
+  which is the Relay convention but not entgql's for integer ids.
+> A: my choice is (a)
+
+**Q43. Ids other than `int`, such as UUID strings** (reopens Q6). `load`, `Client`,
+`Schema.validate` and the generated client assume `int` keys (`map[int]`, `[]int`,
+`int_column`). GraphQL's `ID` is a string on the wire, so the schema doesn't change,
+but Phase 4's resolvers would be built on the `int` load API, and generalizing it in
+6d would break `load`, the generated client and the resolvers at once.
+**Default:** a Phase 3.2 before GraphQL: key by the key's string form inside `load`,
+accept `int`, `i64` and `string` keys, check edge column types against target keys,
+and keep the generated API typed. Test with a UUID-keyed table in `examples/relations`.
+> A: default (2026-10-13)
+
+## 8. Future state
+
+Out of scope for v1, kept for later (Q30, Q37):
+- **entproto** (protobuf and gRPC services generated from the schema): first in line.
+- entoas and ogent (an OpenAPI spec and server generated from the schema).
+- entviz (schema diagrams).
+- Ent's Gremlin driver (graph databases).
+- Apollo's runtime extras: a `GET /graphql` page for Sandbox or GraphiQL, Apollo
+  Server's error codes in `extensions.code`, automatic persisted queries, and
+  Federation v2 subgraph support (`_service`, `_entities`, `@key`).
