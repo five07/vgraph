@@ -168,14 +168,12 @@ fn (fields CommentUpdate) validate() ! {
 	}
 }
 
-// create_tables creates the tables of this module's models, and the index
-// that finds the comments on a record. The `users` table has to exist first.
+// create_tables creates the tables of this module's models. The `users` table
+// has to exist first. The indexes that the edges need come from vgraph's
+// `ensure_indexes`, not the ORM's `@[index]`: for SQLite that puts CREATE INDEX
+// after CREATE TABLE in one string, and SQLite runs only the first statement.
 pub fn create_tables(db orm.Connection) ! {
 	sql db {
 		create table Comment
 	}!
-	// Not the ORM's `@[index]`: for SQLite it puts CREATE INDEX after CREATE
-	// TABLE in one string, and SQLite runs only the first statement of it.
-	mut conn := db
-	conn.execute('CREATE INDEX IF NOT EXISTS idx_comments_owner ON comments (owner_type, owner_id)')!
 }

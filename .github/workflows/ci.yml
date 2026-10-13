@@ -34,7 +34,11 @@ jobs:
       - name: Check formatting
         run: v fmt -verify vgraph
       - name: Check doc comments
-        run: v vet vgraph/edge.v vgraph/schema.v vgraph/client.v vgraph/load
+        run: v vet vgraph/edge.v vgraph/schema.v vgraph/client.v vgraph/migrate.v vgraph/load vgraph/gen vgraph/cmd/vgraph
+      - name: Check that example/graph is generated from the current models
+        run: |
+          v run vgraph/cmd/vgraph gen vgraph/example
+          git -C vgraph diff --exit-code -- example/graph
       - name: Test
         run: v test vgraph
 
@@ -73,4 +77,4 @@ jobs:
           PGUSER: postgres
           PGPASSWORD: 12345678
           PGDATABASE: postgres
-        run: v -d started_postgres test vgraph/pg_test.v
+        run: v -d vgraph_pg test vgraph/pg_test.v

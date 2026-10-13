@@ -1,6 +1,6 @@
 module comments
 
-import five07.vgraph
+import graph
 import app
 import comments.models as comment_models
 import users.models as user_models
@@ -9,7 +9,7 @@ import users.models as user_models
 // comment handler, and the handlers of the records comments are on. Its
 // methods return values, not veb.Result, so veb doesn't serve them as routes.
 pub struct Service {
-	graph  vgraph.Client
+	graph  graph.Graph
 	store  comment_models.CommentStore
 	users  user_models.UserStore
 	owners map[string]Owner
@@ -17,10 +17,10 @@ pub struct Service {
 
 // Service.new returns a service that keeps comments in `store`, their authors
 // in `users`, and allows comments only on the kinds of records in `owners`,
-// keyed by `owner_type`. It loads related records through `graph`.
-pub fn Service.new(graph vgraph.Client, store comment_models.CommentStore, users user_models.UserStore, owners map[string]Owner) Service {
+// keyed by `owner_type`. It loads related records through `g`.
+pub fn Service.new(g graph.Graph, store comment_models.CommentStore, users user_models.UserStore, owners map[string]Owner) Service {
 	return Service{
-		graph:  graph
+		graph:  g
 		store:  store
 		users:  users
 		owners: owners
@@ -99,22 +99,21 @@ pub fn (s Service) view(comment comment_models.Comment) !comment_models.CommentV
 // views returns `list` as the API returns it. It loads the authors, the
 // parents and the owners of each type in one query each, not one per comment.
 pub fn (s Service) views(list []comment_models.Comment) ![]comment_models.CommentView {
-	users := s.graph.load_one[comment_models.Comment, user_models.User](list, 'author')!
-	parents := s.graph.load_one[comment_models.Comment, comment_models.Comment](list,
-		'parent')!
-	mut owners := map[string]map[int]string{}
-	for c in list {
-		if c.owner_type !in owners {
-			owners[c.owner_type] = s.owner(c.owner_type)!.slugs_on(list)!
-		}
-	}
+	nodes := s.graph.comments().with_author().with_parent().with_article().with_post().nodes(list)!
 	mut views := []comment_models.CommentView{cap: list.len}
-	for c in list {
-		views << c.view(
-			user:   if u := users[c.user_id] { u.slug } else { '' }
-			owner:  owners[c.owner_type][c.owner_id] or { '' }
-			parent: if id := c.parent_id {
-				if p := parents[id] { p.slug } else { '' }
+	for n in nodes {
+		owner := if a := n.article {
+			a.article.slug
+		} else if p := n.post {
+			p.post.slug
+		} else {
+			''
+		}
+		views << n.comment.view(
+			user:   if u := n.author { u.user.slug } else { '' }
+			owner:  owner
+			parent: if n.comment.parent_id != none {
+				if p := n.parent { p.comment.slug } else { '' }
 			} else {
 				none
 			}

@@ -162,8 +162,12 @@ fn test_add_reflects_tables_and_edges() {
 	s := schema()!
 	article := s.table('articles')!
 	assert article.key == 'id'
-	assert article.columns['user_id']!.kind == .int
-	assert article.columns['deleted_at']!.nullable
+	assert article.struct_ == 'vgraph.Article'
+	assert article.column('user_id')?.kind == .int
+	assert article.column('deleted_at')?.nullable
+	assert article.column('deleted_at')?.typ == '?time.Time'
+	assert article.columns.map(it.name) == ['id', 'user_id', 'title', 'deleted_at']
+	assert s.tables().map(it.name) == ['users', 'articles', 'comments', 'tags']
 	assert article.edges.map(it.name) == ['author', 'comments', 'tags']
 	assert s.table('tags')!.edges.len == 0
 	s.validate()!
@@ -313,4 +317,23 @@ fn test_load_errors() {
 	} else {
 		assert err.msg() == '`tags` has no edge `x`'
 	}
+}
+
+fn test_indexes() {
+	s := schema()!
+	assert s.indexes().map(it.sql()) == [
+		'CREATE INDEX IF NOT EXISTS "article_tags_article_id_idx" ON "article_tags" ("article_id")',
+		'CREATE INDEX IF NOT EXISTS "articles_user_id_idx" ON "articles" ("user_id")',
+		'CREATE INDEX IF NOT EXISTS "comments_owner_type_owner_id_idx" ON "comments" ("owner_type", "owner_id")',
+	]
+}
+
+fn test_ensure_indexes_creates_them_once() {
+	c := client()!
+	mut conn := c.conn
+	assert c.ensure_indexes()!.len == 3
+	c.ensure_indexes()!
+	rows := conn.execute("SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE '%_idx' ORDER BY name")!
+	assert rows.map(it.vals[0]) == ['article_tags_article_id_idx', 'articles_user_id_idx',
+		'comments_owner_type_owner_id_idx']
 }

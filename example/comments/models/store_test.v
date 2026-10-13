@@ -66,12 +66,10 @@ fn test_find_by_owner() {
 	assert f.store.find_by_owner('Article', 1)!.map(it.slug) == [a1b.slug]
 }
 
-fn test_owner_index() {
+fn test_create_tables_again() {
 	f := setup()!
 	// creating the tables again, as every startup does, is fine
 	create_tables(f.db)!
-	rows := f.db.exec("SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'comments'")!
-	assert rows.any(it.vals[0].contains('owner_type') && it.vals[0].contains('owner_id'))
 }
 
 fn test_replies() {

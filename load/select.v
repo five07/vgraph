@@ -4,11 +4,28 @@ import orm
 import time
 
 // select_in returns the `T` records whose `column` is one of `ids`, in one query,
-// narrowed by `opts.type_col` and `opts.soft_del`. It calls
+// narrowed and ordered by `opts`. It calls
 // `orm.Connection.select` directly: `orm.new_query`, which could do this, leaves
 // the standard library after 2027-08-17 (PLAN.md, Q17). Fields may be `int`,
 // `i64`, `f64`, `bool`, `string` or `time.Time`, or options of those.
 pub fn select_in[T](conn orm.Connection, column string, ids []int, opts Options) ![]T {
+	mut conds := [in_ints(column, ids)]
+	if opts.type_col != '' {
+		conds << eq(opts.type_col, opts.type_val)
+	}
+	if opts.soft_del != '' {
+		conds << is_null(opts.soft_del)
+	}
+	conds << opts.query.conds
+	if matches_nothing(conds) {
+		return []T{}
+	}
+	return run_select[T](conn, where_of(conds), opts.query, false)
+}
+
+// run_select runs one select of `T`'s columns with `where`, ordered by
+// `q.order`, and limited to `q.limit` when `limit` is set.
+fn run_select[T](conn orm.Connection, where orm.QueryData, q Query, limit bool) ![]T {
 	mut fields := []string{}
 	mut types := []int{}
 	$for field in T.fields {
@@ -17,7 +34,7 @@ pub fn select_in[T](conn orm.Connection, column string, ids []int, opts Options)
 		} $else {
 			fields << column_name(field.name, field.attrs)
 			// Inline: `column_type[field.typ]()` generates C that doesn't compile
-			// (regressions/comptime_generic_call_test.v).
+			// (regressions/comptime_generic_call.vv).
 			$if field.typ is int || field.typ is ?int {
 				types << orm.type_idx['int']
 			} $else $if field.typ is i64 || field.typ is ?i64 {
@@ -35,18 +52,27 @@ pub fn select_in[T](conn orm.Connection, column string, ids []int, opts Options)
 			}
 		}
 	}
+	mut data := orm.QueryData{}
+	if limit && q.limit > 0 {
+		data.data << orm.Primitive(q.limit)
+		data.types << orm.type_idx['int']
+	}
 	config := orm.SelectConfig{
 		table:        orm.Table{
 			name: table_name[T]()
 		}
-		has_where:    true
+		has_where:    where.fields.len > 0
+		has_order:    q.order != ''
+		order:        q.order
+		order_type:   if q.desc { .desc } else { .asc }
+		has_limit:    limit && q.limit > 0
 		primary:      primary_key[T]()
 		fields:       fields
 		select_exprs: fields
 		types:        types
 	}
 	mut c := conn
-	rows := c.select(config, orm.QueryData{}, where_in(column, ids, opts))!
+	rows := c.select(config, data, where)!
 	mut result := []T{cap: rows.len}
 	for row in rows {
 		result << map_row[T](row)!
@@ -54,9 +80,13 @@ pub fn select_in[T](conn orm.Connection, column string, ids []int, opts Options)
 	return result
 }
 
-// select_pairs returns the `[from_col, to_col]` pairs of the join table `table`
-// whose `from_col` is one of `ids`, in one query.
-fn select_pairs(conn orm.Connection, table string, from_col string, to_col string, ids []int) ![][]int {
+// link_pairs returns the `[from_col, to_col]` pairs of the join table `table`
+// whose `from_col` is one of `ids`, in one query, or none without a query when
+// `ids` is empty.
+pub fn link_pairs(conn orm.Connection, table string, from_col string, to_col string, ids []int) ![][]int {
+	if ids.len == 0 {
+		return [][]int{}
+	}
 	config := orm.SelectConfig{
 		table:        orm.Table{
 			name: table
@@ -68,37 +98,12 @@ fn select_pairs(conn orm.Connection, table string, from_col string, to_col strin
 		types:        [orm.type_idx['int'], orm.type_idx['int']]
 	}
 	mut c := conn
-	rows := c.select(config, orm.QueryData{}, where_in(from_col, ids, Options{}))!
+	rows := c.select(config, orm.QueryData{}, where_of([in_ints(from_col, ids)]))!
 	mut pairs := [][]int{cap: rows.len}
 	for row in rows {
 		pairs << [cell_int(row[0], from_col)!, cell_int(row[1], to_col)!]
 	}
 	return pairs
-}
-
-// where_in returns `column IN (ids)`, and `type_col = type_val` and
-// `soft_del IS NULL` when `opts` has them.
-fn where_in(column string, ids []int, opts Options) orm.QueryData {
-	mut where := orm.QueryData{
-		fields: [column]
-		data:   [orm.Primitive(ids)]
-		types:  [typeof[[]int]().idx]
-		kinds:  [.in]
-	}
-	if opts.type_col != '' {
-		where.fields << opts.type_col
-		where.data << orm.Primitive(opts.type_val)
-		where.types << orm.type_string
-		where.kinds << .eq
-		where.is_and << true
-	}
-	if opts.soft_del != '' {
-		// IS NULL takes no value
-		where.fields << opts.soft_del
-		where.kinds << .is_null
-		where.is_and << true
-	}
-	return where
 }
 
 // map_row builds a `T` from the cells of one selected row, in field order.

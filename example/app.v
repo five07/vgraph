@@ -3,7 +3,7 @@ module main
 import veb
 import db.sqlite
 import orm
-import five07.vgraph
+import graph
 // `app.Context` is written out in this module: importing `Context` by name
 // makes V 0.5.2 generate C for veb's generics against a `main.Context`.
 import app
@@ -39,33 +39,24 @@ fn new_app_on(cfg app.Config, db sqlite.DB, conn orm.Connection) !&App {
 	post_models.create_tables(conn)!
 	comment_models.create_tables(conn)!
 
-	mut schema := vgraph.Schema{}
-	schema.add[user_models.User]()!
-	schema.add[article_models.Article]()!
-	schema.add[post_models.Post]()!
-	schema.add[comment_models.Comment]()!
-	graph := vgraph.Client.new(conn, schema)!
+	// the client `vgraph gen` writes into `graph/`, which checks the edges
+	g := graph.Graph.new(conn)!
+	g.client.ensure_indexes()!
 
 	user_store := user_models.UserStore.new(conn)
 	article_store := article_models.ArticleStore.new(conn)
 	post_store := post_models.PostStore.new(conn)
 	comment_store := comment_models.CommentStore.new(conn)
 	// The kinds of records that take comments, keyed by `owner_type`.
-	comment_service := comments.Service.new(graph, comment_store, user_store, {
+	comment_service := comments.Service.new(g, comment_store, user_store, {
 		comment_models.owner_type[article_models.Article](): comments.Owner{
-			id_of:    fn [article_store] (slug string) !int {
+			id_of: fn [article_store] (slug string) !int {
 				return article_store.id_of(slug)
-			}
-			slugs_on: fn [graph] (list []comment_models.Comment) !map[int]string {
-				return owner_slugs[article_models.Article](graph, list, 'article')
 			}
 		}
 		comment_models.owner_type[post_models.Post]():       comments.Owner{
-			id_of:    fn [post_store] (slug string) !int {
+			id_of: fn [post_store] (slug string) !int {
 				return post_store.id_of(slug)
-			}
-			slugs_on: fn [graph] (list []comment_models.Comment) !map[int]string {
-				return owner_slugs[post_models.Post](graph, list, 'post')
 			}
 		}
 	})
@@ -79,25 +70,13 @@ fn new_app_on(cfg app.Config, db sqlite.DB, conn orm.Connection) !&App {
 	}
 	mut user_handler := users.Handler.new(user_store, article_store, post_store, comment_service)
 	api.register_controller[users.Handler, app.Context]('/users', mut user_handler)!
-	mut article_handler := articles.Handler.new(graph, article_store, user_store, comment_service)
+	mut article_handler := articles.Handler.new(g, article_store, user_store, comment_service)
 	api.register_controller[articles.Handler, app.Context]('/articles', mut article_handler)!
-	mut post_handler := posts.Handler.new(graph, post_store, user_store, comment_service)
+	mut post_handler := posts.Handler.new(g, post_store, user_store, comment_service)
 	api.register_controller[posts.Handler, app.Context]('/posts', mut post_handler)!
 	mut comment_handler := comments.Handler.new(comment_service)
 	api.register_controller[comments.Handler, app.Context]('/comments', mut comment_handler)!
 	return api
-}
-
-// owner_slugs returns the slugs of the `T` records that the comments in `list`
-// are on, keyed by id, in one query: `edge` is the comment's polymorphic edge to
-// a `T`, such as `article`.
-fn owner_slugs[T](graph vgraph.Client, list []comment_models.Comment, edge string) !map[int]string {
-	owners := graph.load_one[comment_models.Comment, T](list, edge)!
-	mut slugs := map[int]string{}
-	for id, owner in owners {
-		slugs[id] = owner.slug
-	}
-	return slugs
 }
 
 // HealthResponse is the body of `GET /health`.

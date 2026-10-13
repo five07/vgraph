@@ -18,6 +18,9 @@ pub:
 	// soft_del names a column of the loaded rows that marks them deleted when it
 	// is not null, such as `deleted_at`. Those rows are skipped.
 	soft_del string
+	// query adds conditions and an order to the loaded rows. Its limit is
+	// ignored: it would apply to all parents together, not to each.
+	query Query
 }
 
 // load_one returns the `P` records that `children` refer to through their `fk`
@@ -47,7 +50,7 @@ pub fn load_one[C, P](conn orm.Connection, children []C, fk string, opts Options
 		return found
 	}
 	key := primary_key[P]()
-	for row in select_in[P](conn, key, ids, soft_del: opts.soft_del)! {
+	for row in select_in[P](conn, key, ids, soft_del: opts.soft_del, query: opts.query)! {
 		found[int_column[P](row, key) or { 0 }] = row
 	}
 	return found
@@ -76,7 +79,7 @@ pub fn load_through[P, C](conn orm.Connection, parents []P, through string, from
 	if ids.len == 0 {
 		return grouped
 	}
-	pairs := select_pairs(conn, through, from_col, to_col, ids)!
+	pairs := link_pairs(conn, through, from_col, to_col, ids)!
 	mut targets := []int{}
 	mut seen := map[int]bool{}
 	for pair in pairs {
@@ -99,6 +102,19 @@ pub fn load_through[P, C](conn orm.Connection, parents []P, through string, from
 		}
 	}
 	return grouped
+}
+
+// unique returns `ids` without repeats, in the order each first appears.
+pub fn unique(ids []int) []int {
+	mut seen := map[int]bool{}
+	mut out := []int{cap: ids.len}
+	for id in ids {
+		if id !in seen {
+			seen[id] = true
+			out << id
+		}
+	}
+	return out
 }
 
 // keys_of returns the distinct primary keys of `rows`, in the order each first

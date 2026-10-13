@@ -804,3 +804,22 @@ fn test_read_endpoints_query_counts() {
 		assert selects_for(base, mut log, path)! == expected[path], path
 	}
 }
+
+// Startup creates the indexes that the edges need, and running it again on the
+// same database is fine.
+fn test_startup_creates_edge_indexes() {
+	cfg := app.Config{
+		seed: false
+	}
+	db := app.connect(cfg)!
+	new_app_on(cfg, db, db)!
+	new_app_on(cfg, db, db)!
+	rows := db.exec("SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE '%_idx' ORDER BY name")!
+	assert rows.map(it.vals[0]) == [
+		'articles_user_id_idx',
+		'comments_owner_type_owner_id_idx',
+		'comments_parent_id_idx',
+		'comments_user_id_idx',
+		'posts_user_id_idx',
+	]
+}

@@ -2,7 +2,7 @@ module articles
 
 import net.http
 import veb
-import five07.vgraph
+import graph
 import app
 import comments
 import comments.models as comment_models
@@ -14,7 +14,7 @@ const owner_type = comment_models.owner_type[article_models.Article]()
 
 // Handler serves the article endpoints; the app mounts it at `/articles`.
 pub struct Handler {
-	graph    vgraph.Client
+	graph    graph.Graph
 	store    article_models.ArticleStore
 	users    user_models.UserStore
 	comments comments.Service
@@ -22,10 +22,10 @@ pub struct Handler {
 
 // Handler.new returns the article handler, reading and writing articles
 // through `store`, their authors through `users`, and their comments through
-// `comment_service`. It loads the authors of listed articles through `graph`.
-pub fn Handler.new(graph vgraph.Client, store article_models.ArticleStore, users user_models.UserStore, comment_service comments.Service) &Handler {
+// `comment_service`. It loads the authors of listed articles through `g`.
+pub fn Handler.new(g graph.Graph, store article_models.ArticleStore, users user_models.UserStore, comment_service comments.Service) &Handler {
 	return &Handler{
-		graph:    graph
+		graph:    g
 		store:    store
 		users:    users
 		comments: comment_service
@@ -119,10 +119,10 @@ fn render_one(h &Handler, mut ctx app.Context, status http.Status, article artic
 // views returns `list` as the API returns it, looking up the authors' slugs
 // in one query.
 fn (h &Handler) views(list []article_models.Article) ![]article_models.ArticleView {
-	authors := h.graph.load_one[article_models.Article, user_models.User](list, 'author')!
+	nodes := h.graph.articles().with_author().nodes(list)!
 	mut views := []article_models.ArticleView{cap: list.len}
-	for record in list {
-		views << record.view(if a := authors[record.user_id] { a.slug } else { '' })
+	for n in nodes {
+		views << n.article.view(if a := n.author { a.user.slug } else { '' })
 	}
 	return views
 }

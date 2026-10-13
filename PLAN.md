@@ -252,19 +252,93 @@ record it in the README and CI. Then publish `v0.1.0` to VPM from
 - **CI:** `.github/workflows/ci.yml` runs `v fmt -verify`, `v vet` on the package,
   `v test` on SQLite, and `pg_test.v` against a `postgres:16` service, with V built
   at `53dd72c`. It hasn't run yet: it first runs on push.
-- **Left for you:**
-  - push `github.com/five07/vgraph` and check that CI passes;
-  - pin a `0.5.x` release that has `v.migrations` (Q13), or decide to publish
-    against master;
-  - tag `v0.1.0`, and submit it at <https://vpm.vlang.io/new> (the name can't be
-    changed afterwards);
-  - check the exit test: `v install five07.vgraph` in a fresh project.
+- **Your decisions (2026-10-12):**
+  - CI runs only on pushes to `main`, which include merges.
+  - Keep building on V master. Until a release includes `v.migrations`,
+    `Client.ensure_indexes()` (`migrate.v`) creates the indexes edges need with
+    `CREATE INDEX IF NOT EXISTS`, and `example` uses it in place of its hand-written
+    index. Phase 5 replaces it.
+  - The whole plan is finished on `develop` before merging to `main` and tagging
+    `v0.1.0`. VPM submission waits on VPM's OAuth problem.
+  - The exit test (`v install five07.vgraph` in a fresh project) runs once the
+    package is on VPM.
+- `pg_test.v` runs only with `-d vgraph_pg`. `started_postgres` turned it on
+  whenever any PostgreSQL process was running locally.
 
 **Phase 3: generator.** First, the schema comparison from Q4: write the `example`
 entities both as (a) `edges()` methods and as (c) a schema file, and choose one before
 building `vgraph gen` on it. Then `vgraph gen` writes the typed client, and `example`
 switches to it.
 *Exit:* `example` uses no hand-written loading code.
+
+*Result (2026-10-12, done; Q18 chose (a)):*
+- **`vgraph gen [folder] [--out graph]`** (`cmd/vgraph`, logic in `gen/`) finds the
+  structs with `edges()` by scanning the sources. It writes and runs a loader
+  program in `.vgraph-gen/`, which registers them, validates the schema and prints
+  it as JSON. It then writes `graph.v` plus one file per table, removes stale
+  generated files (it never touches files without its header), and runs `v fmt`.
+  Schema problems are reported as such, with exit code 1.
+- **Generated API per table:**
+  - typed predicates by column type (`where_<field>`, `_lt/_le/_gt/_ge`, `_in`,
+    `_like`, `_is_null/_is_not_null`), plus `where(load.Cond...)` for anything else;
+  - `order_by_<field>[_desc]`, `limit`;
+  - `with_<edge>(configure ...)` for nested eager loads, one query per edge;
+  - `all`, `first` (`NotFoundError`), and `nodes(rows)` to load edges onto rows
+    you already have;
+  - on each node, `query_<edge>()` for traversal (`!` for many_to_many, which
+    reads the join table first).
+- **Support code:**
+  - `load` gained `Cond` / `Query` / `select_where` (conditions, order, limit),
+    `link_pairs` and `unique`;
+  - `Schema` keeps columns in field order, with their V field names and types, and
+    tables in registration order.
+- **`example`:** uses `example/graph/`, generated and checked in. Its comment,
+  article and post views load through it. The `Owner` registry is down to `id_of`.
+  The query-count test is unchanged: the same selects, in the same order. The
+  stores keep their own root queries (`find_by_user` and similar), which are queries
+  rather than edge loading.
+- **Tests:** `gen/gen_test.v` (discovery, naming, the loader) and
+  `cmd/vgraph/gen_test.v`, which generates a client for a throwaway project with a
+  join table, a polymorphic edge in both directions, a nullable self-edge and soft
+  deletes, and runs that project's tests against it, query counts included. All 16
+  test files pass, PostgreSQL included.
+- **CI:** CI fails if `example/graph` isn't what `vgraph gen` produces from the
+  current models.
+- **Compiler bugs found:** a second one, `regressions/shadowed_fn_call.vv`: a
+  variable named like the function it calls generates invalid C on master.
+
+*Schema comparison (2026-10-12), for Q18: chose (a).* `example` had the same schema
+both ways, (a) `edges()` on each model and (c) a `schema.toml`, with a test that they
+declared identical edges. Both were removed once (a) was chosen.
+
+| | (a) `edges()` methods | (c) `schema.toml` |
+|---|---|---|
+| Where | next to each struct | one file for the whole graph |
+| Checked | kinds and names by the compiler; columns at `Client.new` | names when parsed; columns at `Client.new` (if a runtime `Schema` is built from it) |
+| Fields for predicates | reflection, from the real structs | must be listed again in the file, or taken from the structs anyway |
+| How `vgraph gen` reads it | writes a small program that imports the models and dumps the reflected schema as JSON, runs it (a few seconds), and generates from the JSON | parses the file: fast, no compile, if fields are listed |
+| Runtime without gen | works today (`Schema.add[T]()`) | needs a loader that maps tables to structs, so in practice still `add[T]()` |
+| Non-V tools (GraphQL, migrations) | read the JSON that gen dumps | read the file directly |
+
+Either way the generated client is the same. Sketch, for `articles`:
+
+```v ignore
+// example/graph/articles.v, generated
+pub fn (g Graph) articles() ArticleQuery
+pub fn (q ArticleQuery) where_slug(slug string) ArticleQuery          // field predicates
+pub fn (q ArticleQuery) with_author() ArticleQuery                     // eager loads, batched
+pub fn (q ArticleQuery) with_comments(f fn (CommentQuery) CommentQuery) ArticleQuery
+pub fn (q ArticleQuery) all() ![]ArticleNode
+pub fn (q ArticleQuery) only() !ArticleNode
+pub struct ArticleNode {
+pub:
+	article  article_models.Article
+	author   ?UserNode      // set by with_author()
+	comments []CommentNode  // set by with_comments()
+}
+pub fn (n ArticleNode) query_comments() CommentQuery                  // traversal
+```
+
 
 **Phase 4: GraphQL** as a separate `five07.graphql` package, only if wanted (Q9).
 
@@ -375,3 +449,8 @@ Postgres/MySQL come with it. The cost is mapping each field type ourselves: opti
 in about 60 lines (`spike/load/select.v`). The other choice is `new_query` for now,
 switching when its new home is known.
 > A: default choice
+
+**Q18. Schema source for `vgraph gen`: (a) `edges()` methods or (c) `schema.toml`?** See
+the comparison under Phase 3. **Recommendation:** (a). The generator needs the fields
+either way, and (a) gets them from the real structs instead of a second copy.
+> A: (a) `edges()` methods. *(`schema.toml` and its sync test were then removed.)*

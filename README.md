@@ -54,6 +54,7 @@ schema.add[User]()!
 schema.add[Article]()!
 schema.add[Comment]()!
 graph := vgraph.Client.new(db, schema)! // checks every edge against the structs
+graph.ensure_indexes()! // indexes the columns edge loads filter by (temporary, see below)
 
 articles := sql db {
 	select from Article
@@ -69,9 +70,51 @@ edge that names a missing table or column, or a column of the wrong type.
 
 `five07.vgraph.load` has the same loads by column name, for code without a schema.
 
+## Typed client: `vgraph gen`
+
+`vgraph gen` finds the structs with an `edges()` method in a project, checks their
+schema, and writes a typed client module, `graph` by default:
+
+```sh
+v run ~/.vmodules/five07/vgraph/cmd/vgraph gen .   # in the folder with v.mod
+```
+
+```v ignore
+import graph
+
+g := graph.Graph.new(db)!
+articles := g.articles()
+	.where_deleted_at_is_null()
+	.where_title_like('V%')
+	.order_by_id_desc()
+	.limit(10)
+	.with_author()
+	.with_tags()
+	.with_comments(fn (q graph.CommentQuery) graph.CommentQuery {
+		return q.with_author().order_by_id() // nested loads, still one query per edge
+	})
+	.all()! // []graph.ArticleNode
+
+for a in articles {
+	println('${a.article.title} by ${a.author?.user.name}, ${a.comments.len} comments')
+}
+first := articles[0].query_comments().where_body_like('%thanks%').all()! // traversal
+nodes := g.comments().with_parent().nodes(rows_you_already_have)! // eager loads only
+```
+
+For each table it writes a query (`where_<field>`, `_lt`/`_gt`/`_in`/`_like`/`_is_null`
+variants by type, `order_by_<field>`, `limit`, `with_<edge>`, `all`, `first`,
+`nodes`) and a node holding the row and its loaded edges, with `query_<edge>` to
+traverse. Regenerate it after changing a model; it is checked in, like any code.
+
+`ensure_indexes` runs `CREATE INDEX IF NOT EXISTS` (SQLite and PostgreSQL) for each
+column an edge load filters by. It is a stopgap: once a V release includes
+`v.migrations`, vgraph will emit migration steps instead.
+
 ## Layout
 
-- `edge.v`, `schema.v`, `client.v`: the `vgraph` module.
+- `edge.v`, `schema.v`, `client.v`, `migrate.v`: the `vgraph` module.
+- `gen/`, `cmd/vgraph/`: the generator and the `vgraph` command.
 - `load/`: `vgraph.load`, the batched loads that `Client` runs.
 - `example/`: a JSON REST API that uses vgraph, and its test bed.
 - `regressions/`: one small program per V compiler bug that vgraph works around.
@@ -80,8 +123,8 @@ edge that names a missing table or column, or a column of the wrong type.
 ## Development
 
 ```sh
-v test .                                    # SQLite; pg_test.v is skipped
-PGPORT=5432 v -d started_postgres test pg_test.v  # with a PostgreSQL server running
+v test .                              # SQLite; pg_test.v is skipped
+PGPORT=5432 v -d vgraph_pg test pg_test.v  # with a PostgreSQL server running
 ```
 
 `example/` imports vgraph as `five07.vgraph`, so link this checkout there first:

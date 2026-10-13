@@ -264,3 +264,68 @@ fn test_reflection() {
 	assert int_column[Note](Note{ author: 7 }, 'author') == none
 	assert int_column[Note](Note{}, 'parent_id') == none
 }
+
+fn test_select_where() {
+	db := seed()!
+	conn, log := counting(db)
+	by_id := fn [conn] (q Query) ![]int {
+		return select_where[Note](conn, q)!.map(it.id)
+	}
+	assert by_id(Query{})! == [1, 2, 3, 4]
+	assert by_id(conds: [eq('owner_type', 'Other')])! == [3, 4]
+	assert by_id(conds: [ne('author_id', 1), lt('id', 3)])! == [2]
+	assert by_id(conds: [ge('id', 2), le('id', 3)])! == [2, 3]
+	assert by_id(conds: [gt('id', 3)])! == [4]
+	assert by_id(conds: [is_null('parent_id')], order: 'id', desc: true)! == [4, 3, 1]
+	assert by_id(conds: [is_not_null('parent_id')])! == [2]
+	assert by_id(conds: [like('body', '%[1, 1%')])! == [4]
+	assert by_id(conds: [in_strings('owner_type', ['Author']), in_ints('id', [2, 9])])! == [2]
+	assert by_id(order: 'id', desc: true, limit: 2)! == [4, 3]
+	log.tables.clear()
+	assert by_id(conds: [in_ints('id', [])])! == []
+	assert log.tables.len == 0, 'an empty IN runs no query'
+}
+
+fn test_load_many_with_a_query() {
+	db := seed()!
+	conn, _ := counting(db)
+	authors := select_in[Author](conn, 'id', [1])!
+	notes := load_many[Author, Note](conn, authors, 'author_id',
+		query: Query{
+			conds: [eq('owner_type', 'Other')]
+			order: 'id'
+			desc:  true
+			limit: 1
+		}
+	)!
+	assert notes[1].map(it.id) == [4], 'the limit is ignored for edge loads'
+	newest_first := load_many[Author, Note](conn, authors, 'author_id',
+		query: Query{
+			order: 'id'
+			desc:  true
+		}
+	)!
+	assert newest_first[1].map(it.id) == [4, 1]
+}
+
+fn test_unique_and_link_pairs() {
+	assert unique([3, 1, 3, 2, 1]) == [3, 1, 2]
+	db := seed()!
+	conn, log := counting(db)
+	assert link_pairs(conn, 'note_tags', 'note_id', 'tag_id', [2, 1])! == [
+		[1, 1],
+		[1, 2],
+		[1, 3],
+		[2, 2],
+	]
+	log.tables.clear()
+	assert link_pairs(conn, 'note_tags', 'note_id', 'tag_id', [])!.len == 0
+	assert log.tables.len == 0
+}
+
+fn test_conditions_on_times() {
+	db := seed()!
+	conn, _ := counting(db)
+	assert select_where[Note](conn, conds: [lt('created_at', time.now().add_days(1))])!.len == 4
+	assert select_where[Note](conn, conds: [gt('created_at', time.now().add_days(1))])!.len == 0
+}

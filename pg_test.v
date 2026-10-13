@@ -1,10 +1,11 @@
-// vtest build: started_postgres?
+// vtest build: vgraph_pg?
 module vgraph
 
 // Runs the edge kinds against PostgreSQL, whose SQL differs from SQLite's in
-// placeholders and types. CI starts the server; locally, run a server and
-// `v -d started_postgres test pg_test.v`, with `PGHOST`, `PGPORT`, `PGUSER`,
-// `PGPASSWORD` and `PGDATABASE` set if the defaults below don't match it.
+// placeholders and types. It runs only with `-d vgraph_pg`, not whenever a
+// PostgreSQL process happens to be running: `v -d vgraph_pg test pg_test.v`, with
+// `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD` and `PGDATABASE` set if the
+// defaults below don't match the server.
 import db.pg
 import os
 import time
@@ -214,4 +215,14 @@ fn test_postgres_edges() {
 	tags := c.load_many[PgArticle, PgTag](articles, 'tags')!
 	assert tags[1].map(it.name) == ['v', 'sql']
 	assert tags[2].map(it.name) == ['sql']
+}
+
+fn test_postgres_ensure_indexes() {
+	c := pg_client()!
+	mut conn := c.conn
+	assert c.ensure_indexes()!.len == 3
+	c.ensure_indexes()!
+	rows := conn.execute("SELECT indexname FROM pg_indexes WHERE indexname LIKE 'vg_%_idx' ORDER BY indexname")!
+	assert rows.map(it.vals[0]) == ['vg_article_tags_article_id_idx', 'vg_articles_user_id_idx',
+		'vg_comments_owner_type_owner_id_idx']
 }

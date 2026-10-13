@@ -2,7 +2,7 @@ module posts
 
 import net.http
 import veb
-import five07.vgraph
+import graph
 import app
 import comments
 import comments.models as comment_models
@@ -14,7 +14,7 @@ const owner_type = comment_models.owner_type[post_models.Post]()
 
 // Handler serves the post endpoints; the app mounts it at `/posts`.
 pub struct Handler {
-	graph    vgraph.Client
+	graph    graph.Graph
 	store    post_models.PostStore
 	users    user_models.UserStore
 	comments comments.Service
@@ -22,10 +22,10 @@ pub struct Handler {
 
 // Handler.new returns the post handler, reading and writing posts through
 // `store`, their authors through `users`, and their comments through
-// `comment_service`. It loads the authors of listed posts through `graph`.
-pub fn Handler.new(graph vgraph.Client, store post_models.PostStore, users user_models.UserStore, comment_service comments.Service) &Handler {
+// `comment_service`. It loads the authors of listed posts through `g`.
+pub fn Handler.new(g graph.Graph, store post_models.PostStore, users user_models.UserStore, comment_service comments.Service) &Handler {
 	return &Handler{
-		graph:    graph
+		graph:    g
 		store:    store
 		users:    users
 		comments: comment_service
@@ -113,10 +113,10 @@ fn render_one(h &Handler, mut ctx app.Context, status http.Status, post post_mod
 // views returns `list` as the API returns it, looking up the authors' slugs
 // in one query.
 fn (h &Handler) views(list []post_models.Post) ![]post_models.PostView {
-	authors := h.graph.load_one[post_models.Post, user_models.User](list, 'author')!
+	nodes := h.graph.posts().with_author().nodes(list)!
 	mut views := []post_models.PostView{cap: list.len}
-	for record in list {
-		views << record.view(if a := authors[record.user_id] { a.slug } else { '' })
+	for n in nodes {
+		views << n.post.view(if a := n.author { a.user.slug } else { '' })
 	}
 	return views
 }
