@@ -115,6 +115,7 @@ As built in Phase 2 (`edge.v`):
 ```v ignore
 pub enum EdgeKind {
 	one_to_many  // Article.comments: the target table holds this record's id
+	one_to_one   // User.card: as one_to_many, but at most one (added in Phase 3)
 	many_to_one  // Comment.author: this table holds the target's id
 	many_to_many // Article.tags: through a join table
 }
@@ -139,6 +140,24 @@ Changes from the first draft:
   `many_to_one` edge they filter the records followed (`Comment.article`).
 - **No `from` field.** `Schema.add[T]()` knows the declaring table.
 - **`through_to` is new.** A join table has two key columns.
+- **`one_to_one` is new** (Phase 3, after reviewing Ent's relationship kinds). It is
+  the side without the foreign key; `ensure_indexes` makes its index unique.
+
+Ent's relationship kinds map onto these four. `examples/relations` declares and
+tests each one:
+
+| Ent | vgraph |
+|-----|--------|
+| O2O two types (user, card) | `one_to_one` + `many_to_one` |
+| O2O same type (linked list next/prev) | self `many_to_one` + self `one_to_one` |
+| O2O bidirectional (spouse) | self `many_to_one`, set on both rows by the app |
+| O2M two types (user, pets) | `one_to_many` + `many_to_one` |
+| O2M same type (tree) | self `one_to_many` + self `many_to_one` |
+| M2M two types (groups, users) | `many_to_many` on both sides, join columns swapped |
+| M2M same type (following, followers) | two self `many_to_many` edges, join columns swapped |
+| M2M bidirectional (friends) | self `many_to_many`, each pair stored both ways by the app |
+
+vgraph only reads, so a bidirectional edge is the app's job to write both ways.
 
 `example` declares `users → articles/posts/comments`, `articles/posts → author`,
 `articles/posts → comments` (polymorphic), and `comments → author/parent/article/post`
@@ -306,6 +325,11 @@ switches to it.
   current models.
 - **Compiler bugs found:** a second one, `regressions/shadowed_fn_call.vv`: a
   variable named like the function it calls generates invalid C on master.
+- **Relationship coverage (added after review):** `one_to_one` was missing, so the
+  user side of O2O came out as a list. Added to the core, the runtime `Client`,
+  unique indexes and the generator (`?&Node`, first row wins).
+  `examples/relations` has a test for each of Ent's eight kinds. The generator now
+  rejects table and edge names its output needs for itself.
 
 *Schema comparison (2026-10-12), for Q18: chose (a).* `example` had the same schema
 both ways, (a) `edges()` on each model and (c) a `schema.toml`, with a test that they
@@ -340,11 +364,29 @@ pub fn (n ArticleNode) query_comments() CommentQuery                  // travers
 ```
 
 
-**Phase 4: GraphQL** as a separate `five07.graphql` package, only if wanted (Q9).
+**Phase 3.1: Ent relationships, and `examples/`** (2026-10-12, done).
+- **Layout:** `example/` moved to `examples/service/`, renamed `service`. Earlier
+  phases call it `example`.
+- **New example:** `examples/relations/` covers every Ent relationship kind (table
+  under Design).
+- **Shared checks:** the checks live in `checks.v`, so the same nine run on SQLite
+  (`main_test.v`) and on PostgreSQL (`pg_test.v`, `-d vgraph_pg`). Both pass.
+- **What the checks cover:** for each kind, eager loading (`with_<edge>`, nested
+  where it applies), every generated traversal (`query_<edge>`, 14 of 14), the
+  queries run (one per edge, two through a join table), and missing targets
+  (`none` and empty lists). For `one_to_one`, the unique index rejects a second
+  card for the same user.
+- **CI:** the PostgreSQL job runs both PostgreSQL tests. The generated-code check
+  covers both examples.
+
+**Phase 4: GraphQL.** Without it, vgraph can't serve GraphQL to a client at all:
+it has no GraphQL schema, parser or executor, and V's standard library has none.
+So it is built here, in this repo, and moved to its own package (`five07.graphql`)
+later if that's needed (2026-10-12; revises Q9). Scope questions: Q19.
 
 **Phase 5: migration helpers** for `v.migrations` (Q10): from the declared edges,
 produce the indexes, foreign keys and join tables as `migrations.Index` /
-`ForeignKey` / `Table` values, for migrations written by hand. `example` moves its
+`ForeignKey` / `Table` values, for migrations written by hand. `examples/service` moves its
 table setup to `v.migrations`.
 
 ## 7. Questions
@@ -454,3 +496,53 @@ switching when its new home is known.
 the comparison under Phase 3. **Recommendation:** (a). The generator needs the fields
 either way, and (a) gets them from the real structs instead of a second copy.
 > A: (a) `edges()` methods. *(`schema.toml` and its sync test were then removed.)*
+
+### Phase 4 scope (GraphQL)
+
+Background: vgraph's generated client already loads one query per edge per level,
+which is how a GraphQL executor should resolve nested fields. What doesn't exist
+yet: a GraphQL schema, a parser, an executor, and an HTTP endpoint.
+
+**Q19. Operations: queries only, or mutations too?** vgraph only reads today.
+Mutations need a write API first: create, update and delete, plus writing edges,
+including both directions of a bidirectional edge. **Default:** queries only for
+Phase 4, with the write API and mutations as a later phase.
+> A:
+
+**Q20. Parser and executor: our own, or `luizfonseca.graphql`?** That package is a
+parser only, unfinished, and untouched for about 3 years. **Default:** our own: a
+lexer and parser for the executable subset of the spec (queries, fields, arguments,
+aliases, variables, fragments and inline fragments, `@include` / `@skip`), and an
+executor that resolves each level of a query with the generated `with_<edge>` loads.
+> A:
+
+**Q21. Schema: generated, or written by hand?** **Default:** generated by `vgraph gen`
+(a flag such as `--graphql`, or always), like Ent's `entgql`. Each table becomes an
+object type with its scalar fields and its edges as fields, plus root query fields
+for each table. The output is both the SDL (`schema.graphql`) and the V resolvers.
+Field names stay snake_case (`created_at`), or are converted to camelCase
+(`createdAt`) as GraphQL tooling expects.
+> A: (and snake_case or camelCase?)
+
+**Q22. Arguments, pagination and counts.** **Default:** list fields take `where`
+(one input type per table, built from the same predicates as the generated
+queries: `eq`, `lt`/`gt`, `in`, `like`, `is_null`), `order_by` and `limit` /
+`offset`, and each table gets a `count`. Relay-style cursor connections
+(`edges { node }`, `pageInfo`, as `entgql` does) come later, if needed. The
+generated V queries gain `count()` and `offset()` for this.
+> A:
+
+**Q23. Introspection.** Tools such as GraphiQL, Apollo and code generators need
+`__schema` / `__type`. **Default:** yes: it's mostly static data generated with the
+schema, and without it the endpoint is hard to use from standard tools.
+> A:
+
+**Q24. Transport and where it lives.** **Default:** a `graphql` module in this repo
+(moved to `five07.graphql` later, if needed), with an HTTP handler that any web
+framework can call (request body in, JSON out), and a `POST /graphql` route in
+`examples/service` built on veb. No subscriptions.
+> A:
+
+**Q25. Delete `spike/`?** The `load/` module replaced it, and its tests still run in
+every `v test .`. **Default:** delete it; git history keeps it.
+> A:

@@ -67,7 +67,7 @@ fn test_config_rejects_bad_values() {
 }
 
 fn test_load_config_reads_the_file_and_the_environment_overrides_it() {
-	dir := os.join_path(os.vtmp_dir(), 'example-config-test-${os.getpid()}')
+	dir := os.join_path(os.vtmp_dir(), 'service-config-test-${os.getpid()}')
 	os.mkdir_all(dir)!
 	defer {
 		os.rmdir_all(dir) or {}

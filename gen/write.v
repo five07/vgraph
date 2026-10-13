@@ -47,12 +47,29 @@ pub fn generate(out_module string, entities []Entity, tables []Table) !map[strin
 			entity: entity or { return error('no entity found for table `${table.name}` (`${table.struct_}`)') }
 		}
 	}
+	for table in tables {
+		check_names(infos[table.name])!
+	}
 	mut files := map[string]string{}
 	files['graph.v'] = graph_file(out_module, entities)
 	for table in tables {
 		files['${table.name}.v'] = table_file(out_module, infos[table.name], infos)!
 	}
 	return files
+}
+
+// check_names rejects a table or edge whose name the generated code needs for
+// something else.
+fn check_names(info Info) ! {
+	t := info.table
+	if t.name in ['client', 'new'] {
+		return error('table `${t.name}`: `Graph.${t.name}` is taken; rename the table')
+	}
+	for edge in t.edges {
+		if edge.name in ['graph', info.field()] {
+			return error('`${t.name}.${edge.name}`: `${info.node()}.${edge.name}` is taken; rename the edge')
+		}
+	}
 }
 
 fn graph_file(out_module string, entities []Entity) string {
@@ -149,7 +166,7 @@ pub struct ${n} {
 pub mut:
 	${info.field()} ${info.typ()}')
 	for i, edge in t.edges {
-		typ := if edge.kind == 'many_to_one' {
+		typ := if edge.kind in ['many_to_one', 'one_to_one'] {
 			'?&${targets[i].node()}'
 		} else {
 			'[]${targets[i].node()}'
@@ -348,7 +365,7 @@ fn write_edge_load(mut b strings.Builder, info Info, edge Edge, target Info) ! {
 			sub = configure(sub)
 		}')
 	match edge.kind {
-		'one_to_many' {
+		'one_to_many', 'one_to_one' {
 			fk := target.table.column(edge.column)!
 			b.writeln("		children := sub.nodes(load.select_in[${target.typ()}](q.graph.client.conn, '${edge.column}',
 			rows.map(it.${key}), ${filters(edge, true)})!)!
@@ -361,10 +378,22 @@ fn write_edge_load(mut b strings.Builder, info Info, edge Edge, target Info) ! {
 			} else {
 				b.writeln('			by_parent[child.${target.field()}.${fk.field}] << child')
 			}
-			b.writeln('		}
+			if edge.kind == 'one_to_one' {
+				b.writeln('		}
+		// at most one each: the first, in the order of the query
+		for mut node in nodes {
+			if found := by_parent[node.${info.field()}.${key}] {
+				node.${edge.name} = &${target.node()}{
+					...found[0]
+				}
+			}
+		}')
+			} else {
+				b.writeln('		}
 		for mut node in nodes {
 			node.${edge.name} = by_parent[node.${info.field()}.${key}] or { [] }
 		}')
+			}
 		}
 		'many_to_one' {
 			fk := t.column(edge.column)!
@@ -449,7 +478,7 @@ fn write_traversal(mut b strings.Builder, info Info, edge Edge, target Info) ! {
 		extra << "load.is_null('${edge.soft_del}')"
 	}
 	match edge.kind {
-		'one_to_many' {
+		'one_to_many', 'one_to_one' {
 			mut conds := ["load.eq('${edge.column}', ${row}.${info.key_field()!})"]
 			if edge.type_col != '' {
 				conds << "load.eq('${edge.type_col}', '${edge.type_val}')"

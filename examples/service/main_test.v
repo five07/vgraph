@@ -646,7 +646,7 @@ fn test_seed() {
 // A database file is seeded on the first start only, and not again once its
 // users are deleted, since their emails stay taken.
 fn test_seed_runs_once() {
-	dir := os.join_path(os.vtmp_dir(), 'example-seed-test-${os.getpid()}')
+	dir := os.join_path(os.vtmp_dir(), 'service-seed-test-${os.getpid()}')
 	os.mkdir_all(dir)!
 	defer {
 		os.rmdir_all(dir) or {}

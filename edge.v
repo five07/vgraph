@@ -2,6 +2,10 @@ module vgraph
 
 // EdgeKind is the shape of an edge, which decides where its column lives.
 pub enum EdgeKind {
+	// one_to_one: each record has at most one target, which holds its key in
+	// `column`, such as a user's card. The other direction, the card's owner, is
+	// a many_to_one edge on the card.
+	one_to_one
 	// one_to_many: each record has many targets, which hold its key in
 	// `column`, such as an article's comments.
 	one_to_many
@@ -17,11 +21,14 @@ pub enum EdgeKind {
 // Edge is a relationship from the struct that declares it, in its `edges()`
 // method, to the table `to`.
 //
-// An edge is polymorphic when it has `type_col`: a `one_to_many` edge then only
-// reaches the targets whose `type_col` is `type_val` (an article's comments,
-// where comments have `owner_type` and `owner_id`), and a `many_to_one` edge
-// only follows the records whose own `type_col` is `type_val` (a comment's
-// article).
+// An edge is polymorphic when it has `type_col`: a `one_to_many` or
+// `one_to_one` edge then only reaches the targets whose `type_col` is
+// `type_val` (an article's comments, where comments have `owner_type` and
+// `owner_id`), and a `many_to_one` edge only follows the records whose own
+// `type_col` is `type_val` (a comment's article).
+//
+// vgraph only reads edges. For a bidirectional edge, such as a spouse or a
+// friend, the app writes both directions: both foreign keys, or both join rows.
 pub struct Edge {
 pub:
 	name       string   @[required] // the name loads use, such as `comments`

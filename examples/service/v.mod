@@ -1,5 +1,5 @@
 Module {
-	name: 'example'
+	name: 'service'
 	description: ''
 	version: '0.0.0'
 	license: 'MIT'

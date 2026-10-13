@@ -1,19 +1,21 @@
-# example
+# service
 
 A small JSON REST API in [V](https://vlang.io), backed by SQLite through V's ORM. It
 has users, articles, posts, and comments that can be on either an article or a post,
 with threaded replies. There is no authentication.
 
 It started as a copy of `rest-api` (commit `9d802d6`) and is the test bed and,
-later, the published example for vgraph. See `../PLAN.md` for the plan.
+later, the published example for vgraph. See `../../PLAN.md` for the plan.
 
-Built and tested with V 0.5.2.
+Built and tested with V master, like vgraph (see the root README). It imports vgraph
+as `five07.vgraph`, so link the checkout first: `ln -s <vgraph> ~/.vmodules/five07/vgraph`.
 
 ## Running
 
 ```sh
-v run .            # build and start on http://localhost:8080
-v test .           # store tests and HTTP-level tests
+v run .                          # build and start on http://localhost:8080
+v test .                         # store tests and HTTP-level tests
+v run ../../cmd/vgraph gen .     # regenerate graph/ after changing a model's edges()
 ```
 
 Settings come from a `.env` file in the working directory, when there is one. Real
@@ -26,8 +28,9 @@ environment variables override it. Copy `.env.example` to start one.
 | `SEED` | `true` | Load example data at startup when the database has no users. |
 | `DB_DRIVER` | `sqlite` | Only `sqlite` is supported for now. |
 
-Tables are created at startup if they don't exist. There are no migrations: after a
-schema change, delete the database file.
+Tables are created at startup if they don't exist, and so are the indexes the edges
+need (`ensure_indexes`). There are no migrations yet: after a schema change, delete
+the database file.
 
 ## Layout
 
@@ -37,9 +40,10 @@ that holds the struct, its validation and its store:
 ```
 main.v, app.v, seed.v      startup, wiring, example data
 app/                       Context, config, database, errors, JSON in and out, slugs
+graph/                     the typed vgraph client, generated from the models' edges()
 users/  articles/  posts/  comments/
     <name>.v               the routes
-    models/<name>.v        the struct, its request and response shapes, validation
+    models/<name>.v        the struct, its edges, request and response shapes, validation
     models/store.v         reads and writes through orm.Connection
 comments/service.v         comment operations shared with the articles and posts routes
 comments/owners.v          the kinds of records comments can be on
@@ -150,7 +154,7 @@ curl -s "$API/comments" | jq length                                       # stil
 
 ## V notes
 
-Things in V 0.5.2 this project works around; section 5 of `../PLAN.md` lists them.
+Things in V 0.5.2 this project works around; section 5 of `../../PLAN.md` lists them.
 
 - macOS's libsqlite3 is in multi-thread mode, and veb serves requests on several
   threads, so the shared connection is opened with `fullmutex`. New rows are read

@@ -160,7 +160,7 @@ pub fn (s Schema) validate() ! {
 			}
 			// the table whose rows hold `column`, and the one `type_col` filters
 			holder := match edge.kind {
-				.one_to_many { target }
+				.one_to_many, .one_to_one { target }
 				.many_to_one { table }
 				.many_to_many { Table{} }
 			}

@@ -19,7 +19,20 @@ fn (u User) edges() []Edge {
 			column:   'user_id'
 			soft_del: 'deleted_at'
 		},
+		Edge{
+			name:   'profile'
+			kind:   .one_to_one
+			to:     'profiles'
+			column: 'user_id'
+		},
 	]
+}
+
+@[table: 'profiles']
+struct Profile {
+	id      int @[primary; sql: serial]
+	user_id int
+	bio     string
 }
 
 @[table: 'articles']
@@ -97,6 +110,7 @@ fn schema() !Schema {
 	s.add[Article]()!
 	s.add[Comment]()!
 	s.add[Tag]()!
+	s.add[Profile]()!
 	return s
 }
 
@@ -108,6 +122,15 @@ fn client() !Client {
 		create table Comment
 		create table Tag
 		create table ArticleTag
+		create table Profile
+	}!
+	// only ada has a profile
+	profile := Profile{
+		user_id: 1
+		bio:     'hi'
+	}
+	sql db {
+		insert profile into Profile
 	}!
 	for name in ['ada', 'bob'] {
 		user := User{
@@ -167,7 +190,7 @@ fn test_add_reflects_tables_and_edges() {
 	assert article.column('deleted_at')?.nullable
 	assert article.column('deleted_at')?.typ == '?time.Time'
 	assert article.columns.map(it.name) == ['id', 'user_id', 'title', 'deleted_at']
-	assert s.tables().map(it.name) == ['users', 'articles', 'comments', 'tags']
+	assert s.tables().map(it.name) == ['users', 'articles', 'comments', 'tags', 'profiles']
 	assert article.edges.map(it.name) == ['author', 'comments', 'tags']
 	assert s.table('tags')!.edges.len == 0
 	s.validate()!
@@ -197,6 +220,7 @@ fn test_validate_reports_every_problem() {
 			'bad.no_join: a many_to_many edge needs `through` and `through_to`',
 			'bad.bad_soft_del: `soft_del` names `users.name`, which is not nullable',
 			'users.articles: no table `articles` is registered',
+			'users.profile: no table `profiles` is registered',
 		]
 		return
 	}
@@ -325,15 +349,56 @@ fn test_indexes() {
 		'CREATE INDEX IF NOT EXISTS "article_tags_article_id_idx" ON "article_tags" ("article_id")',
 		'CREATE INDEX IF NOT EXISTS "articles_user_id_idx" ON "articles" ("user_id")',
 		'CREATE INDEX IF NOT EXISTS "comments_owner_type_owner_id_idx" ON "comments" ("owner_type", "owner_id")',
+		'CREATE UNIQUE INDEX IF NOT EXISTS "profiles_user_id_idx" ON "profiles" ("user_id")',
 	]
 }
 
 fn test_ensure_indexes_creates_them_once() {
 	c := client()!
 	mut conn := c.conn
-	assert c.ensure_indexes()!.len == 3
+	assert c.ensure_indexes()!.len == 4
 	c.ensure_indexes()!
 	rows := conn.execute("SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE '%_idx' ORDER BY name")!
 	assert rows.map(it.vals[0]) == ['article_tags_article_id_idx', 'articles_user_id_idx',
-		'comments_owner_type_owner_id_idx']
+		'comments_owner_type_owner_id_idx', 'profiles_user_id_idx']
+}
+
+fn test_load_one_to_one() {
+	c := client()!
+	users := sql c.conn {
+		select from User order by id
+	}!
+	profiles := c.load_many[User, Profile](users, 'profile')!
+	assert profiles[1].map(it.bio) == ['hi']
+	assert 2 !in profiles
+}
+
+fn test_a_one_to_one_index_is_unique_only_alone() {
+	mut s := Schema{}
+	s.add[Profile]()!
+	s.add[ProfileOwner]()!
+	// `ProfileOwner.profiles` needs the same index, and it isn't unique
+	assert s.indexes().map(it.unique) == [false]
+}
+
+@[table: 'profile_owners']
+struct ProfileOwner {
+	id int @[primary; sql: serial]
+}
+
+fn (o ProfileOwner) edges() []Edge {
+	return [
+		Edge{
+			name:   'profile'
+			kind:   .one_to_one
+			to:     'profiles'
+			column: 'user_id'
+		},
+		Edge{
+			name:   'profiles'
+			kind:   .one_to_many
+			to:     'profiles'
+			column: 'user_id'
+		},
+	]
 }

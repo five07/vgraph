@@ -16,8 +16,8 @@ fn test_snake() {
 	assert snake('ArticleTag') == 'article_tag'
 }
 
-fn test_discover_finds_the_example_entities() {
-	root := os.join_path(@VMODROOT, 'example')
+fn test_discover_finds_the_service_entities() {
+	root := os.join_path(@VMODROOT, 'examples', 'service')
 	found := discover(root, ['graph'])!
 	assert found.map('${it.module_path}.${it.struct_name}') == [
 		'articles.models.Article',
@@ -70,4 +70,43 @@ fn test_generate_rejects_an_edge_to_an_unknown_table() {
 fn test_import_line() {
 	assert import_line('users.models') == 'users.models as users_models'
 	assert import_line('models') == 'models'
+}
+
+fn test_generate_rejects_names_it_needs() {
+	id := Column{
+		name:  'id'
+		field: 'id'
+		typ:   'int'
+		kind:  'int'
+	}
+	client := [Table{
+		name:    'client'
+		struct_: 'models.A'
+		key:     'id'
+		columns: [id]
+	}]
+	if _ := generate('graph', [Entity{'x.models', 'A'}], client) {
+		assert false
+	} else {
+		assert err.msg() == 'table `client`: `Graph.client` is taken; rename the table'
+	}
+	self_named := [
+		Table{
+			name:    'as'
+			struct_: 'models.A'
+			key:     'id'
+			columns: [id]
+			edges:   [Edge{
+				name:   'a'
+				kind:   'many_to_one'
+				to:     'as'
+				column: 'id'
+			}]
+		},
+	]
+	if _ := generate('graph', [Entity{'x.models', 'A'}], self_named) {
+		assert false
+	} else {
+		assert err.msg() == '`as.a`: `ANode.a` is taken; rename the edge'
+	}
 }

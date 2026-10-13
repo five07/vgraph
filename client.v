@@ -34,9 +34,10 @@ pub fn (c Client) load_one[C, P](children []C, edge string) !map[int]P {
 	)
 }
 
-// load_many follows the one_to_many or many_to_many edge `edge` of `P` from each
-// of `parents`, and returns the `C` records reached, keyed by the parent's
-// primary key: one query, or two through a join table.
+// load_many follows the one_to_many, one_to_one or many_to_many edge `edge` of
+// `P` from each of `parents`, and returns the `C` records reached, keyed by the
+// parent's primary key: one query, or two through a join table. A one_to_one
+// edge gives each parent at most one record.
 pub fn (c Client) load_many[P, C](parents []P, edge string) !map[int][]C {
 	e := c.edge_between(load.table_name[P](), edge, load.table_name[C]())!
 	opts := load.Options{
@@ -45,7 +46,7 @@ pub fn (c Client) load_many[P, C](parents []P, edge string) !map[int][]C {
 		soft_del: e.soft_del
 	}
 	return match e.kind {
-		.one_to_many { load.load_many[P, C](c.conn, parents, e.column, opts)! }
+		.one_to_many, .one_to_one { load.load_many[P, C](c.conn, parents, e.column, opts)! }
 		.many_to_many {
 			load.load_through[P, C](c.conn, parents, e.through, e.column, e.through_to, opts)!
 		}

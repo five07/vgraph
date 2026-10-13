@@ -63,8 +63,9 @@ authors := graph.load_one[Article, User](articles, 'author')! // map[int]User, o
 comments := graph.load_many[Article, Comment](articles, 'comments')! // map[int][]Comment, one query
 ```
 
-The edge kinds are `one_to_many`, `many_to_one` and `many_to_many` (through a join
-table, in two queries). `type_col` / `type_val` make an edge polymorphic, and
+The edge kinds are `one_to_one`, `one_to_many`, `many_to_one` and `many_to_many`
+(through a join table, in two queries). Together they cover all of Ent's
+relationship kinds; `examples/relations` has one of each. `type_col` / `type_val` make an edge polymorphic, and
 `soft_del` leaves out targets whose column is not null. `Client.new` reports every
 edge that names a missing table or column, or a column of the wrong type.
 
@@ -116,20 +117,22 @@ column an edge load filters by. It is a stopgap: once a V release includes
 - `edge.v`, `schema.v`, `client.v`, `migrate.v`: the `vgraph` module.
 - `gen/`, `cmd/vgraph/`: the generator and the `vgraph` command.
 - `load/`: `vgraph.load`, the batched loads that `Client` runs.
-- `example/`: a JSON REST API that uses vgraph, and its test bed.
+- `examples/service/`: a JSON REST API that uses vgraph, and its test bed.
+- `examples/relations/`: every Ent relationship kind, declared and tested.
 - `regressions/`: one small program per V compiler bug that vgraph works around.
 - `spike/`: Phase 0, which checked that V's reflection and ORM can support this.
 
 ## Development
 
 ```sh
-v test .                              # SQLite; pg_test.v is skipped
-PGPORT=5432 v -d vgraph_pg test pg_test.v  # with a PostgreSQL server running
+v test .            # SQLite; the PostgreSQL tests are skipped
+PGPORT=5432 v -d vgraph_pg test pg_test.v examples/relations/pg_test.v
 ```
 
-`example/` imports vgraph as `five07.vgraph`, so link this checkout there first:
-`ln -s "$PWD" ~/.vmodules/five07/vgraph`. `pg_test.v` reads `PGHOST`, `PGPORT`,
-`PGUSER`, `PGPASSWORD` and `PGDATABASE`.
+The examples import vgraph as `five07.vgraph`, so link this checkout there first:
+`ln -s "$PWD" ~/.vmodules/five07/vgraph`. The PostgreSQL tests run only with
+`-d vgraph_pg`, read `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD` and `PGDATABASE`,
+and drop and recreate their tables.
 
 ## Requirements
 

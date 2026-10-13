@@ -27,7 +27,7 @@ jobs:
           git -C vlang checkout "$V_COMMIT"
           make -C vlang -j4
           sudo ./vlang/v symlink
-      - name: Install vgraph as five07.vgraph, for the example app
+      - name: Install vgraph as five07.vgraph, for the examples
         run: |
           mkdir -p ~/.vmodules/five07
           ln -s "$GITHUB_WORKSPACE/vgraph" ~/.vmodules/five07/vgraph
@@ -35,10 +35,12 @@ jobs:
         run: v fmt -verify vgraph
       - name: Check doc comments
         run: v vet vgraph/edge.v vgraph/schema.v vgraph/client.v vgraph/migrate.v vgraph/load vgraph/gen vgraph/cmd/vgraph
-      - name: Check that example/graph is generated from the current models
+      - name: Check that the examples' clients are generated from their current models
         run: |
-          v run vgraph/cmd/vgraph gen vgraph/example
-          git -C vgraph diff --exit-code -- example/graph
+          v run vgraph/cmd/vgraph gen vgraph/examples/service
+          v run vgraph/cmd/vgraph gen vgraph/examples/relations
+          git -C vgraph diff --exit-code -- examples/service/graph examples/relations/graph
+          test -z "$(git -C vgraph status --porcelain -- examples/service/graph examples/relations/graph)"
       - name: Test
         run: v test vgraph
 
@@ -70,6 +72,10 @@ jobs:
           git -C vlang checkout "$V_COMMIT"
           make -C vlang -j4
           sudo ./vlang/v symlink
+      - name: Install vgraph as five07.vgraph, for the examples
+        run: |
+          mkdir -p ~/.vmodules/five07
+          ln -s "$GITHUB_WORKSPACE/vgraph" ~/.vmodules/five07/vgraph
       - name: Test on PostgreSQL
         env:
           PGHOST: localhost
@@ -77,4 +83,4 @@ jobs:
           PGUSER: postgres
           PGPASSWORD: 12345678
           PGDATABASE: postgres
-        run: v -d vgraph_pg test vgraph/pg_test.v
+        run: v -d vgraph_pg test vgraph/pg_test.v vgraph/examples/relations/pg_test.v
