@@ -1,8 +1,9 @@
 name: CI
 
+# Only on main: pushes, which include merges into it.
 on:
   push:
-  pull_request:
+    branches: [main]
 
 env:
   # The V commit vgraph is built against: V master, until a 0.5.x release
