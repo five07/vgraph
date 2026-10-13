@@ -50,6 +50,9 @@ pub:
 	positive bool
 	// validate checks a value as the ORM sees it: an `int`, `string`, and so on.
 	validate ?fn (value orm.Primitive) !
+	// json: a `string` field holding JSON, and the V type it decodes to, such as
+	// `[]string` or a struct of the model's module
+	json string
 }
 
 // Fields is implemented by structs that give options to their fields. vgraph
@@ -112,6 +115,9 @@ fn check_options(mut problems []string, table Table, options []Field) {
 				problems << '${at}: `pattern` is not a valid regular expression: ${err.msg()}'
 			}
 		}
+		if o.json != '' && base != 'string' {
+			problems << '${at}: `json` needs a string field, which holds the JSON'
+		}
 		if c.name == table.key && (o.update_now || o.update_default != none) {
 			problems << '${at}: the key has no update default'
 		}
@@ -132,6 +138,7 @@ fn (c Column) with_options(o Field) Column {
 		deprecated:   o.deprecated
 		has_default:  o.default != none || o.default_now
 		auto_update:  o.update_now || o.update_default != none
+		json_type:    o.json
 	}
 }
 

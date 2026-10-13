@@ -522,7 +522,7 @@ pub fn (q LoginQuery) for_share() LoginQuery {
 	return next
 }
 
-// no_wait: a lock fails at once on a row another transaction locked.
+// no_wait makes the lock one that fails at once on a row another transaction locked.
 pub fn (q LoginQuery) no_wait() LoginQuery {
 	mut next := q
 	next.query = load.Query{
@@ -535,7 +535,7 @@ pub fn (q LoginQuery) no_wait() LoginQuery {
 	return next
 }
 
-// skip_locked: a lock leaves out the rows other transactions locked.
+// skip_locked makes the lock one that leaves out the rows other transactions locked.
 pub fn (q LoginQuery) skip_locked() LoginQuery {
 	mut next := q
 	next.query = load.Query{

@@ -27,8 +27,8 @@ pub enum EdgeKind {
 // `owner_id`), and a `many_to_one` edge only follows the records whose own
 // `type_col` is `type_val` (a comment's article).
 //
-// vgraph only reads edges. For a bidirectional edge, such as a spouse or a
-// friend, the app writes both directions: both foreign keys, or both join rows.
+// A bidirectional edge, such as a spouse or a friend, sets `bidi`, and writes
+// store both directions: both foreign keys, or both join rows.
 pub struct Edge {
 pub:
 	name       string   @[required] // the name loads use, such as `comments`
@@ -43,6 +43,21 @@ pub:
 	// null, such as `deleted_at`. Deleted targets are not loaded. Leave it unset
 	// to load them, as for the author of an old comment.
 	soft_del string
+	// ref names the inverse edge on `to`, as Ent's `Ref`: `validate` checks that
+	// the two are the two sides of one relationship.
+	ref string
+	// unique: a many_to_one edge whose target at most one row holds, as Ent's
+	// `Unique()`: the side of a one-to-one relationship that holds the key, such
+	// as a spouse. Its column gets a unique index.
+	unique bool
+	// bidi: a self edge stored both ways, such as a spouse (many_to_one, which
+	// must be unique) or friends (many_to_many): a write to one side writes the
+	// other.
+	bidi bool
+	// required: a many_to_one edge a create must set.
+	required bool
+	// immutable: only a create sets the edge; updates can't change it.
+	immutable bool
 }
 
 // Edges is implemented by structs that declare edges. vgraph finds the method

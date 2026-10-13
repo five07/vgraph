@@ -79,6 +79,8 @@ pub mut:
 	// update and delete: the rows; update_one and delete_one: the row's key
 	conds   []load.Cond
 	row_key string
+	// update: JSON arrays appended to, by column
+	appends map[string]string
 	// create: the upsert
 	conflict_columns []string
 	on_conflict      OnConflict
@@ -226,6 +228,7 @@ pub fn (m MutationData) clone() MutationData {
 		...m
 		values:           m.values.clone()
 		adds:             m.adds.clone()
+		appends:          m.appends.clone()
 		added:            added
 		removed:          removed
 		cleared:          m.cleared.clone()
@@ -245,6 +248,15 @@ pub fn (m MutationData) with_value(column string, value orm.Primitive) MutationD
 pub fn (m MutationData) with_add(column string, delta orm.Primitive) MutationData {
 	mut next := m.clone()
 	next.adds[column] = delta
+	return next
+}
+
+// with_append returns a copy of `m` that appends `items`, a JSON array, to
+// the JSON array in `column`.
+pub fn (m MutationData) with_append(column string, items string) MutationData {
+	mut next := m.clone()
+	current := next.appends[column] or { '[]' }
+	next.appends[column] = json_concat(current, items) or { items }
 	return next
 }
 

@@ -7,12 +7,18 @@ type Query {
   categoriesCount(where: CategoryWhereInput): Int!
   devices(where: DeviceWhereInput, orderBy: DeviceOrder, limit: Int, offset: Int): [Device!]!
   devicesCount(where: DeviceWhereInput): Int!
+  gadgets(where: GadgetWhereInput, orderBy: GadgetOrder, limit: Int, offset: Int): [Gadget!]!
+  gadgetsCount(where: GadgetWhereInput): Int!
   groups(where: GroupWhereInput, orderBy: GroupOrder, limit: Int, offset: Int): [Group!]!
   groupsCount(where: GroupWhereInput): Int!
+  likes(where: LikeWhereInput, orderBy: LikeOrder, limit: Int, offset: Int): [Like!]!
+  likesCount(where: LikeWhereInput): Int!
   logins(where: LoginWhereInput, orderBy: LoginOrder, limit: Int, offset: Int): [Login!]!
   loginsCount(where: LoginWhereInput): Int!
   nodes(where: NodeWhereInput, orderBy: NodeOrder, limit: Int, offset: Int): [Node!]!
   nodesCount(where: NodeWhereInput): Int!
+  petOwners(where: OwnedPetWhereInput, orderBy: OwnedPetOrder, limit: Int, offset: Int): [OwnedPet!]!
+  petOwnersCount(where: OwnedPetWhereInput): Int!
   pets(where: PetWhereInput, orderBy: PetOrder, limit: Int, offset: Int): [Pet!]!
   petsCount(where: PetWhereInput): Int!
   users(where: UserWhereInput, orderBy: UserOrder, limit: Int, offset: Int): [User!]!
@@ -189,6 +195,190 @@ enum DeviceOrderField {
   OWNER_ID
 }
 
+type Gadget {
+  createdAt: Time!
+  updatedAt: Time!
+  id: ID!
+  ownerID: ID!
+  serialNo: String!
+  color: GadgetColor!
+  level: Int!
+  weight: Int!
+  parts: Int!
+  big: Int!
+  ratio: Float!
+  rating: Float
+  score: Int
+  active: Boolean
+  tags: JSON!
+  owner: User
+  likers(where: UserWhereInput, orderBy: UserOrder, limit: Int, offset: Int): [User!]
+}
+
+"""GadgetWhereInput is used for filtering Gadget objects."""
+input GadgetWhereInput {
+  """createdAt field predicates"""
+  createdAt: Time
+  createdAtNEQ: Time
+  createdAtGT: Time
+  createdAtGTE: Time
+  createdAtLT: Time
+  createdAtLTE: Time
+
+  """updatedAt field predicates"""
+  updatedAt: Time
+  updatedAtNEQ: Time
+  updatedAtGT: Time
+  updatedAtGTE: Time
+  updatedAtLT: Time
+  updatedAtLTE: Time
+
+  """id field predicates"""
+  id: ID
+  idNEQ: ID
+  idIn: [ID!]
+  idNotIn: [ID!]
+  idGT: ID
+  idGTE: ID
+  idLT: ID
+  idLTE: ID
+
+  """ownerID field predicates"""
+  ownerID: ID
+  ownerIDNEQ: ID
+  ownerIDIn: [ID!]
+  ownerIDNotIn: [ID!]
+
+  """serialNo field predicates"""
+  serialNo: String
+  serialNoNEQ: String
+  serialNoIn: [String!]
+  serialNoNotIn: [String!]
+  serialNoGT: String
+  serialNoGTE: String
+  serialNoLT: String
+  serialNoLTE: String
+  serialNoContains: String
+  serialNoHasPrefix: String
+  serialNoHasSuffix: String
+
+  """color field predicates"""
+  color: GadgetColor
+  colorNEQ: GadgetColor
+  colorIn: [GadgetColor!]
+  colorNotIn: [GadgetColor!]
+
+  """level field predicates"""
+  level: Int
+  levelNEQ: Int
+  levelIn: [Int!]
+  levelNotIn: [Int!]
+  levelGT: Int
+  levelGTE: Int
+  levelLT: Int
+  levelLTE: Int
+
+  """weight field predicates"""
+  weight: Int
+  weightNEQ: Int
+  weightIn: [Int!]
+  weightNotIn: [Int!]
+  weightGT: Int
+  weightGTE: Int
+  weightLT: Int
+  weightLTE: Int
+
+  """parts field predicates"""
+  parts: Int
+  partsNEQ: Int
+  partsIn: [Int!]
+  partsNotIn: [Int!]
+  partsGT: Int
+  partsGTE: Int
+  partsLT: Int
+  partsLTE: Int
+
+  """big field predicates"""
+  big: Int
+  bigNEQ: Int
+  bigIn: [Int!]
+  bigNotIn: [Int!]
+  bigGT: Int
+  bigGTE: Int
+  bigLT: Int
+  bigLTE: Int
+
+  """ratio field predicates"""
+  ratio: Float
+  ratioNEQ: Float
+  ratioGT: Float
+  ratioGTE: Float
+  ratioLT: Float
+  ratioLTE: Float
+
+  """rating field predicates"""
+  rating: Float
+  ratingNEQ: Float
+  ratingGT: Float
+  ratingGTE: Float
+  ratingLT: Float
+  ratingLTE: Float
+  ratingIsNil: Boolean
+  ratingNotNil: Boolean
+
+  """score field predicates"""
+  score: Int
+  scoreNEQ: Int
+  scoreIn: [Int!]
+  scoreNotIn: [Int!]
+  scoreGT: Int
+  scoreGTE: Int
+  scoreLT: Int
+  scoreLTE: Int
+  scoreIsNil: Boolean
+  scoreNotNil: Boolean
+
+  """active field predicates"""
+  active: Boolean
+  activeNEQ: Boolean
+  activeIsNil: Boolean
+  activeNotNil: Boolean
+}
+
+"""Ordering options for Gadget lists"""
+input GadgetOrder {
+  """The ordering direction."""
+  direction: OrderDirection! = ASC
+
+  """The field by which to order Gadgets."""
+  field: GadgetOrderField!
+}
+
+"""Properties by which Gadget lists can be ordered."""
+enum GadgetOrderField {
+  CREATED_AT
+  UPDATED_AT
+  ID
+  OWNER_ID
+  SERIAL_NO
+  COLOR
+  LEVEL
+  WEIGHT
+  PARTS
+  BIG
+  RATIO
+  RATING
+  SCORE
+  ACTIVE
+}
+
+"""GadgetColor is enum for the field color"""
+enum GadgetColor {
+  RED
+  GREEN
+  BLUE
+}
+
 type Group {
   id: ID!
   name: String!
@@ -235,6 +425,65 @@ input GroupOrder {
 enum GroupOrderField {
   ID
   NAME
+}
+
+type Like {
+  id: ID!
+  userID: ID!
+  gadgetID: ID!
+  likedAt: Time!
+  user: User
+  gadget: Gadget
+}
+
+"""LikeWhereInput is used for filtering Like objects."""
+input LikeWhereInput {
+  """id field predicates"""
+  id: ID
+  idNEQ: ID
+  idIn: [ID!]
+  idNotIn: [ID!]
+  idGT: ID
+  idGTE: ID
+  idLT: ID
+  idLTE: ID
+
+  """userID field predicates"""
+  userID: ID
+  userIDNEQ: ID
+  userIDIn: [ID!]
+  userIDNotIn: [ID!]
+
+  """gadgetID field predicates"""
+  gadgetID: ID
+  gadgetIDNEQ: ID
+  gadgetIDIn: [ID!]
+  gadgetIDNotIn: [ID!]
+
+  """likedAt field predicates"""
+  likedAt: Time
+  likedAtNEQ: Time
+  likedAtGT: Time
+  likedAtGTE: Time
+  likedAtLT: Time
+  likedAtLTE: Time
+}
+
+"""Ordering options for Like lists"""
+input LikeOrder {
+  """The ordering direction."""
+  direction: OrderDirection! = ASC
+
+  """The field by which to order Likes."""
+  field: LikeOrderField!
+}
+
+"""Properties by which Like lists can be ordered."""
+enum LikeOrderField {
+  ID
+  USER_ID
+  GADGET_ID
+  LIKED_AT
 }
 
 type Login {
@@ -344,6 +593,76 @@ enum NodeOrderField {
   NEXT_ID
 }
 
+type OwnedPet {
+  id: ID!
+  petName: String!
+  ownerID: ID!
+  ownerName: String!
+  owner: User
+}
+
+"""OwnedPetWhereInput is used for filtering OwnedPet objects."""
+input OwnedPetWhereInput {
+  """id field predicates"""
+  id: ID
+  idNEQ: ID
+  idIn: [ID!]
+  idNotIn: [ID!]
+  idGT: ID
+  idGTE: ID
+  idLT: ID
+  idLTE: ID
+
+  """petName field predicates"""
+  petName: String
+  petNameNEQ: String
+  petNameIn: [String!]
+  petNameNotIn: [String!]
+  petNameGT: String
+  petNameGTE: String
+  petNameLT: String
+  petNameLTE: String
+  petNameContains: String
+  petNameHasPrefix: String
+  petNameHasSuffix: String
+
+  """ownerID field predicates"""
+  ownerID: ID
+  ownerIDNEQ: ID
+  ownerIDIn: [ID!]
+  ownerIDNotIn: [ID!]
+
+  """ownerName field predicates"""
+  ownerName: String
+  ownerNameNEQ: String
+  ownerNameIn: [String!]
+  ownerNameNotIn: [String!]
+  ownerNameGT: String
+  ownerNameGTE: String
+  ownerNameLT: String
+  ownerNameLTE: String
+  ownerNameContains: String
+  ownerNameHasPrefix: String
+  ownerNameHasSuffix: String
+}
+
+"""Ordering options for OwnedPet lists"""
+input OwnedPetOrder {
+  """The ordering direction."""
+  direction: OrderDirection! = ASC
+
+  """The field by which to order OwnedPets."""
+  field: OwnedPetOrderField!
+}
+
+"""Properties by which OwnedPet lists can be ordered."""
+enum OwnedPetOrderField {
+  ID
+  PET_NAME
+  OWNER_ID
+  OWNER_NAME
+}
+
 type Pet {
   id: ID!
   name: String!
@@ -425,6 +744,8 @@ type User {
   followers(where: UserWhereInput, orderBy: UserOrder, limit: Int, offset: Int): [User!]
   friends(where: UserWhereInput, orderBy: UserOrder, limit: Int, offset: Int): [User!]
   devices(where: DeviceWhereInput, orderBy: DeviceOrder, limit: Int, offset: Int): [Device!]
+  gadgets(where: GadgetWhereInput, orderBy: GadgetOrder, limit: Int, offset: Int): [Gadget!]
+  likedGadgets(where: GadgetWhereInput, orderBy: GadgetOrder, limit: Int, offset: Int): [Gadget!]
 }
 
 """UserWhereInput is used for filtering User objects."""
@@ -487,6 +808,11 @@ enum OrderDirection {
   """Specifies a descending order for a given `orderBy` argument."""
   DESC
 }
+
+"""
+A JSON value: an object, a list, a string, a number, a boolean or null.
+"""
+scalar JSON
 
 """An RFC 3339 date and time, such as `2026-10-13T07:30:00Z`."""
 scalar Time @specifiedBy(url: "https://scalars.graphql.org/chillicream/date-time.html")

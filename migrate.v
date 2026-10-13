@@ -7,6 +7,18 @@ import v.migrations
 // takes them from the current schema creates what the edges need now; later
 // migrations that add edges add only what those edges need.
 
+// Index is an index a struct declares in its `indexes()` method, beside
+// `edges()`: on its columns, unique or not, and partial with `where`.
+pub struct Index {
+pub:
+	// name: `<table>_<columns>_idx` when empty
+	name    string
+	columns []string @[required]
+	unique  bool
+	// where: a partial index's condition, in SQL, such as `deleted_at IS NULL`
+	where string
+}
+
 // migration_indexes returns the indexes that the schema's edges need, once
 // each, sorted by name, for `ctx.add_index`:
 // - one_to_many and one_to_one: on the target's `column`, after `type_col` for
@@ -15,7 +27,9 @@ import v.migrations
 //   same columns without it.
 // - many_to_many: on the join table's `column`, and a unique index on its two
 //   columns, so that a pair is stored once.
-// - many_to_one: none; it looks targets up by their primary key.
+// - many_to_one: none, as it looks targets up by their primary key; but a
+//   unique one gets a unique index on its column, as the key side of a
+//   one-to-one relationship.
 //
 // A field whose options (`fields()`) say `unique` gets a unique index too.
 // Each is named `<table>_<columns>_idx`.
@@ -23,6 +37,17 @@ pub fn (s Schema) migration_indexes() []migrations.Index {
 	mut found := map[string]migrations.Index{}
 	for table in s.tables() {
 		for edge in table.edges {
+			// a view has no indexes
+			holder := match edge.kind {
+				.one_to_many, .one_to_one { edge.to }
+				.many_to_many { edge.through }
+				.many_to_one { table.name }
+			}
+			if t := s.tables[holder] {
+				if t.view {
+					continue
+				}
+			}
 			mut needed := []migrations.Index{}
 			match edge.kind {
 				.one_to_many, .one_to_one {
@@ -40,7 +65,17 @@ pub fn (s Schema) migration_indexes() []migrations.Index {
 					pair.sort()
 					needed << new_index(edge.through, pair, true)
 				}
-				.many_to_one {}
+				.many_to_one {
+					// the key side of a one-to-one relationship
+					if edge.unique {
+						columns := if edge.type_col != '' {
+							[edge.type_col, edge.column]
+						} else {
+							[edge.column]
+						}
+						needed << new_index(table.name, columns, true)
+					}
+				}
 			}
 			for index in needed {
 				if existing := found[index.name] {
@@ -54,6 +89,15 @@ pub fn (s Schema) migration_indexes() []migrations.Index {
 					}
 				}
 				found[index.name] = index
+			}
+		}
+	}
+	// declared indexes, but partial ones (`partial_indexes`)
+	for table in s.tables() {
+		for index in table.indexes {
+			if index.where == '' && !table.view {
+				i := declared_index(table, index)
+				found[i.name] = i
 			}
 		}
 	}
@@ -74,6 +118,40 @@ pub fn (s Schema) migration_indexes() []migrations.Index {
 	mut names := found.keys()
 	names.sort()
 	return names.map(found[it])
+}
+
+fn declared_index(table Table, index Index) migrations.Index {
+	i := new_index(table.name, index.columns, index.unique)
+	return migrations.Index{
+		...i
+		name: if index.name != '' { index.name } else { i.name }
+	}
+}
+
+// PartialIndex is a declared index with a condition, which `v.migrations`
+// can't create: `add_edge_indexes` writes its SQL.
+pub struct PartialIndex {
+pub:
+	index migrations.Index
+	where string
+}
+
+// partial_indexes returns the declared indexes that have a `where`, sorted by
+// name.
+pub fn (s Schema) partial_indexes() []PartialIndex {
+	mut found := []PartialIndex{}
+	for table in s.tables() {
+		for index in table.indexes {
+			if index.where != '' && !table.view {
+				found << PartialIndex{
+					index: declared_index(table, index)
+					where: index.where
+				}
+			}
+		}
+	}
+	found.sort(a.index.name < b.index.name)
+	return found
 }
 
 fn new_index(table string, columns []string, unique bool) migrations.Index {
@@ -121,7 +199,9 @@ pub fn (s Schema) foreign_keys() ![]migrations.ForeignKey {
 				.many_to_many { join_foreign_keys(table, edge, target) }
 			}
 			for key in keys {
-				if '${key.from_table}.${key.column}' !in polymorphic {
+				from_view := if t := s.tables[key.from_table] { t.view } else { false }
+				to_view := if t := s.tables[key.to_table] { t.view } else { false }
+				if '${key.from_table}.${key.column}' !in polymorphic && !from_view && !to_view {
 					found[key.name] = key
 				}
 			}
@@ -197,12 +277,162 @@ pub fn add_edge_indexes(mut ctx migrations.Context, s Schema) ! {
 	for index in s.migration_indexes() {
 		ctx.add_index(index)!
 	}
+	for p in s.partial_indexes() {
+		i := p.index
+		unique := if i.unique { 'UNIQUE ' } else { '' }
+		ctx.execute('CREATE ${unique}INDEX ${quote_name(i.name)} ON ${quote_name(i.table)} (${i.columns.map(quote_name(it)).join(', ')}) WHERE ${p.where}')!
+	}
+}
+
+fn quote_name(name string) string {
+	return '"${name.replace('"', '""')}"'
 }
 
 // remove_edge_indexes removes each of `s.migration_indexes()`, for the `down`
 // of a migration that added them with `add_edge_indexes`.
 pub fn remove_edge_indexes(mut ctx migrations.Context, s Schema) ! {
+	for p in s.partial_indexes().reverse() {
+		ctx.execute('DROP INDEX ${quote_name(p.index.name)}')!
+	}
 	for index in s.migration_indexes().reverse() {
 		ctx.remove_index(index.table, index.name)!
+	}
+}
+
+// migration_table returns the table of the struct registered as `table`, for
+// `ctx.create_table`: its key an auto-incrementing `id` (`AUTOINCREMENT` on
+// SQLite, `BIGSERIAL` on PostgreSQL), as `global_ids` needs, and its other
+// columns typed as V's ORM stores them, with the foreign keys
+// `foreign_keys()` gives it.
+pub fn (s Schema) migration_table(table string) !migrations.Table {
+	s.validate()!
+	t := s.table(table)!
+	mut columns := []migrations.Column{}
+	for c in t.columns {
+		if c.name == t.key {
+			continue
+		}
+		sql := c.sql_type.to_lower()
+		kind := match true {
+			sql.starts_with('uuid') { migrations.ColumnType.uuid }
+			sql.starts_with('jsonb') { migrations.ColumnType.jsonb }
+			else {
+				match c.typ.trim_left('?') {
+					'bool' { migrations.ColumnType.boolean }
+					'i64', 'u32', 'u64', 'enum' { migrations.ColumnType.bigint }
+					'i8', 'i16', 'int', 'u8', 'u16' { migrations.ColumnType.integer }
+					'f32' { migrations.ColumnType.real }
+					'f64' { migrations.ColumnType.double_precision }
+					'time.Time' { migrations.ColumnType.timestamp }
+					else { migrations.ColumnType.text }
+				}
+			}
+		}
+		columns << migrations.Column{
+			name:     c.name
+			kind:     kind
+			nullable: c.nullable
+			unique:   if c.unique { ?bool(true) } else { none }
+		}
+	}
+	return migrations.Table{
+		name:         t.name
+		columns:      columns
+		id_name:      t.key
+		foreign_keys: s.foreign_keys()!.filter(it.from_table == t.name)
+	}
+}
+
+// create_table creates the table of the struct registered as `table`, as
+// `migration_table` describes it: its key auto-incrementing, as `global_ids`
+// needs. It writes the SQL itself, as `v.migrations` refuses the column names
+// V's ORM gives a mixin's fields (`Stamps.created_at`).
+pub fn create_table(mut ctx migrations.Context, s Schema, table string) ! {
+	t := s.migration_table(table)!
+	pg := ctx.dialect == .pg
+	mut parts := [if pg {
+		'${quote_name(t.id_name)} BIGSERIAL PRIMARY KEY'
+	} else {
+		'${quote_name(t.id_name)} INTEGER PRIMARY KEY AUTOINCREMENT'
+	}]
+	for c in t.columns {
+		typ := match c.kind {
+			.boolean { 'BOOLEAN' }
+			.integer { 'INTEGER' }
+			.bigint { 'BIGINT' }
+			.real { 'REAL' }
+			.double_precision { 'DOUBLE PRECISION' }
+			.timestamp { 'TIMESTAMP' }
+			.jsonb {
+				if pg { 'JSONB' } else { 'TEXT' }
+			}
+			.uuid {
+				if pg { 'UUID' } else { 'TEXT' }
+			}
+			else { 'TEXT' }
+		}
+		mut column := '${quote_name(c.name)} ${typ}'
+		if !(c.nullable or { true }) {
+			column += ' NOT NULL'
+		}
+		if c.unique or { false } {
+			column += ' UNIQUE'
+		}
+		parts << column
+	}
+	for key in t.foreign_keys {
+		parts << 'CONSTRAINT ${quote_name(key.name)} FOREIGN KEY (${quote_name(key.column)}) REFERENCES ${quote_name(key.to_table)} (${quote_name(key.primary_key)})'
+	}
+	ctx.execute('CREATE TABLE ${quote_name(t.name)} (${parts.join(', ')})')!
+}
+
+// global_ids gives each table with an `i64` serial key its own range of keys,
+// as Ent's globally unique ids: the table with index `n` (from 1) in
+// `vgraph_types` counts from `n << 32`, so a key names its table
+// (`Client.table_of`). A
+// table gets the next index the first time a migration calls it; indexes never
+// move. On SQLite a table must have been created with `AUTOINCREMENT`, and on
+// PostgreSQL its key must be a `BIGSERIAL`: `create_table` does both.
+pub fn global_ids(mut ctx migrations.Context, s Schema) ! {
+	s.validate()!
+	ctx.execute('CREATE TABLE IF NOT EXISTS vgraph_types (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)')!
+	mut known := map[string]int{}
+	// from 1, so that a global id is always past 2^32, and never a plain one
+	mut next := 1
+	for row in ctx.execute('SELECT id, name FROM vgraph_types')! {
+		index := row.vals[0].int()
+		known[row.vals[1]] = index
+		if index >= next {
+			next = index + 1
+		}
+	}
+	for t in s.tables() {
+		key := t.column(t.key) or { continue }
+		if !key.serial || key.typ != 'i64' || t.view || t.name in known {
+			continue
+		}
+		index := next
+		next++
+		start := i64(index) << 32
+		name := t.name.replace("'", "''")
+		match ctx.dialect {
+			.sqlite {
+				ddl := ctx.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = '${name}'")!
+				if ddl.len == 0 || !ddl[0].vals[0].to_upper().contains('AUTOINCREMENT') {
+					return error('`${t.name}`: global ids need its key to be AUTOINCREMENT on SQLite: create the table with `vgraph.create_table`')
+				}
+				ctx.execute("DELETE FROM sqlite_sequence WHERE name = '${name}'")!
+				ctx.execute("INSERT INTO sqlite_sequence (name, seq) VALUES ('${name}', ${start})")!
+			}
+			.pg {
+				ctx.execute("SELECT setval(pg_get_serial_sequence('${quote_name(t.name).replace("'", "''")}', '${t.key}'), ${start + 1}, false)") or {
+					return error('`${t.name}`: global ids need its key to be a BIGSERIAL on PostgreSQL: ${err.msg()}')
+				}
+			}
+			else {
+				return error('global ids run on SQLite and PostgreSQL')
+			}
+		}
+		ctx.execute("INSERT INTO vgraph_types (id, name) VALUES (${index}, '${name}')")!
 	}
 }

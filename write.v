@@ -28,6 +28,9 @@ pub fn (c Client) create_bulk(ms []MutationData) ![]string {
 		return []string{}
 	}
 	t := c.schema.table(ms[0].table)!
+	if t.view {
+		return error('`${t.name}` is a view: it has no writes')
+	}
 	for m in ms {
 		if m.table != t.name {
 			return error('create_bulk: `${m.table}` and `${t.name}` rows are mixed')
@@ -51,12 +54,15 @@ fn (c Client) create_all(t Table, ms []MutationData) ![]string {
 			mut data := m.clone()
 			data.op = .create
 			apply_defaults(t, options, mut data)
-			rows << prepare_create(t, options, data)!
+			row := prepare_create(t, options, data)!
+			c.free_partners(t, '', row)!
+			rows << row
 		}
 		keys := c.insert_rows(t, rows, ms[0])!
 		for i, m in ms {
 			if keys[i] != '' {
 				c.write_edges(t, keys[i], m)!
+				c.write_bidi(t, keys[i], rows[i])!
 			}
 		}
 		return keys
@@ -98,6 +104,9 @@ pub fn (c Client) delete(m MutationData) !int {
 // it.
 fn (c Client) mutate(m MutationData, op Op) !&MutationData {
 	t := c.schema.table(m.table)!
+	if t.view {
+		return error('`${t.name}` is a view: it has no writes')
+	}
 	tc := c.atomic()!
 	data := tc.run(t, tc.hooks_of(t.name), m, op) or {
 		tc.rollback() or {}
@@ -133,10 +142,12 @@ fn (c Client) write(t Table, mut m MutationData) ! {
 	match m.op {
 		.create {
 			row := prepare_create(t, options, m)!
+			c.free_partners(t, '', row)!
 			keys := c.insert_rows(t, [row], m)!
 			m.row_key = keys[0]
 			if m.row_key != '' {
 				c.write_edges(t, m.row_key, m)!
+				c.write_bidi(t, m.row_key, row)!
 				m.affected = 1
 			}
 		}
@@ -165,15 +176,118 @@ fn (c Client) update_rows(t Table, set Row, conds []load.Cond, m MutationData) !
 	if keys.len == 0 {
 		return 0
 	}
+	for key in keys {
+		c.free_partners(t, key, set)!
+	}
 	if set.len > 0 {
 		where := load.where_data([load.in_keys(t.key, keys, key_type(t)!)]) or { return 0 }
 		mut conn := c.conn
 		conn.update(orm.Table{ name: t.name }, query_data(set), where)!
 	}
 	for key in keys {
+		if m.appends.len > 0 {
+			c.append_json(t, key, m.appends)!
+		}
 		c.write_edges(t, key, m)!
+		c.write_bidi(t, key, set)!
 	}
 	return keys.len
+}
+
+// append_json appends to the JSON arrays of the row with the key `key`, by
+// column: it reads them (locking the row on PostgreSQL) and writes them back,
+// in the write's transaction.
+fn (c Client) append_json(t Table, key string, appends map[string]string) ! {
+	typ := key_type(t)!
+	if c.conn is Driver {
+		d := c.conn as Driver
+		if d.dialect() == .pg {
+			load.select_keys_where(c.conn, t.name, t.key, typ, load.Query{
+				conds: [load.in_keys(t.key, [key], typ)]
+				lock:  load.Lock{
+					mode: .update
+				}
+			}, false)!
+		}
+	}
+	old := c.select_row(t, key)!
+	mut set := Row{}
+	for column, items in appends {
+		current := old[column] or { orm.Primitive(orm.Null{}) }
+		text := if current is string { current.trim_space() } else { '' }
+		set[column] = json_concat(if text == '' { '[]' } else { text }, items)!
+	}
+	where := load.where_data([load.in_keys(t.key, [key], typ)]) or { return }
+	mut conn := c.conn
+	conn.update(orm.Table{ name: t.name }, query_data(set), where)!
+}
+
+// json_concat returns the JSON arrays `a` and `b` as one.
+fn json_concat(a string, b string) !string {
+	if !a.starts_with('[') || !a.ends_with(']') || !b.starts_with('[') || !b.ends_with(']') {
+		return error('`append` needs JSON arrays, not `${a}` and `${b}`')
+	}
+	inner_a := a[1..a.len - 1].trim_space()
+	inner_b := b[1..b.len - 1].trim_space()
+	if inner_a == '' {
+		return '[${inner_b}]'
+	}
+	if inner_b == '' {
+		return '[${inner_a}]'
+	}
+	return '[${inner_a},${inner_b}]'
+}
+
+// free_partners clears, before the row with the key `key` ('' for a new one)
+// is written with `values`, the column of each bidirectional many_to_one edge
+// of the rows that hold the partner it gets, so its unique index holds.
+fn (c Client) free_partners(t Table, key string, values Row) ! {
+	typ := key_type(t)!
+	for e in t.edges {
+		if !e.bidi || e.kind != .many_to_one {
+			continue
+		}
+		value := values[e.column] or { continue }
+		partner := key_text(value)
+		if partner == '' {
+			continue
+		}
+		mut conds := [load.in_keys(e.column, [partner], typ)]
+		if key != '' {
+			conds << load.ne(t.key, key_value(key, typ))
+		}
+		c.set_null(t, e, conds)!
+	}
+}
+
+// write_bidi keeps the pairs of the table's bidirectional many_to_one edges
+// whose column `values` sets on the row with the key `key`: the rows that
+// pointed at it, or at its new partner, stop, and the partner points back.
+fn (c Client) write_bidi(t Table, key string, values Row) ! {
+	typ := key_type(t)!
+	for e in t.edges {
+		if !e.bidi || e.kind != .many_to_one {
+			continue
+		}
+		value := values[e.column] or { continue }
+		partner := key_text(value)
+		// whoever pointed at this row, but its partner
+		mut conds := [load.in_keys(e.column, [key], typ)]
+		if partner != '' {
+			conds << load.ne(t.key, key_value(partner, typ))
+		}
+		c.set_null(t, e, conds)!
+		if partner == '' {
+			continue
+		}
+		// whoever pointed at the partner, but this row
+		c.set_null(t, e, [load.in_keys(e.column, [partner], typ), load.ne(t.key, key_value(key, typ))])!
+		mut set := Row{}
+		set[e.column] = key_value(key, typ)
+		where := load.where_data([load.in_keys(t.key, [partner], typ)]) or { continue }
+		mut conn := c.conn
+		conn.update(orm.Table{ name: t.name }, query_data(set), where)!
+	}
 }
 
 fn (c Client) delete_rows(t Table, conds []load.Cond) !int {
@@ -234,6 +348,19 @@ fn prepare_create(t Table, options map[string]Field, m MutationData) !Row {
 		t.column(name) or { return error('`${t.name}` has no column `${name}`') }
 		row[name] = value
 	}
+	for e in t.edges {
+		if !e.required {
+			continue
+		}
+		set := if value := row[e.column] { value !is orm.Null } else { false }
+		if !set && (m.added[e.name] or { []string{} }).len == 0 {
+			return ValidationError{
+				table:   t.name
+				field:   e.column
+				message: 'the edge `${e.name}` is required'
+			}
+		}
+	}
 	for column in t.columns {
 		if column.name !in row && !column.optional && !column.has_default {
 			return ValidationError{
@@ -250,6 +377,25 @@ fn prepare_create(t Table, options map[string]Field, m MutationData) !Row {
 // prepare_update returns the columns `m` sets on each row: its values and its
 // additions. It reports a column that may not change, and runs every check.
 fn prepare_update(t Table, options map[string]Field, m MutationData) !Row {
+	for e in t.edges {
+		if !e.immutable {
+			continue
+		}
+		if (e.kind == .many_to_one && e.column in m.values) || e.name in m.added
+			|| e.name in m.removed || e.name in m.cleared {
+			return ValidationError{
+				table:   t.name
+				field:   e.column
+				message: 'the edge `${e.name}` is immutable'
+			}
+		}
+	}
+	for column in m.appends.keys() {
+		c := t.column(column) or { return error('`${t.name}` has no column `${column}`') }
+		if c.json_type == '' || !c.json_type.starts_with('[]') {
+			return error('`${t.name}.${column}` is not a JSON array: it has no `append`')
+		}
+	}
 	mut set := Row{}
 	for name, value in m.values {
 		column := t.column(name) or { return error('`${t.name}` has no column `${name}`') }
@@ -323,12 +469,20 @@ fn check_values(t Table, options map[string]Field, row Row) ! {
 // fits reports whether `value` has the type of `column`.
 fn fits(column Column, value orm.Primitive) bool {
 	return match column.typ.trim_left('?') {
+		'i8' { value is i8 }
+		'i16' { value is i16 }
 		'int' { value is int }
 		'i64' { value is i64 || value is int }
+		'u8' { value is u8 }
+		'u16' { value is u16 }
+		'u32' { value is u32 }
+		'u64' { value is u64 }
+		'f32' { value is f32 }
 		'f64' { value is f64 }
 		'bool' { value is bool }
 		'string' { value is string }
 		'time.Time' { value is time.Time }
+		'enum' { value is int || value is i64 }
 		else { true }
 	}
 }
@@ -357,10 +511,14 @@ fn (c Client) insert_rows(t Table, rows []Row, m MutationData) ![]string {
 	mut conn := c.conn
 	mut keys := []string{cap: rows.len}
 	for row in rows {
+		if key.kind == .i64 && t.key !in row {
+			// `last_id()` is 32 bits on SQLite, so a global id would come back wrong
+			return error('`${t.name}`: reading back a new `i64` key needs a vgraph driver (five07.vgraph.sqlite or five07.vgraph.pg)')
+		}
 		conn.insert(orm.Table{ name: t.name }, query_data(row))!
 		if value := row[t.key] {
 			keys << key_text(value)
-		} else if key.kind in [.int, .i64] {
+		} else if key.kind == .int {
 			keys << conn.last_id().str()
 		} else {
 			return error('`${t.name}`: a create must set the key `${t.key}`')
@@ -456,6 +614,11 @@ fn (c Client) write_edges(t Table, key string, m MutationData) ! {
 				if where := load.where_data([load.in_keys(e.column, [key], typ)]) {
 					conn.delete(orm.Table{ name: e.through }, where)!
 				}
+				if e.bidi {
+					if where := load.where_data([load.in_keys(e.through_to, [key], typ)]) {
+						conn.delete(orm.Table{ name: e.through }, where)!
+					}
+				}
 			}
 			.many_to_one {
 				c.set_null(t, e, [load.in_keys(t.key, [key], typ)])!
@@ -476,11 +639,7 @@ fn (c Client) write_edges(t Table, key string, m MutationData) ! {
 				c.set_null(target, e, conds)!
 			}
 			.many_to_many {
-				if where := load.where_data([load.in_keys(e.column, [key], typ),
-					load.in_keys(e.through_to, ids, key_type(target)!)])
-				{
-					conn.delete(orm.Table{ name: e.through }, where)!
-				}
+				c.delete_pairs(e, key, ids, typ, key_type(target)!)!
 			}
 			.many_to_one {
 				return error('`${t.name}.${name}` is many_to_one: clear it, or set another')
@@ -509,15 +668,13 @@ fn (c Client) write_edges(t Table, key string, m MutationData) ! {
 				}
 			}
 			.many_to_many {
-				mut data := orm.QueryData{
-					fields:     [e.column, e.through_to]
-					batch_rows: ids.len
+				mut pairs := ids.map([key, it])
+				if e.bidi {
+					// a pair stored the other way already would be stored twice
+					c.delete_pairs(e, key, ids, typ, target_typ)!
+					pairs << ids.filter(it != key).map([it, key])
 				}
-				for id in ids {
-					data.data << key_value(key, typ)
-					data.data << key_value(id, target_typ)
-				}
-				conn.insert(orm.Table{ name: e.through }, data)!
+				c.insert_pairs(e, pairs, typ, target_typ)!
 			}
 			.many_to_one {
 				if ids.len != 1 {
@@ -533,6 +690,60 @@ fn (c Client) write_edges(t Table, key string, m MutationData) ! {
 			}
 		}
 	}
+}
+
+// delete_pairs deletes the join rows of the many_to_many edge `e` from `key`
+// to each of `ids`, and back, for a bidirectional one.
+fn (c Client) delete_pairs(e Edge, key string, ids []string, typ load.KeyType, target_typ load.KeyType) ! {
+	mut conn := c.conn
+	if where := load.where_data([load.in_keys(e.column, [key], typ),
+		load.in_keys(e.through_to, ids, target_typ)])
+	{
+		conn.delete(orm.Table{ name: e.through }, where)!
+	}
+	if e.bidi {
+		if where := load.where_data([load.in_keys(e.column, ids, target_typ),
+			load.in_keys(e.through_to, [key], typ)])
+		{
+			conn.delete(orm.Table{ name: e.through }, where)!
+		}
+	}
+}
+
+// insert_pairs stores the join rows `pairs` (`[from, to]` keys) of the
+// many_to_many edge `e`. The join table of an edge schema, a struct of its
+// own, gets them through its own create, with its defaults and hooks.
+fn (c Client) insert_pairs(e Edge, pairs [][]string, typ load.KeyType, target_typ load.KeyType) ! {
+	if pairs.len == 0 {
+		return
+	}
+	if join := c.schema.tables[e.through] {
+		for pair in pairs {
+			mut values := map[string]orm.Primitive{}
+			values[e.column] = key_value(pair[0], typ)
+			values[e.through_to] = key_value(pair[1], target_typ)
+			c.create(MutationData{
+				table:  join.name
+				values: values
+			}) or {
+				if err is ValidationError && err.message == 'is required' {
+					return error('`${join.name}.${err.field}` is required: create `${join.name}` rows through their own builder')
+				}
+				return err
+			}
+		}
+		return
+	}
+	mut data := orm.QueryData{
+		fields:     [e.column, e.through_to]
+		batch_rows: pairs.len
+	}
+	for pair in pairs {
+		data.data << key_value(pair[0], typ)
+		data.data << key_value(pair[1], target_typ)
+	}
+	mut conn := c.conn
+	conn.insert(orm.Table{ name: e.through }, data)!
 }
 
 // set_null sets the column of the edge `e`, which `table` holds, to null on
@@ -614,14 +825,27 @@ fn (c Client) select_row(t Table, key string) !Row {
 	mut names := []string{}
 	mut types := []int{}
 	for column in t.columns {
-		typ := match column.typ.trim_left('?') {
-			'int' { orm.type_idx['int'] }
-			'i64' { orm.type_idx['i64'] }
-			'f64' { orm.type_idx['f64'] }
-			'bool' { orm.type_idx['bool'] }
-			'string' { orm.type_string }
-			'time.Time' { orm.time_ }
-			else { continue }
+		base := column.typ.trim_left('?')
+		typ := match base {
+			'i8', 'i16', 'int', 'i64', 'u8', 'u16', 'f32', 'f64', 'bool' {
+				orm.type_idx[base]
+			}
+			'u32', 'u64' {
+				// db.pg decodes these cells wrongly
+				orm.type_idx['i64']
+			}
+			'enum' {
+				orm.type_idx['int']
+			}
+			'string' {
+				orm.type_string
+			}
+			'time.Time' {
+				orm.time_
+			}
+			else {
+				continue
+			}
 		}
 		names << column.name
 		types << typ

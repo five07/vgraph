@@ -55,11 +55,25 @@ pub fn generate(out_module string, entities []Entity, tables []Table) !map[strin
 	for table in tables {
 		check_names(infos[table.name])!
 	}
+	// predicate functions are named `<struct>_<field>_<op>`, which two tables
+	// can both produce
+	mut funcs := map[string]string{}
+	for table in tables {
+		for p in predicates(infos[table.name], infos)! {
+			if other := funcs[p.func] {
+				return error('`${p.func}` would be generated for both `${other}` and `${table.name}`; rename a struct, a field or an edge')
+			}
+			funcs[p.func] = table.name
+		}
+	}
 	mut files := map[string]string{}
 	files['graph.v'] = graph_file(out_module, entities)
 	for table in tables {
 		files['${table.name}.v'] = table_file(out_module, infos[table.name], infos)!
-		files['${table.name}_mutation.v'] = mutation_file(out_module, infos[table.name], infos)!
+		if !table.view {
+			files['${table.name}_mutation.v'] = mutation_file(out_module, infos[table.name],
+				infos)!
+		}
 	}
 	return files
 }
@@ -252,6 +266,9 @@ fn table_file(out_module string, info Info, infos map[string]Info) !string {
 	if t.columns.any(it.typ.trim_left('?') == 'time.Time') {
 		imports << 'time'
 	}
+	if t.columns.any(it.json_type != '') {
+		imports << 'json2'
+	}
 	mut paths := [info.entity.module_path]
 	paths << targets.map(it.entity.module_path)
 	for path in paths {
@@ -387,6 +404,23 @@ pub fn (q ${q}) first() !${n} {
 }')
 	write_nodes(mut b, info, infos)!
 	write_edge_methods(mut b, info, infos)!
+	for c in t.columns {
+		if c.json_type == '' {
+			continue
+		}
+		jt := c.json_v_type(info)
+		text := if c.nullable {
+			"n.${info.field()}.${c.field} or { return error('`${t.name}.${c.name}` is null') }"
+		} else {
+			'n.${info.field()}.${c.field}'
+		}
+		b.writeln('
+// ${c.field}_value returns `${c.name}`, decoded from JSON.
+pub fn (n ${n}) ${c.field}_value() !${jt} {
+	text := ${text}
+	return json2.decode[${jt}](text)!
+}')
+	}
 	for i, edge in t.edges {
 		write_traversal(mut b, info, edge, targets[i])!
 	}
@@ -397,7 +431,7 @@ pub fn (q ${q}) first() !${n} {
 // for each column of `t`, which add an order column.
 fn write_order_methods(mut b strings.Builder, t Table, q string) {
 	for c in t.columns {
-		if c.typ.trim_left('?') !in ['int', 'i64', 'f64', 'bool', 'string', 'time.Time'] {
+		if !c.scalar() || c.json_type != '' {
 			continue
 		}
 		b.writeln('

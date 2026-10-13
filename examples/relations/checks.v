@@ -57,10 +57,20 @@ fn initial_up(mut ctx migrations.Context) ! {
 	migrations.create_orm_table[models.Device](mut ctx)!
 	migrations.create_orm_table[models.Login](mut ctx)!
 	migrations.create_orm_table[models.DeviceGroup](mut ctx)!
-	vgraph.add_edge_indexes(mut ctx, graph.schema()!)!
+	// gadgets have global ids: their table comes from the schema, with an
+	// AUTOINCREMENT (SQLite) or BIGSERIAL (PostgreSQL) key
+	s := graph.schema()!
+	vgraph.create_table(mut ctx, s, 'gadgets')!
+	migrations.create_orm_table[models.Like](mut ctx)!
+	ctx.execute('CREATE VIEW pet_owners AS SELECT p.id AS id, p.name AS pet_name, p.owner_id AS owner_id, u.name AS owner_name FROM pets p JOIN users u ON u.id = p.owner_id')!
+	vgraph.add_edge_indexes(mut ctx, s)!
+	vgraph.global_ids(mut ctx, s)!
 }
 
 fn initial_down(mut ctx migrations.Context) ! {
+	ctx.execute('DROP VIEW pet_owners')!
+	migrations.drop_orm_table[models.Like](mut ctx)!
+	ctx.drop_table('gadgets')!
 	migrations.drop_orm_table[models.DeviceGroup](mut ctx)!
 	migrations.drop_orm_table[models.Login](mut ctx)!
 	migrations.drop_orm_table[models.Device](mut ctx)!
@@ -339,7 +349,9 @@ fn check_m2m_two_types(f Fixture) ! {
 
 // M2M same type: following and followers, two edges over one join table.
 fn check_m2m_same_type(f Fixture) ! {
-	users := f.g.users().with_following().with_followers().order_by_id().all()!
+	users := f.g.users().with_following(fn (q graph.UserQuery) graph.UserQuery {
+		return q.order_by_id()
+	}).with_followers().order_by_id().all()!
 	assert users.map(names(it.following)) == [['bob', 'cy'], ['cy'], [], []]
 	assert users.map(names(it.followers)) == [[], ['ada'], ['ada', 'bob'], []]
 	assert names(users[0].query_following()!.order_by_id().all()!) == ['bob', 'cy']
@@ -361,7 +373,8 @@ fn check_unique_indexes(f Fixture) ! {
 	unique := f.g.client.schema.migration_indexes().filter(it.unique).map(it.name)
 	assert unique == ['cards_owner_id_idx', 'device_groups_device_id_group_id_idx',
 		'follows_followee_id_follower_id_idx', 'friendships_friend_id_user_id_idx',
-		'group_users_group_id_user_id_idx', 'nodes_next_id_idx']
+		'gadgets_serial_no_idx', 'group_users_group_id_user_id_idx', 'likes_gadget_id_user_id_idx',
+		'nodes_next_id_idx', 'users_spouse_id_idx']
 	second_card := models.Card{
 		number:   '9999'
 		owner_id: 1
@@ -384,7 +397,14 @@ fn check_unique_indexes(f Fixture) ! {
 		assert err.msg().to_lower().contains('unique')
 		rejected++
 	}
-	assert rejected == 2, 'a second card for ada, and ada in admins twice, should be rejected'
+	// bob is ada's spouse: cy can't marry him too
+	sql f.db {
+		update models.User set spouse_id = 2 where id == 3
+	} or {
+		assert err.msg().to_lower().contains('unique')
+		rejected++
+	}
+	assert rejected == 3, 'a second card for ada, ada in admins twice, and a second spouse for bob, should be rejected'
 }
 
 // UUID keys: devices are keyed by strings, and every kind of edge works on them,
@@ -451,7 +471,7 @@ fn check_graphql(f Fixture) ! {
 	assert gql(f, '{ usersCount petsCount(where: {ownerIDIsNil: false, nameHasPrefix: "r"}) users(orderBy: {field: ID}, limit: 2) { name pets(orderBy: {field: NAME}, limit: 1) { name } } strays: pets(where: {ownerIDIsNil: true}) { name owner { name } } page: users(orderBy: {field: NAME, direction: DESC}, limit: 2, offset: 1) { id name } }')! == '{"data":{"usersCount":4,"petsCount":1,"users":[{"name":"ada","pets":[{"name":"rex"}]},{"name":"bob","pets":[]}],"strays":[{"name":"stray","owner":null}],"page":[{"id":"3","name":"cy"},{"id":"2","name":"bob"}]}}'
 	assert f.queries() == ['users', 'pets', 'users', 'pets', 'pets', 'users']
 	// O2O same type and bidirectional, M2M same type and bidirectional
-	assert gql(f, '{ nodes(where: {idIn: ["1", "2"]}, orderBy: {field: ID}) { value next { value } prev { value } } users(where: {idNotIn: ["3", "4"]}, orderBy: {field: ID}) { spouse { name } following { name } followers { name } friends { name } } }')! == '{"data":{"nodes":[{"value":1,"next":{"value":2},"prev":null},{"value":2,"next":{"value":3},"prev":{"value":1}}],"users":[{"spouse":{"name":"bob"},"following":[{"name":"bob"},{"name":"cy"}],"followers":[],"friends":[{"name":"bob"}]},{"spouse":{"name":"ada"},"following":[{"name":"cy"}],"followers":[{"name":"ada"}],"friends":[{"name":"ada"}]}]}}'
+	assert gql(f, '{ nodes(where: {idIn: ["1", "2"]}, orderBy: {field: ID}) { value next { value } prev { value } } users(where: {idNotIn: ["3", "4"]}, orderBy: {field: ID}) { spouse { name } following(orderBy: {field: ID}) { name } followers { name } friends { name } } }')! == '{"data":{"nodes":[{"value":1,"next":{"value":2},"prev":null},{"value":2,"next":{"value":3},"prev":{"value":1}}],"users":[{"spouse":{"name":"bob"},"following":[{"name":"bob"},{"name":"cy"}],"followers":[],"friends":[{"name":"bob"}]},{"spouse":{"name":"ada"},"following":[{"name":"cy"}],"followers":[{"name":"ada"}],"friends":[{"name":"ada"}]}]}}'
 	// UUID keys
 	assert gql(f, '{ devices(orderBy: {field: NAME}) { id name owner { name } logins(orderBy: {field: AT, direction: DESC}) { at } groups { name } } }')! == '{"data":{"devices":[{"id":"${laptop}","name":"laptop","owner":{"name":"ada"},"logins":[],"groups":[]},{"id":"${phone}","name":"phone","owner":{"name":"ada"},"logins":[{"at":2},{"at":1}],"groups":[{"name":"admins"},{"name":"devs"}]},{"id":"${tablet}","name":"tablet","owner":{"name":"bob"},"logins":[{"at":3}],"groups":[{"name":"devs"}]}]}}'
 	assert gql(f, '{ devices(where: {id: "${tablet}"}) { name } }')! == '{"data":{"devices":[{"name":"tablet"}]}}'
@@ -498,17 +518,17 @@ fn check_writes(f Fixture) ! {
 	assert nodes.map(it.node.next_id or { 0 }) == [4, 3, 0, 0]
 	w.nodes().update_one_id(4).clear_prev().exec()!
 	assert w.nodes().where_next_id(4).count()! == 0
-	// O2O bidirectional: both sides, in one transaction
-	w.tx(fn (tx graph.Graph) ! {
-		tx.users().update_one_id(3).set_spouse_id(4).exec()!
-		tx.users().update_one_id(4).set_spouse_id(3).exec()!
-	})!
+	// O2O bidirectional (`bidi`): one write sets both sides
+	w.users().update_one_id(3).set_spouse_id(4).exec()!
 	assert w.users().where_id_in([3, 4]).order_by_id().all()!.map(it.user.spouse_id or { 0 }) == [
 		4,
 		3,
 	]
+	// ada marries cy: bob and dee lose their spouses
+	w.users().update_one_id(1).set_spouse_id(3).exec()!
+	assert w.users().order_by_id().all()!.map(it.user.spouse_id or { 0 }) == [3, 0, 1, 0, 0]
 	w.users().update_one_id(3).clear_spouse().exec()!
-	assert w.users().where_id(3).first()!.user.spouse_id == none
+	assert w.users().where_id_in([1, 3]).all()!.all(it.user.spouse_id == none)
 	// O2M two types: add the stray, remove one, clear
 	w.users().update_one_id(2).add_pets_ids(3).exec()!
 	assert w.pets().where_owner_id(2).count()! == 1
@@ -547,11 +567,8 @@ fn check_writes(f Fixture) ! {
 	// M2M same type: dee follows ada; ada now has a follower
 	w.users().update_one_id(4).add_following_ids(1).exec()!
 	assert w.users().where_id(1).first()!.query_followers()!.all()!.map(it.user.name) == ['dee']
-	// M2M bidirectional: a friendship, stored both ways
-	w.tx(fn (tx graph.Graph) ! {
-		tx.users().update_one_id(1).add_friends_ids(3).exec()!
-		tx.users().update_one_id(3).add_friends_ids(1).exec()!
-	})!
+	// M2M bidirectional (`bidi`): one write stores the friendship both ways
+	w.users().update_one_id(1).add_friends_ids(3).exec()!
 	friends := w.users().where_id_in([1, 3]).with_friends(fn (q graph.UserQuery) graph.UserQuery {
 		return q.order_by_id()
 	}).order_by_id().all()!
@@ -850,4 +867,93 @@ fn check_queries(f Fixture) ! {
 			assert err is graph.NotFoundError
 		}
 	}
+}
+
+// The schema options of 6d: every field type, JSON, a mixin, declared and
+// partial indexes, an edge schema, a required and immutable edge, global ids
+// and a view.
+fn check_schema(f Fixture) ! {
+	w := f.w
+	driver := f.w.client.conn as vgraph.Driver
+	on_pg := driver.dialect() == .pg
+	g1 := w.gadgets().create().set_owner_id(1).set_serial_no('S-1').set_color(.green).set_level(-3).set_weight(500).set_parts(70000).set_big(9_000_000_000).set_ratio(0.5).set_rating(4.5).set_tags_value([
+		'new',
+	]).save()!
+	// a global id: the first table with an i64 serial key counts from 1 << 32
+	assert g1.gadget.id == (i64(1) << 32) + 1
+	assert w.client.table_of(g1.gadget.id)! == 'gadgets'
+	g := w.gadgets().where_id(g1.gadget.id).first()!.gadget
+	assert g.serial_no == 'S-1'
+	assert g.color == .green
+	assert g.level == -3
+	assert g.weight == 500
+	assert g.parts == 70000
+	assert g.big == 9_000_000_000
+	assert g.ratio == 0.5
+	assert (g.rating or { 0 }) == 4.5
+	assert g.score == none && g.active == none
+	// the mixin's fields, set by its options
+	assert g.created_at.unix() > 0
+	assert g.updated_at.unix() - g.created_at.unix() <= 1
+	// JSON
+	assert w.gadgets().where_id(g.id).first()!.tags_value()! == ['new']
+	w.gadgets().update_one_id(g.id).append_tags('used', 'blue').exec()!
+	assert w.gadgets().where_id(g.id).first()!.tags_value()! == ['new', 'used', 'blue']
+	// predicates, orders and aggregates on the new types
+	w.gadgets().create().set_owner_id(2).set_serial_no('S-2').set_color(.red).set_level(2).set_weight(100).set_parts(1).set_big(1).set_ratio(1.5).set_score(7).set_active(true).set_tags('[]').exec()!
+	assert w.gadgets().where_color(.red).only()!.gadget.serial_no == 'S-2'
+	assert w.gadgets().where_color_in([.green, .blue]).count()! == 1
+	assert w.gadgets().where_serial_no(models.Serial('S-1')).count()! == 1
+	assert w.gadgets().where_level_lt(0).count()! == 1
+	assert w.gadgets().where_big_gt(1).count()! == 1
+	assert w.gadgets().where_active(true).count()! == 1
+	assert w.gadgets().where_score_is_null().count()! == 1
+	assert w.gadgets().sum_weight()! == 600
+	assert w.gadgets().order_by_color().all()!.map(it.gadget.serial_no) == ['S-2', 'S-1']
+	// a declared unique index
+	if _ := w.gadgets().create().set_owner_id(3).set_serial_no('S-1').set_tags('[]').exec() {
+		assert false
+	}
+	// a required edge, and an immutable one
+	if _ := w.gadgets().create().set_serial_no('S-3').set_tags('[]').exec() {
+		assert false
+	} else {
+		assert err.msg() == '`gadgets.owner_id`: the edge `owner` is required'
+	}
+	if _ := w.client.update_one(vgraph.MutationData{
+		table:   'gadgets'
+		row_key: g.id.str()
+		values:  {
+			'owner_id': orm.Primitive(2)
+		}
+	})
+	{
+		assert false
+	} else {
+		assert err.msg() == '`gadgets.owner_id`: the edge `owner` is immutable'
+	}
+	// an edge schema: a like is a row of its own, with its default
+	w.users().update_one_id(1).add_liked_gadgets_ids(g.id).exec()!
+	likes := w.likes().with_user().with_gadget().all()!
+	assert likes.len == 1
+	assert likes[0].like.liked_at.unix() > 0
+	assert names(w.gadgets().where_id(g.id).first()!.query_likers()!.all()!) == ['ada']
+	assert w.users().where_id(1).first()!.query_liked_gadgets()!.ids()! == [g.id]
+	// the partial index exists
+	query := if on_pg {
+		'SELECT indexname FROM pg_indexes WHERE indexname = \$1'
+	} else {
+		"SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?"
+	}
+	mut d := driver
+	assert d.exec_params(query, ['gadgets_rated_owner_idx'])!.len == 1
+	// a view: queries, edges and GraphQL
+	owners := f.g.pet_owners().with_owner().order_by_id().all()!
+	assert owners.map('${it.owned_pet.pet_name} ${it.owned_pet.owner_name}') == [
+		'rex ada',
+		'tom ada',
+	]
+	assert owners.map(if o := it.owner { o.user.id } else { 0 }) == [1, 1]
+	assert gql(f, '{ petOwners(orderBy: {field: ID}) { petName owner { name } } }')! == '{"data":{"petOwners":[{"petName":"rex","owner":{"name":"ada"}},{"petName":"tom","owner":{"name":"ada"}}]}}'
+	assert gql(f, '{ gadgets(where: {color: RED}) { serialNo color tags level big } }')! == '{"data":{"gadgets":[{"serialNo":"S-2","color":"RED","tags":[],"level":2,"big":1}]}}'
 }

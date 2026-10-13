@@ -1220,7 +1220,7 @@ pub fn (q ArticleQuery) for_share() ArticleQuery {
 	return next
 }
 
-// no_wait: a lock fails at once on a row another transaction locked.
+// no_wait makes the lock one that fails at once on a row another transaction locked.
 pub fn (q ArticleQuery) no_wait() ArticleQuery {
 	mut next := q
 	next.query = load.Query{
@@ -1233,7 +1233,7 @@ pub fn (q ArticleQuery) no_wait() ArticleQuery {
 	return next
 }
 
-// skip_locked: a lock leaves out the rows other transactions locked.
+// skip_locked makes the lock one that leaves out the rows other transactions locked.
 pub fn (q ArticleQuery) skip_locked() ArticleQuery {
 	mut next := q
 	next.query = load.Query{

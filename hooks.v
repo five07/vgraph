@@ -111,6 +111,18 @@ pub:
 	mutation []MutationRule
 }
 
+// merged returns `p`'s rules, then `other`'s.
+pub fn (p Policy) merged(other Policy) Policy {
+	mut query := p.query.clone()
+	query << other.query
+	mut mutation := p.mutation.clone()
+	mutation << other.mutation
+	return Policy{
+		query:    query
+		mutation: mutation
+	}
+}
+
 // always_allow allows any write.
 pub fn always_allow(_ graphql.Context, _ Mutation) !Decision {
 	return .allow

@@ -635,7 +635,7 @@ pub fn (q PetQuery) for_share() PetQuery {
 	return next
 }
 
-// no_wait: a lock fails at once on a row another transaction locked.
+// no_wait makes the lock one that fails at once on a row another transaction locked.
 pub fn (q PetQuery) no_wait() PetQuery {
 	mut next := q
 	next.query = load.Query{
@@ -648,7 +648,7 @@ pub fn (q PetQuery) no_wait() PetQuery {
 	return next
 }
 
-// skip_locked: a lock leaves out the rows other transactions locked.
+// skip_locked makes the lock one that leaves out the rows other transactions locked.
 pub fn (q PetQuery) skip_locked() PetQuery {
 	mut next := q
 	next.query = load.Query{

@@ -60,14 +60,30 @@ fn (f GqlField) typ() string {
 }
 
 fn gql_scalar(c Column) ?string {
-	return match c.typ.trim_left('?') {
-		'int', 'i64' { 'Int' }
-		'f64' { 'Float' }
-		'bool' { 'Boolean' }
-		'string' { 'String' }
-		'time.Time' { 'Time' }
+	if c.json_type != '' {
+		return 'JSON'
+	}
+	b := c.base()
+	return match true {
+		b in int_types { 'Int' }
+		b in float_types { 'Float' }
+		b == 'bool' { 'Boolean' }
+		b == 'string' { 'String' }
+		b == 'time.Time' { 'Time' }
+		b == 'enum' { 'ENUM' }
 		else { none }
 	}
+}
+
+// gql_enum returns the GraphQL enum type of an enum column, as entgql names it:
+// the type, then the field, such as `ArticleStatus`.
+fn (i Info) gql_enum(c Column) string {
+	return i.gql_type() + pascal(c.field)
+}
+
+// pascal returns `ArticleStatus` for `article_status`.
+fn pascal(name string) string {
+	return name.split('_').map(if it.len > 0 { it[0..1].to_upper() + it[1..] } else { it }).join('')
 }
 
 fn (i Info) gql_type() string {
@@ -91,6 +107,9 @@ fn (i Info) gql_fields() []GqlField {
 			continue
 		}
 		mut scalar := gql_scalar(c) or { continue }
+		if scalar == 'ENUM' {
+			scalar = i.gql_enum(c)
+		}
 		key := c.name == i.table.key
 		if key || c.name in foreign {
 			scalar = 'ID'
@@ -118,7 +137,13 @@ fn (i Info) gql_edges(infos map[string]Info) []Edge {
 // predicates returns the WhereInput predicates of a field: the suffixes after
 // its name, as entgql names them.
 fn (f GqlField) predicates() []string {
+	if f.scalar == 'JSON' {
+		return if f.nullable { ['IsNil', 'NotNil'] } else { []string{} }
+	}
 	mut out := ['', 'NEQ']
+	if f.column.base() == 'enum' {
+		out << ['In', 'NotIn']
+	}
 	match f.scalar {
 		'ID' {
 			out << ['In', 'NotIn']
@@ -163,6 +188,7 @@ fn base_sdl(infos map[string]Info, tables []Table) string {
 	mut b := strings.new_builder(8192)
 	visible := tables.filter(!it.graphql_skip).map(infos[it.name])
 	mut has_time := false
+	mut has_json := false
 	b.writeln('type Query {')
 	for info in visible {
 		b.writeln('  ${info.gql_root()}(${list_args_of(info)}): [${info.gql_type()}!]!')
@@ -172,6 +198,7 @@ fn base_sdl(infos map[string]Info, tables []Table) string {
 	for info in visible {
 		fields := info.gql_fields()
 		has_time = has_time || fields.any(it.scalar == 'Time')
+		has_json = has_json || fields.any(it.scalar == 'JSON')
 		b.writeln('')
 		b.writeln('type ${info.gql_type()} {')
 		for f in fields {
@@ -212,9 +239,22 @@ fn base_sdl(infos map[string]Info, tables []Table) string {
 		b.writeln('"""Properties by which ${info.gql_type()} lists can be ordered."""')
 		b.writeln('enum ${info.gql_type()}OrderField {')
 		for f in fields {
-			b.writeln('  ${upper_snake(f.column.field)}')
+			if f.scalar != 'JSON' {
+				b.writeln('  ${upper_snake(f.column.field)}')
+			}
 		}
 		b.writeln('}')
+		for f in fields {
+			if f.column.base() == 'enum' {
+				b.writeln('')
+				b.writeln('"""${f.scalar} is enum for the field ${f.name}"""')
+				b.writeln('enum ${f.scalar} {')
+				for v in f.column.enum_values {
+					b.writeln('  ${v.to_upper()}')
+				}
+				b.writeln('}')
+			}
+		}
 	}
 	b.writeln('')
 	b.writeln('"""')
@@ -226,6 +266,11 @@ fn base_sdl(infos map[string]Info, tables []Table) string {
 	b.writeln('  """Specifies a descending order for a given `orderBy` argument."""')
 	b.writeln('  DESC')
 	b.writeln('}')
+	if has_json {
+		b.writeln('')
+		b.writeln('"""A JSON value: an object, a list, a string, a number, a boolean or null."""')
+		b.writeln('scalar JSON')
+	}
 	if has_time {
 		b.writeln('')
 		b.writeln('"""An RFC 3339 date and time, such as `2026-10-13T07:30:00Z`."""')
@@ -536,8 +581,12 @@ fn field_value(f GqlField, row string) string {
 	conv := fn [f, base] (v string) string {
 		return match true {
 			f.scalar == 'ID' { 'graphql.Value(${v}.str())' }
-			base == 'i64' { 'graphql.Value(f64(${v}))' }
+			f.scalar == 'JSON' { 'graphql.parse_json(${v}) or { graphql.null }' }
+			base == 'enum' { 'graphql.Value(${v}.str().to_upper())' }
+			base in ['i64', 'u32', 'u64', 'f32', 'f64'] { 'graphql.Value(f64(${v}))' }
+			base in int_types { 'graphql.Value(int(${v}))' }
 			base == 'time.Time' { 'graphql.Value(${v}.format_rfc3339())' }
+			base == 'string' { 'graphql.Value(string(${v}))' }
 			else { 'graphql.Value(${v})' }
 		}
 	}
@@ -574,26 +623,36 @@ fn ${snake(t)}_value(row ${info.typ()}, field string) graphql.Value {
 fn cond_expr(f GqlField, suffix string) string {
 	col := "'${f.column.name}'"
 	base := f.column.typ.trim_left('?')
+	if base == 'enum' {
+		fn_name := '${snake(f.column.v_type_name())}_enum'
+		return match suffix {
+			'' { 'load.eq(${col}, ${fn_name}(v.as_string())!)' }
+			'NEQ' { 'load.ne(${col}, ${fn_name}(v.as_string())!)' }
+			'In' { 'load.in_ints(${col}, ${fn_name}s(v)!)' }
+			'NotIn' { 'load.not_in_ints(${col}, ${fn_name}s(v)!)' }
+			else { '' }
+		}
+	}
 	one := match true {
 		f.scalar == 'ID' && base == 'string' { 'v.as_string()' }
 		f.scalar == 'ID' && base == 'i64' { 'gql_i64_id(v)!' }
 		f.scalar == 'ID' { 'gql_int_id(v)!' }
 		base == 'time.Time' { 'gql_time(v)!' }
 		base == 'string' { 'v.as_string()' }
-		base == 'f64' { 'v.as_float()' }
+		base in float_types { 'v.as_float()' }
 		base == 'bool' { 'v.as_bool()' }
-		base == 'i64' { 'i64(v.as_float())' }
+		base in ['i64', 'u64'] { 'i64(v.as_float())' }
 		else { 'v.as_int()' }
 	}
 	many := match true {
 		base == 'string' { 'gql_strings(v)' }
-		base == 'i64' { 'gql_i64s(v)!' }
+		base in ['i64', 'u64'] { 'gql_i64s(v)!' }
 		f.scalar == 'ID' { 'gql_int_ids(v)!' }
 		else { 'gql_ints(v)' }
 	}
-	in_fn := match base {
-		'string' { 'strings' }
-		'i64' { 'i64s' }
+	in_fn := match true {
+		base == 'string' { 'strings' }
+		base in ['i64', 'u64'] { 'i64s' }
 		else { 'ints' }
 	}
 	return match suffix {
@@ -631,7 +690,9 @@ fn (q ${q}) graphql_args(args map[string]graphql.Value) !${q} {
 			field := (o[\'field\'] or { graphql.null }).as_string()
 			column := match field {')
 	for f in fields {
-		b.writeln("				'${upper_snake(f.column.field)}' { '${f.column.name}' }")
+		if f.scalar != 'JSON' {
+			b.writeln("				'${upper_snake(f.column.field)}' { '${f.column.name}' }")
+		}
 	}
 	b.writeln("				else { '' }
 			}
@@ -680,6 +741,37 @@ fn ${snake(t)}_where(w map[string]graphql.Value) ![]load.Cond {
 	}
 	return conds
 }')
+	// each enum's GraphQL values, back to the V enum's
+	mut done := map[string]bool{}
+	for f in fields {
+		c := f.column
+		if c.base() != 'enum' || c.v_type_name() in done {
+			continue
+		}
+		done[c.v_type_name()] = true
+		name := '${snake(c.v_type_name())}_enum'
+		vt := c.v_type(info)
+		b.writeln('
+// ${name} returns the value of `${vt}` a GraphQL enum value names.
+fn ${name}(name string) !int {
+	return match name {')
+		for v in c.enum_values {
+			b.writeln("		'${v.to_upper()}' { int(${vt}.${v}) }")
+		}
+		b.writeln("		else { error('`\${name}` is not a ${c.type_name}') }
+	}
+}
+
+// ${name}s returns the values of `${vt}` that a list of GraphQL enum values
+// names.
+fn ${name}s(v graphql.Value) ![]int {
+	mut out := []int{}
+	for item in v.as_list() {
+		out << ${name}(item.as_string())!
+	}
+	return out
+}")
+	}
 }
 
 // gql_helpers returns the helper functions `code` calls, so the generated

@@ -573,7 +573,7 @@ pub fn (q CategoryQuery) for_share() CategoryQuery {
 	return next
 }
 
-// no_wait: a lock fails at once on a row another transaction locked.
+// no_wait makes the lock one that fails at once on a row another transaction locked.
 pub fn (q CategoryQuery) no_wait() CategoryQuery {
 	mut next := q
 	next.query = load.Query{
@@ -586,7 +586,7 @@ pub fn (q CategoryQuery) no_wait() CategoryQuery {
 	return next
 }
 
-// skip_locked: a lock leaves out the rows other transactions locked.
+// skip_locked makes the lock one that leaves out the rows other transactions locked.
 pub fn (q CategoryQuery) skip_locked() CategoryQuery {
 	mut next := q
 	next.query = load.Query{

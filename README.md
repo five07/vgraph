@@ -232,6 +232,73 @@ without `orm.TransactionalConnection` statements run one by one. On a pool,
 `pg.pool(db)` holds one connection for each transaction. The adapters pass values
 as text, stored the way V's ORM stores them (on SQLite, times as Unix seconds).
 
+## Schema options
+
+```v ignore
+pub enum Color { red green }
+pub type Serial = string
+
+pub struct Stamps { // a mixin: embedded, with its own options
+pub:
+	created_at time.Time
+	updated_at time.Time
+}
+
+pub fn (s Stamps) fields() []vgraph.Field {
+	return [vgraph.Field{name: 'created_at', default_now: true, immutable: true},
+		vgraph.Field{name: 'updated_at', default_now: true, update_now: true}]
+}
+
+@[table: 'gadgets']
+pub struct Gadget {
+	Stamps
+pub:
+	id        i64 @[primary; sql: serial] // a global id (see below)
+	owner_id  int
+	serial_no Serial // an alias: the API takes a Serial
+	color     Color  // an enum: stored as an integer, a GraphQL enum
+	level     i8     // any of V's integer and float types
+	tags      string // JSON, with `json: '[]string'` below
+}
+
+pub fn (g Gadget) fields() []vgraph.Field {
+	return [vgraph.Field{name: 'tags', json: '[]string'}]
+}
+
+pub fn (g Gadget) indexes() []vgraph.Index {
+	return [vgraph.Index{columns: ['serial_no'], unique: true},
+		vgraph.Index{columns: ['owner_id'], where: 'rating IS NOT NULL'}]
+}
+```
+
+- **Types:** `i8` to `u64`, `f32`, `f64`, `bool`, `string`, `time.Time`, enums, type
+  aliases of those, and options of those. `[]u8` isn't: V's ORM can't create or read
+  a bytes column yet.
+- **JSON:** a `string` column with `Field.json` naming its V type gets
+  `node.<field>_value()`, `set_<field>_value(v)`, and on updates
+  `append_<field>(items...)` for lists; a `JSON` scalar in GraphQL.
+- **Mixins:** an embedded struct's fields are the table's columns, named
+  `<Struct>.<field>` as V's ORM names them; its `fields()`, `edges()`, `hooks()`,
+  `interceptors()`, `indexes()` and `policy()` apply before the table's own.
+- **Edges:** `ref` names the inverse edge, and `validate` checks the pair; `unique`
+  makes a many_to_one edge the key side of a one-to-one relationship, with a unique
+  index (Ent's `Unique()`); `bidi` on a self edge writes both directions (a spouse,
+  which must be `unique`, or friends); `required` and `immutable` on a many_to_one
+  edge. A many_to_many edge whose join table is a
+  registered struct is an edge schema: its join rows get that struct's defaults and
+  hooks.
+- **Views:** a struct marked `@[vgraph: 'view']` reads a view; it has no write
+  builders.
+- **Indexes:** `indexes()` declares indexes, unique and partial; `add_edge_indexes`
+  creates them.
+- **Global ids:** `vgraph.create_table(mut ctx, schema, 'gadgets')` creates a table
+  with an `AUTOINCREMENT` / `BIGSERIAL` key, and `vgraph.global_ids(mut ctx, schema)`
+  gives each table with an `i64` serial key its own range: the table with index
+  `n` counts from `n << 32`, and `client.table_of(key)` names it. Reading back a new
+  `i64` key needs a driver.
+- **`vgraph describe [folder]`** prints the schema; `vgraph gen --no-graphql` writes
+  the client alone.
+
 ## Hooks, interceptors and privacy
 
 As in Ent, a model declares them beside `edges()`, and an app registers more on

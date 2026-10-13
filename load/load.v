@@ -141,16 +141,3 @@ pub fn primary_key[T]() string {
 	}
 	return 'id'
 }
-
-// string_column returns the value of the `string` field of `row` stored in
-// `column`, or `none` when there is no such field.
-pub fn string_column[T](row T, column string) ?string {
-	$for field in T.fields {
-		$if field.typ is string {
-			if column_name(field.name, field.attrs) == column {
-				return row.$(field.name)
-			}
-		}
-	}
-	return none
-}

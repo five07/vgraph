@@ -1,7 +1,6 @@
 module load
 
 import orm
-import time
 
 // select_in returns the `T` records whose `column` is one of `ids`, keys in their
 // string form, narrowed and ordered by `opts`: one query, or two through a
@@ -96,35 +95,7 @@ pub fn select_into[T](conn orm.Connection, table string, key string, kind KeyTyp
 // `limit` is set. With `extra`, it also reads that column, and returns its
 // values, as strings.
 fn run_select[T](conn orm.Connection, table string, where orm.QueryData, q Query, limit bool, extra string) !([]T, []string) {
-	mut fields := []string{}
-	mut types := []int{}
-	$for field in T.fields {
-		$if field.typ is $array || field.typ is $map {
-			// relation fields are not columns
-		} $else {
-			name := column_name(field.name, field.attrs)
-			if q.columns.len == 0 || name in q.columns {
-				fields << name
-				// Inline: `column_type[field.typ]()` generates C that doesn't
-				// compile (regressions/comptime_generic_call.vv).
-				$if field.typ is int || field.typ is ?int {
-					types << orm.type_idx['int']
-				} $else $if field.typ is i64 || field.typ is ?i64 {
-					types << orm.type_idx['i64']
-				} $else $if field.typ is f64 || field.typ is ?f64 {
-					types << orm.type_idx['f64']
-				} $else $if field.typ is bool || field.typ is ?bool {
-					types << orm.type_idx['bool']
-				} $else $if field.typ is string || field.typ is ?string {
-					types << orm.type_string
-				} $else $if field.typ is time.Time || field.typ is ?time.Time {
-					types << orm.time_
-				} $else {
-					return error('`${field.name}`: vgraph cannot load this field type yet')
-				}
-			}
-		}
-	}
+	mut fields, mut types := select_columns[T](q.columns)!
 	if extra != '' {
 		fields << extra
 		types << orm.type_string
@@ -182,73 +153,6 @@ fn cell_text(cell orm.Primitive) string {
 			if cell { 'true' } else { 'false' }
 		}
 		else { '' }
-	}
-}
-
-// map_row builds a `T` from the cells of one selected row, in field order:
-// the fields of the columns `only` names, or all of them.
-fn map_row[T](row []orm.Primitive, only []string) !T {
-	mut value := T{}
-	mut i := 0
-	$for field in T.fields {
-		$if field.typ is $array || field.typ is $map {
-		} $else {
-			if only.len == 0 || column_name(field.name, field.attrs) in only {
-				cell := row[i]
-				i++
-				$if field.typ is int {
-					value.$(field.name) = cell_int(cell, field.name)!
-				} $else $if field.typ is ?int {
-					value.$(field.name) = if cell is orm.Null {
-						?int(none)
-					} else {
-						?int(cell_int(cell, field.name)!)
-					}
-				} $else $if field.typ is i64 {
-					value.$(field.name) = cell_i64(cell, field.name)!
-				} $else $if field.typ is f64 {
-					value.$(field.name) = cell as f64
-				} $else $if field.typ is bool {
-					value.$(field.name) = cell_int(cell, field.name)! != 0
-				} $else $if field.typ is string {
-					value.$(field.name) = cell as string
-				} $else $if field.typ is ?string {
-					value.$(field.name) = if cell is orm.Null {
-						?string(none)
-					} else {
-						?string(cell as string)
-					}
-				} $else $if field.typ is time.Time {
-					value.$(field.name) = cell as time.Time
-				} $else $if field.typ is ?time.Time {
-					value.$(field.name) = if cell is orm.Null {
-						?time.Time(none)
-					} else {
-						?time.Time(cell as time.Time)
-					}
-				} $else {
-					return error('`${field.name}`: vgraph cannot load this field type yet')
-				}
-			}
-		}
-	}
-	return value
-}
-
-fn cell_int(cell orm.Primitive, name string) !int {
-	return match cell {
-		int { cell }
-		i64 { int(cell) }
-		bool { int(cell) }
-		else { error('`${name}`: expected an int, got ${cell.type_name()}') }
-	}
-}
-
-fn cell_i64(cell orm.Primitive, name string) !i64 {
-	return match cell {
-		i64 { cell }
-		int { i64(cell) }
-		else { error('`${name}`: expected an i64, got ${cell.type_name()}') }
 	}
 }
 

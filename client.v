@@ -175,6 +175,29 @@ fn (c Client) atomic() !Client {
 	}
 }
 
+// table_of returns the table a globally unique key belongs to (`global_ids`):
+// the one whose index in `vgraph_types` is `key >> 32`.
+pub fn (c Client) table_of(key i64) !string {
+	config := orm.SelectConfig{
+		table:        orm.Table{
+			name: 'vgraph_types'
+		}
+		has_where:    true
+		primary:      'id'
+		fields:       ['name']
+		select_exprs: ['name']
+		types:        [orm.type_string]
+	}
+	mut conn := c.conn
+	rows := conn.select(config, orm.QueryData{}, load.where_data([load.eq('id', int(key >> 32))]) or {
+		orm.QueryData{}
+	})!
+	if rows.len == 0 {
+		return error('no table has the global id ${key}')
+	}
+	return rows[0][0] as string
+}
+
 // load_one follows the many_to_one edge `edge` of `C` from each of `children`,
 // and returns the `P` records reached, keyed by their primary key's string form
 // (`'3'`, or a UUID), in one query.

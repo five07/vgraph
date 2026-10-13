@@ -463,7 +463,7 @@ pub fn (q GroupQuery) for_share() GroupQuery {
 	return next
 }
 
-// no_wait: a lock fails at once on a row another transaction locked.
+// no_wait makes the lock one that fails at once on a row another transaction locked.
 pub fn (q GroupQuery) no_wait() GroupQuery {
 	mut next := q
 	next.query = load.Query{
@@ -476,7 +476,7 @@ pub fn (q GroupQuery) no_wait() GroupQuery {
 	return next
 }
 
-// skip_locked: a lock leaves out the rows other transactions locked.
+// skip_locked makes the lock one that leaves out the rows other transactions locked.
 pub fn (q GroupQuery) skip_locked() GroupQuery {
 	mut next := q
 	next.query = load.Query{

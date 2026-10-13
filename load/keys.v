@@ -13,62 +13,6 @@ pub enum KeyType {
 	string
 }
 
-// key_type returns the type of `T`'s field stored in `column`, which must be an
-// `int`, `i64` or `string`, or an option of one.
-pub fn key_type[T](column string) !KeyType {
-	$for field in T.fields {
-		$if field.typ is int || field.typ is ?int {
-			if column_name(field.name, field.attrs) == column {
-				return .int
-			}
-		} $else $if field.typ is i64 || field.typ is ?i64 {
-			if column_name(field.name, field.attrs) == column {
-				return .i64
-			}
-		} $else $if field.typ is string || field.typ is ?string {
-			if column_name(field.name, field.attrs) == column {
-				return .string
-			}
-		}
-	}
-	return error('`${table_name[T]()}.${column}` is not an int, i64 or string column')
-}
-
-// key_column returns the value of `row`'s key field stored in `column`, an
-// `int`, `i64` or `string` or an option of one, as a string. It returns `none`
-// when there is no such field, or it is null.
-pub fn key_column[T](row T, column string) ?string {
-	$for field in T.fields {
-		$if field.typ is int || field.typ is i64 || field.typ is string {
-			if column_name(field.name, field.attrs) == column {
-				return row.$(field.name).str()
-			}
-		} $else $if field.typ is ?int {
-			if column_name(field.name, field.attrs) == column {
-				if value := row.$(field.name) {
-					return value.str()
-				}
-				return none
-			}
-		} $else $if field.typ is ?i64 {
-			if column_name(field.name, field.attrs) == column {
-				if value := row.$(field.name) {
-					return value.str()
-				}
-				return none
-			}
-		} $else $if field.typ is ?string {
-			if column_name(field.name, field.attrs) == column {
-				if value := row.$(field.name) {
-					return value
-				}
-				return none
-			}
-		}
-	}
-	return none
-}
-
 // in_keys returns the condition `column IN (keys)`, with `keys` in their string
 // form converted to `typ`. An empty `keys` matches no row.
 pub fn in_keys(column string, keys []string, typ KeyType) Cond {

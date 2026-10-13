@@ -15,12 +15,18 @@ pub const schema_sdl = 'type Query {
   categoriesCount(where: CategoryWhereInput): Int!
   devices(where: DeviceWhereInput, orderBy: DeviceOrder, limit: Int, offset: Int): [Device!]!
   devicesCount(where: DeviceWhereInput): Int!
+  gadgets(where: GadgetWhereInput, orderBy: GadgetOrder, limit: Int, offset: Int): [Gadget!]!
+  gadgetsCount(where: GadgetWhereInput): Int!
   groups(where: GroupWhereInput, orderBy: GroupOrder, limit: Int, offset: Int): [Group!]!
   groupsCount(where: GroupWhereInput): Int!
+  likes(where: LikeWhereInput, orderBy: LikeOrder, limit: Int, offset: Int): [Like!]!
+  likesCount(where: LikeWhereInput): Int!
   logins(where: LoginWhereInput, orderBy: LoginOrder, limit: Int, offset: Int): [Login!]!
   loginsCount(where: LoginWhereInput): Int!
   nodes(where: NodeWhereInput, orderBy: NodeOrder, limit: Int, offset: Int): [Node!]!
   nodesCount(where: NodeWhereInput): Int!
+  petOwners(where: OwnedPetWhereInput, orderBy: OwnedPetOrder, limit: Int, offset: Int): [OwnedPet!]!
+  petOwnersCount(where: OwnedPetWhereInput): Int!
   pets(where: PetWhereInput, orderBy: PetOrder, limit: Int, offset: Int): [Pet!]!
   petsCount(where: PetWhereInput): Int!
   users(where: UserWhereInput, orderBy: UserOrder, limit: Int, offset: Int): [User!]!
@@ -197,6 +203,190 @@ enum DeviceOrderField {
   OWNER_ID
 }
 
+type Gadget {
+  createdAt: Time!
+  updatedAt: Time!
+  id: ID!
+  ownerID: ID!
+  serialNo: String!
+  color: GadgetColor!
+  level: Int!
+  weight: Int!
+  parts: Int!
+  big: Int!
+  ratio: Float!
+  rating: Float
+  score: Int
+  active: Boolean
+  tags: JSON!
+  owner: User
+  likers(where: UserWhereInput, orderBy: UserOrder, limit: Int, offset: Int): [User!]
+}
+
+"""GadgetWhereInput is used for filtering Gadget objects."""
+input GadgetWhereInput {
+  """createdAt field predicates"""
+  createdAt: Time
+  createdAtNEQ: Time
+  createdAtGT: Time
+  createdAtGTE: Time
+  createdAtLT: Time
+  createdAtLTE: Time
+
+  """updatedAt field predicates"""
+  updatedAt: Time
+  updatedAtNEQ: Time
+  updatedAtGT: Time
+  updatedAtGTE: Time
+  updatedAtLT: Time
+  updatedAtLTE: Time
+
+  """id field predicates"""
+  id: ID
+  idNEQ: ID
+  idIn: [ID!]
+  idNotIn: [ID!]
+  idGT: ID
+  idGTE: ID
+  idLT: ID
+  idLTE: ID
+
+  """ownerID field predicates"""
+  ownerID: ID
+  ownerIDNEQ: ID
+  ownerIDIn: [ID!]
+  ownerIDNotIn: [ID!]
+
+  """serialNo field predicates"""
+  serialNo: String
+  serialNoNEQ: String
+  serialNoIn: [String!]
+  serialNoNotIn: [String!]
+  serialNoGT: String
+  serialNoGTE: String
+  serialNoLT: String
+  serialNoLTE: String
+  serialNoContains: String
+  serialNoHasPrefix: String
+  serialNoHasSuffix: String
+
+  """color field predicates"""
+  color: GadgetColor
+  colorNEQ: GadgetColor
+  colorIn: [GadgetColor!]
+  colorNotIn: [GadgetColor!]
+
+  """level field predicates"""
+  level: Int
+  levelNEQ: Int
+  levelIn: [Int!]
+  levelNotIn: [Int!]
+  levelGT: Int
+  levelGTE: Int
+  levelLT: Int
+  levelLTE: Int
+
+  """weight field predicates"""
+  weight: Int
+  weightNEQ: Int
+  weightIn: [Int!]
+  weightNotIn: [Int!]
+  weightGT: Int
+  weightGTE: Int
+  weightLT: Int
+  weightLTE: Int
+
+  """parts field predicates"""
+  parts: Int
+  partsNEQ: Int
+  partsIn: [Int!]
+  partsNotIn: [Int!]
+  partsGT: Int
+  partsGTE: Int
+  partsLT: Int
+  partsLTE: Int
+
+  """big field predicates"""
+  big: Int
+  bigNEQ: Int
+  bigIn: [Int!]
+  bigNotIn: [Int!]
+  bigGT: Int
+  bigGTE: Int
+  bigLT: Int
+  bigLTE: Int
+
+  """ratio field predicates"""
+  ratio: Float
+  ratioNEQ: Float
+  ratioGT: Float
+  ratioGTE: Float
+  ratioLT: Float
+  ratioLTE: Float
+
+  """rating field predicates"""
+  rating: Float
+  ratingNEQ: Float
+  ratingGT: Float
+  ratingGTE: Float
+  ratingLT: Float
+  ratingLTE: Float
+  ratingIsNil: Boolean
+  ratingNotNil: Boolean
+
+  """score field predicates"""
+  score: Int
+  scoreNEQ: Int
+  scoreIn: [Int!]
+  scoreNotIn: [Int!]
+  scoreGT: Int
+  scoreGTE: Int
+  scoreLT: Int
+  scoreLTE: Int
+  scoreIsNil: Boolean
+  scoreNotNil: Boolean
+
+  """active field predicates"""
+  active: Boolean
+  activeNEQ: Boolean
+  activeIsNil: Boolean
+  activeNotNil: Boolean
+}
+
+"""Ordering options for Gadget lists"""
+input GadgetOrder {
+  """The ordering direction."""
+  direction: OrderDirection! = ASC
+
+  """The field by which to order Gadgets."""
+  field: GadgetOrderField!
+}
+
+"""Properties by which Gadget lists can be ordered."""
+enum GadgetOrderField {
+  CREATED_AT
+  UPDATED_AT
+  ID
+  OWNER_ID
+  SERIAL_NO
+  COLOR
+  LEVEL
+  WEIGHT
+  PARTS
+  BIG
+  RATIO
+  RATING
+  SCORE
+  ACTIVE
+}
+
+"""GadgetColor is enum for the field color"""
+enum GadgetColor {
+  RED
+  GREEN
+  BLUE
+}
+
 type Group {
   id: ID!
   name: String!
@@ -243,6 +433,65 @@ input GroupOrder {
 enum GroupOrderField {
   ID
   NAME
+}
+
+type Like {
+  id: ID!
+  userID: ID!
+  gadgetID: ID!
+  likedAt: Time!
+  user: User
+  gadget: Gadget
+}
+
+"""LikeWhereInput is used for filtering Like objects."""
+input LikeWhereInput {
+  """id field predicates"""
+  id: ID
+  idNEQ: ID
+  idIn: [ID!]
+  idNotIn: [ID!]
+  idGT: ID
+  idGTE: ID
+  idLT: ID
+  idLTE: ID
+
+  """userID field predicates"""
+  userID: ID
+  userIDNEQ: ID
+  userIDIn: [ID!]
+  userIDNotIn: [ID!]
+
+  """gadgetID field predicates"""
+  gadgetID: ID
+  gadgetIDNEQ: ID
+  gadgetIDIn: [ID!]
+  gadgetIDNotIn: [ID!]
+
+  """likedAt field predicates"""
+  likedAt: Time
+  likedAtNEQ: Time
+  likedAtGT: Time
+  likedAtGTE: Time
+  likedAtLT: Time
+  likedAtLTE: Time
+}
+
+"""Ordering options for Like lists"""
+input LikeOrder {
+  """The ordering direction."""
+  direction: OrderDirection! = ASC
+
+  """The field by which to order Likes."""
+  field: LikeOrderField!
+}
+
+"""Properties by which Like lists can be ordered."""
+enum LikeOrderField {
+  ID
+  USER_ID
+  GADGET_ID
+  LIKED_AT
 }
 
 type Login {
@@ -352,6 +601,76 @@ enum NodeOrderField {
   NEXT_ID
 }
 
+type OwnedPet {
+  id: ID!
+  petName: String!
+  ownerID: ID!
+  ownerName: String!
+  owner: User
+}
+
+"""OwnedPetWhereInput is used for filtering OwnedPet objects."""
+input OwnedPetWhereInput {
+  """id field predicates"""
+  id: ID
+  idNEQ: ID
+  idIn: [ID!]
+  idNotIn: [ID!]
+  idGT: ID
+  idGTE: ID
+  idLT: ID
+  idLTE: ID
+
+  """petName field predicates"""
+  petName: String
+  petNameNEQ: String
+  petNameIn: [String!]
+  petNameNotIn: [String!]
+  petNameGT: String
+  petNameGTE: String
+  petNameLT: String
+  petNameLTE: String
+  petNameContains: String
+  petNameHasPrefix: String
+  petNameHasSuffix: String
+
+  """ownerID field predicates"""
+  ownerID: ID
+  ownerIDNEQ: ID
+  ownerIDIn: [ID!]
+  ownerIDNotIn: [ID!]
+
+  """ownerName field predicates"""
+  ownerName: String
+  ownerNameNEQ: String
+  ownerNameIn: [String!]
+  ownerNameNotIn: [String!]
+  ownerNameGT: String
+  ownerNameGTE: String
+  ownerNameLT: String
+  ownerNameLTE: String
+  ownerNameContains: String
+  ownerNameHasPrefix: String
+  ownerNameHasSuffix: String
+}
+
+"""Ordering options for OwnedPet lists"""
+input OwnedPetOrder {
+  """The ordering direction."""
+  direction: OrderDirection! = ASC
+
+  """The field by which to order OwnedPets."""
+  field: OwnedPetOrderField!
+}
+
+"""Properties by which OwnedPet lists can be ordered."""
+enum OwnedPetOrderField {
+  ID
+  PET_NAME
+  OWNER_ID
+  OWNER_NAME
+}
+
 type Pet {
   id: ID!
   name: String!
@@ -433,6 +752,8 @@ type User {
   followers(where: UserWhereInput, orderBy: UserOrder, limit: Int, offset: Int): [User!]
   friends(where: UserWhereInput, orderBy: UserOrder, limit: Int, offset: Int): [User!]
   devices(where: DeviceWhereInput, orderBy: DeviceOrder, limit: Int, offset: Int): [Device!]
+  gadgets(where: GadgetWhereInput, orderBy: GadgetOrder, limit: Int, offset: Int): [Gadget!]
+  likedGadgets(where: GadgetWhereInput, orderBy: GadgetOrder, limit: Int, offset: Int): [Gadget!]
 }
 
 """UserWhereInput is used for filtering User objects."""
@@ -495,6 +816,11 @@ enum OrderDirection {
   """Specifies a descending order for a given `orderBy` argument."""
   DESC
 }
+
+"""
+A JSON value: an object, a list, a string, a number, a boolean or null.
+"""
+scalar JSON
 
 """An RFC 3339 date and time, such as `2026-10-13T07:30:00Z`."""
 scalar Time @specifiedBy(url: "https://scalars.graphql.org/chillicream/date-time.html")'
@@ -611,6 +937,42 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		return out
 	})
 
+	// Gadget
+	s.resolve('Query', 'gadgets', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).gadgets().graphql_args(info.args)!.all()!
+		result := graphql.list(found.map(graphql.obj(it)))
+		return parents.map(result)
+	})
+	s.resolve('Query', 'gadgetsCount', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		n := g.with_ctx(ctx).gadgets().graphql_args(info.args)!.count()!
+		return parents.map(graphql.Resolved(graphql.Value(n)))
+	})
+	for name in ['createdAt', 'updatedAt', 'id', 'ownerID', 'serialNo', 'color', 'level', 'weight',
+		'parts', 'big', 'ratio', 'rating', 'score', 'active', 'tags'] {
+		s.resolve('Gadget', name, resolve_gadget_field)
+	}
+	s.resolve('Gadget', 'owner', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).gadgets().with_owner().nodes(parents.map((it as GadgetNode).gadget))!
+		return loaded.map(fn (n GadgetNode) graphql.Resolved {
+			if target := n.owner {
+				return graphql.obj(*target)
+			}
+			return graphql.null
+		})
+	})
+	s.resolve('Gadget', 'likers', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.users().graphql_args(info.args)!
+		loaded := cg.gadgets().with_likers(fn [sub] (_ UserQuery) UserQuery {
+			return sub
+		}).nodes(parents.map((it as GadgetNode).gadget))!
+		mut out := []graphql.Resolved{cap: loaded.len}
+		for n in loaded {
+			out << graphql.list(page(n.likers, info.args).map(graphql.obj(it)))
+		}
+		return out
+	})
+
 	// Group
 	s.resolve('Query', 'groups', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		found := g.with_ctx(ctx).groups().graphql_args(info.args)!.all()!
@@ -647,6 +1009,38 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			out << graphql.list(page(n.devices, info.args).map(graphql.obj(it)))
 		}
 		return out
+	})
+
+	// Like
+	s.resolve('Query', 'likes', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).likes().graphql_args(info.args)!.all()!
+		result := graphql.list(found.map(graphql.obj(it)))
+		return parents.map(result)
+	})
+	s.resolve('Query', 'likesCount', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		n := g.with_ctx(ctx).likes().graphql_args(info.args)!.count()!
+		return parents.map(graphql.Resolved(graphql.Value(n)))
+	})
+	for name in ['id', 'userID', 'gadgetID', 'likedAt'] {
+		s.resolve('Like', name, resolve_like_field)
+	}
+	s.resolve('Like', 'user', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).likes().with_user().nodes(parents.map((it as LikeNode).like))!
+		return loaded.map(fn (n LikeNode) graphql.Resolved {
+			if target := n.user {
+				return graphql.obj(*target)
+			}
+			return graphql.null
+		})
+	})
+	s.resolve('Like', 'gadget', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).likes().with_gadget().nodes(parents.map((it as LikeNode).like))!
+		return loaded.map(fn (n LikeNode) graphql.Resolved {
+			if target := n.gadget {
+				return graphql.obj(*target)
+			}
+			return graphql.null
+		})
 	})
 
 	// Login
@@ -698,6 +1092,29 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		loaded := g.with_ctx(ctx).nodes().with_prev().nodes(parents.map((it as NodeNode).node))!
 		return loaded.map(fn (n NodeNode) graphql.Resolved {
 			if target := n.prev {
+				return graphql.obj(*target)
+			}
+			return graphql.null
+		})
+	})
+
+	// OwnedPet
+	s.resolve('Query', 'petOwners', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).pet_owners().graphql_args(info.args)!.all()!
+		result := graphql.list(found.map(graphql.obj(it)))
+		return parents.map(result)
+	})
+	s.resolve('Query', 'petOwnersCount', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		n := g.with_ctx(ctx).pet_owners().graphql_args(info.args)!.count()!
+		return parents.map(graphql.Resolved(graphql.Value(n)))
+	})
+	for name in ['id', 'petName', 'ownerID', 'ownerName'] {
+		s.resolve('OwnedPet', name, resolve_owned_pet_field)
+	}
+	s.resolve('OwnedPet', 'owner', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		loaded := g.with_ctx(ctx).pet_owners().with_owner().nodes(parents.map((it as OwnedPetNode).owned_pet))!
+		return loaded.map(fn (n OwnedPetNode) graphql.Resolved {
+			if target := n.owner {
 				return graphql.obj(*target)
 			}
 			return graphql.null
@@ -830,6 +1247,30 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
+	s.resolve('User', 'gadgets', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.gadgets().graphql_args(info.args)!
+		loaded := cg.users().with_gadgets(fn [sub] (_ GadgetQuery) GadgetQuery {
+			return sub
+		}).nodes(parents.map((it as UserNode).user))!
+		mut out := []graphql.Resolved{cap: loaded.len}
+		for n in loaded {
+			out << graphql.list(page(n.gadgets, info.args).map(graphql.obj(it)))
+		}
+		return out
+	})
+	s.resolve('User', 'likedGadgets', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		cg := g.with_ctx(ctx)
+		sub := cg.gadgets().graphql_args(info.args)!
+		loaded := cg.users().with_liked_gadgets(fn [sub] (_ GadgetQuery) GadgetQuery {
+			return sub
+		}).nodes(parents.map((it as UserNode).user))!
+		mut out := []graphql.Resolved{cap: loaded.len}
+		for n in loaded {
+			out << graphql.list(page(n.liked_gadgets, info.args).map(graphql.obj(it)))
+		}
+		return out
+	})
 	return s
 }
 
@@ -841,7 +1282,7 @@ fn resolve_card_field(_ graphql.Context, info graphql.FieldInfo, parents []graph
 fn card_value(row models.Card, field string) graphql.Value {
 	return match field {
 		'id' { graphql.Value(row.id.str()) }
-		'number' { graphql.Value(row.number) }
+		'number' { graphql.Value(string(row.number)) }
 		'ownerID' { graphql.Value(row.owner_id.str()) }
 		else { graphql.null }
 	}
@@ -930,7 +1371,7 @@ fn resolve_category_field(_ graphql.Context, info graphql.FieldInfo, parents []g
 fn category_value(row models.Category, field string) graphql.Value {
 	return match field {
 		'id' { graphql.Value(row.id.str()) }
-		'name' { graphql.Value(row.name) }
+		'name' { graphql.Value(string(row.name)) }
 		'parentID' {
 			if v := row.parent_id { graphql.Value(v.str()) } else { graphql.null }
 		}
@@ -1027,7 +1468,7 @@ fn resolve_device_field(_ graphql.Context, info graphql.FieldInfo, parents []gra
 fn device_value(row models.Device, field string) graphql.Value {
 	return match field {
 		'id' { graphql.Value(row.id.str()) }
-		'name' { graphql.Value(row.name) }
+		'name' { graphql.Value(string(row.name)) }
 		'ownerID' { graphql.Value(row.owner_id.str()) }
 		else { graphql.null }
 	}
@@ -1108,6 +1549,232 @@ fn device_where(w map[string]graphql.Value) ![]load.Cond {
 	return conds
 }
 
+// resolve_gadget_field resolves the columns of `Gadget`.
+fn resolve_gadget_field(_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	return parents.map(graphql.Resolved(gadget_value((it as GadgetNode).gadget, info.field_name)))
+}
+
+fn gadget_value(row models.Gadget, field string) graphql.Value {
+	return match field {
+		'createdAt' { graphql.Value(row.created_at.format_rfc3339()) }
+		'updatedAt' { graphql.Value(row.updated_at.format_rfc3339()) }
+		'id' { graphql.Value(row.id.str()) }
+		'ownerID' { graphql.Value(row.owner_id.str()) }
+		'serialNo' { graphql.Value(string(row.serial_no)) }
+		'color' { graphql.Value(row.color.str().to_upper()) }
+		'level' { graphql.Value(int(row.level)) }
+		'weight' { graphql.Value(int(row.weight)) }
+		'parts' { graphql.Value(f64(row.parts)) }
+		'big' { graphql.Value(f64(row.big)) }
+		'ratio' { graphql.Value(f64(row.ratio)) }
+		'rating' {
+			if v := row.rating { graphql.Value(f64(v)) } else { graphql.null }
+		}
+		'score' {
+			if v := row.score { graphql.Value(f64(v)) } else { graphql.null }
+		}
+		'active' {
+			if v := row.active { graphql.Value(v) } else { graphql.null }
+		}
+		'tags' { graphql.parse_json(row.tags) or { graphql.null } }
+		else { graphql.null }
+	}
+}
+
+// graphql_args applies the arguments of a `Gadget` list: `where`, `orderBy`,
+// `limit` and `offset`.
+fn (q GadgetQuery) graphql_args(args map[string]graphql.Value) !GadgetQuery {
+	mut next := q
+	if w := args['where'] {
+		if w is map[string]graphql.Value {
+			next = next.where(...gadget_where(w)!)
+		}
+	}
+	if o := args['orderBy'] {
+		if o is map[string]graphql.Value {
+			field := (o['field'] or { graphql.null }).as_string()
+			column := match field {
+				'CREATED_AT' { 'Stamps.created_at' }
+				'UPDATED_AT' { 'Stamps.updated_at' }
+				'ID' { 'id' }
+				'OWNER_ID' { 'owner_id' }
+				'SERIAL_NO' { 'serial_no' }
+				'COLOR' { 'color' }
+				'LEVEL' { 'level' }
+				'WEIGHT' { 'weight' }
+				'PARTS' { 'parts' }
+				'BIG' { 'big' }
+				'RATIO' { 'ratio' }
+				'RATING' { 'rating' }
+				'SCORE' { 'score' }
+				'ACTIVE' { 'active' }
+				else { '' }
+			}
+			next.query = load.Query{
+				...next.query
+				order: column
+				desc:  (o['direction'] or { graphql.null }).as_string() == 'DESC'
+			}
+		}
+	}
+	if limit := args['limit'] {
+		if limit is int {
+			next = next.limit(limit)
+		}
+	}
+	if offset := args['offset'] {
+		if offset is int {
+			next = next.offset(offset)
+		}
+	}
+	return next
+}
+
+// gadget_where returns the conditions of a `GadgetWhereInput`.
+fn gadget_where(w map[string]graphql.Value) ![]load.Cond {
+	mut conds := []load.Cond{}
+	for key, v in w {
+		if v is graphql.Null {
+			continue
+		}
+		match key {
+			'createdAt' { conds << load.eq('Stamps.created_at', gql_time(v)!) }
+			'createdAtNEQ' { conds << load.ne('Stamps.created_at', gql_time(v)!) }
+			'createdAtGT' { conds << load.gt('Stamps.created_at', gql_time(v)!) }
+			'createdAtGTE' { conds << load.ge('Stamps.created_at', gql_time(v)!) }
+			'createdAtLT' { conds << load.lt('Stamps.created_at', gql_time(v)!) }
+			'createdAtLTE' { conds << load.le('Stamps.created_at', gql_time(v)!) }
+			'updatedAt' { conds << load.eq('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtNEQ' { conds << load.ne('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtGT' { conds << load.gt('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtGTE' { conds << load.ge('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtLT' { conds << load.lt('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtLTE' { conds << load.le('Stamps.updated_at', gql_time(v)!) }
+			'id' { conds << load.eq('id', gql_i64_id(v)!) }
+			'idNEQ' { conds << load.ne('id', gql_i64_id(v)!) }
+			'idIn' { conds << load.in_i64s('id', gql_i64s(v)!) }
+			'idNotIn' { conds << load.not_in_i64s('id', gql_i64s(v)!) }
+			'idGT' { conds << load.gt('id', gql_i64_id(v)!) }
+			'idGTE' { conds << load.ge('id', gql_i64_id(v)!) }
+			'idLT' { conds << load.lt('id', gql_i64_id(v)!) }
+			'idLTE' { conds << load.le('id', gql_i64_id(v)!) }
+			'ownerID' { conds << load.eq('owner_id', gql_int_id(v)!) }
+			'ownerIDNEQ' { conds << load.ne('owner_id', gql_int_id(v)!) }
+			'ownerIDIn' { conds << load.in_ints('owner_id', gql_int_ids(v)!) }
+			'ownerIDNotIn' { conds << load.not_in_ints('owner_id', gql_int_ids(v)!) }
+			'serialNo' { conds << load.eq('serial_no', v.as_string()) }
+			'serialNoNEQ' { conds << load.ne('serial_no', v.as_string()) }
+			'serialNoIn' { conds << load.in_strings('serial_no', gql_strings(v)) }
+			'serialNoNotIn' { conds << load.not_in_strings('serial_no', gql_strings(v)) }
+			'serialNoGT' { conds << load.gt('serial_no', v.as_string()) }
+			'serialNoGTE' { conds << load.ge('serial_no', v.as_string()) }
+			'serialNoLT' { conds << load.lt('serial_no', v.as_string()) }
+			'serialNoLTE' { conds << load.le('serial_no', v.as_string()) }
+			'serialNoContains' { conds << load.contains('serial_no', v.as_string()) }
+			'serialNoHasPrefix' { conds << load.has_prefix('serial_no', v.as_string()) }
+			'serialNoHasSuffix' { conds << load.has_suffix('serial_no', v.as_string()) }
+			'color' { conds << load.eq('color', color_enum(v.as_string())!) }
+			'colorNEQ' { conds << load.ne('color', color_enum(v.as_string())!) }
+			'colorIn' { conds << load.in_ints('color', color_enums(v)!) }
+			'colorNotIn' { conds << load.not_in_ints('color', color_enums(v)!) }
+			'level' { conds << load.eq('level', v.as_int()) }
+			'levelNEQ' { conds << load.ne('level', v.as_int()) }
+			'levelIn' { conds << load.in_ints('level', gql_ints(v)) }
+			'levelNotIn' { conds << load.not_in_ints('level', gql_ints(v)) }
+			'levelGT' { conds << load.gt('level', v.as_int()) }
+			'levelGTE' { conds << load.ge('level', v.as_int()) }
+			'levelLT' { conds << load.lt('level', v.as_int()) }
+			'levelLTE' { conds << load.le('level', v.as_int()) }
+			'weight' { conds << load.eq('weight', v.as_int()) }
+			'weightNEQ' { conds << load.ne('weight', v.as_int()) }
+			'weightIn' { conds << load.in_ints('weight', gql_ints(v)) }
+			'weightNotIn' { conds << load.not_in_ints('weight', gql_ints(v)) }
+			'weightGT' { conds << load.gt('weight', v.as_int()) }
+			'weightGTE' { conds << load.ge('weight', v.as_int()) }
+			'weightLT' { conds << load.lt('weight', v.as_int()) }
+			'weightLTE' { conds << load.le('weight', v.as_int()) }
+			'parts' { conds << load.eq('parts', v.as_int()) }
+			'partsNEQ' { conds << load.ne('parts', v.as_int()) }
+			'partsIn' { conds << load.in_ints('parts', gql_ints(v)) }
+			'partsNotIn' { conds << load.not_in_ints('parts', gql_ints(v)) }
+			'partsGT' { conds << load.gt('parts', v.as_int()) }
+			'partsGTE' { conds << load.ge('parts', v.as_int()) }
+			'partsLT' { conds << load.lt('parts', v.as_int()) }
+			'partsLTE' { conds << load.le('parts', v.as_int()) }
+			'big' { conds << load.eq('big', i64(v.as_float())) }
+			'bigNEQ' { conds << load.ne('big', i64(v.as_float())) }
+			'bigIn' { conds << load.in_i64s('big', gql_i64s(v)!) }
+			'bigNotIn' { conds << load.not_in_i64s('big', gql_i64s(v)!) }
+			'bigGT' { conds << load.gt('big', i64(v.as_float())) }
+			'bigGTE' { conds << load.ge('big', i64(v.as_float())) }
+			'bigLT' { conds << load.lt('big', i64(v.as_float())) }
+			'bigLTE' { conds << load.le('big', i64(v.as_float())) }
+			'ratio' { conds << load.eq('ratio', v.as_float()) }
+			'ratioNEQ' { conds << load.ne('ratio', v.as_float()) }
+			'ratioGT' { conds << load.gt('ratio', v.as_float()) }
+			'ratioGTE' { conds << load.ge('ratio', v.as_float()) }
+			'ratioLT' { conds << load.lt('ratio', v.as_float()) }
+			'ratioLTE' { conds << load.le('ratio', v.as_float()) }
+			'rating' { conds << load.eq('rating', v.as_float()) }
+			'ratingNEQ' { conds << load.ne('rating', v.as_float()) }
+			'ratingGT' { conds << load.gt('rating', v.as_float()) }
+			'ratingGTE' { conds << load.ge('rating', v.as_float()) }
+			'ratingLT' { conds << load.lt('rating', v.as_float()) }
+			'ratingLTE' { conds << load.le('rating', v.as_float()) }
+			'ratingIsNil' {
+				if v.as_bool() { conds << load.is_null('rating') }
+			}
+			'ratingNotNil' {
+				if v.as_bool() { conds << load.is_not_null('rating') }
+			}
+			'score' { conds << load.eq('score', i64(v.as_float())) }
+			'scoreNEQ' { conds << load.ne('score', i64(v.as_float())) }
+			'scoreIn' { conds << load.in_i64s('score', gql_i64s(v)!) }
+			'scoreNotIn' { conds << load.not_in_i64s('score', gql_i64s(v)!) }
+			'scoreGT' { conds << load.gt('score', i64(v.as_float())) }
+			'scoreGTE' { conds << load.ge('score', i64(v.as_float())) }
+			'scoreLT' { conds << load.lt('score', i64(v.as_float())) }
+			'scoreLTE' { conds << load.le('score', i64(v.as_float())) }
+			'scoreIsNil' {
+				if v.as_bool() { conds << load.is_null('score') }
+			}
+			'scoreNotNil' {
+				if v.as_bool() { conds << load.is_not_null('score') }
+			}
+			'active' { conds << load.eq('active', v.as_bool()) }
+			'activeNEQ' { conds << load.ne('active', v.as_bool()) }
+			'activeIsNil' {
+				if v.as_bool() { conds << load.is_null('active') }
+			}
+			'activeNotNil' {
+				if v.as_bool() { conds << load.is_not_null('active') }
+			}
+			else {}
+		}
+	}
+	return conds
+}
+
+// color_enum returns the value of `models.Color` a GraphQL enum value names.
+fn color_enum(name string) !int {
+	return match name {
+		'RED' { int(models.Color.red) }
+		'GREEN' { int(models.Color.green) }
+		'BLUE' { int(models.Color.blue) }
+		else { error('`${name}` is not a Color') }
+	}
+}
+
+// color_enums returns the values of `models.Color` that a list of GraphQL enum values
+// names.
+fn color_enums(v graphql.Value) ![]int {
+	mut out := []int{}
+	for item in v.as_list() {
+		out << color_enum(item.as_string())!
+	}
+	return out
+}
+
 // resolve_group_field resolves the columns of `Group`.
 fn resolve_group_field(_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 	return parents.map(graphql.Resolved(group_value((it as GroupNode).group, info.field_name)))
@@ -1116,7 +1783,7 @@ fn resolve_group_field(_ graphql.Context, info graphql.FieldInfo, parents []grap
 fn group_value(row models.Group, field string) graphql.Value {
 	return match field {
 		'id' { graphql.Value(row.id.str()) }
-		'name' { graphql.Value(row.name) }
+		'name' { graphql.Value(string(row.name)) }
 		else { graphql.null }
 	}
 }
@@ -1191,6 +1858,96 @@ fn group_where(w map[string]graphql.Value) ![]load.Cond {
 	return conds
 }
 
+// resolve_like_field resolves the columns of `Like`.
+fn resolve_like_field(_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	return parents.map(graphql.Resolved(like_value((it as LikeNode).like, info.field_name)))
+}
+
+fn like_value(row models.Like, field string) graphql.Value {
+	return match field {
+		'id' { graphql.Value(row.id.str()) }
+		'userID' { graphql.Value(row.user_id.str()) }
+		'gadgetID' { graphql.Value(row.gadget_id.str()) }
+		'likedAt' { graphql.Value(row.liked_at.format_rfc3339()) }
+		else { graphql.null }
+	}
+}
+
+// graphql_args applies the arguments of a `Like` list: `where`, `orderBy`,
+// `limit` and `offset`.
+fn (q LikeQuery) graphql_args(args map[string]graphql.Value) !LikeQuery {
+	mut next := q
+	if w := args['where'] {
+		if w is map[string]graphql.Value {
+			next = next.where(...like_where(w)!)
+		}
+	}
+	if o := args['orderBy'] {
+		if o is map[string]graphql.Value {
+			field := (o['field'] or { graphql.null }).as_string()
+			column := match field {
+				'ID' { 'id' }
+				'USER_ID' { 'user_id' }
+				'GADGET_ID' { 'gadget_id' }
+				'LIKED_AT' { 'liked_at' }
+				else { '' }
+			}
+			next.query = load.Query{
+				...next.query
+				order: column
+				desc:  (o['direction'] or { graphql.null }).as_string() == 'DESC'
+			}
+		}
+	}
+	if limit := args['limit'] {
+		if limit is int {
+			next = next.limit(limit)
+		}
+	}
+	if offset := args['offset'] {
+		if offset is int {
+			next = next.offset(offset)
+		}
+	}
+	return next
+}
+
+// like_where returns the conditions of a `LikeWhereInput`.
+fn like_where(w map[string]graphql.Value) ![]load.Cond {
+	mut conds := []load.Cond{}
+	for key, v in w {
+		if v is graphql.Null {
+			continue
+		}
+		match key {
+			'id' { conds << load.eq('id', gql_int_id(v)!) }
+			'idNEQ' { conds << load.ne('id', gql_int_id(v)!) }
+			'idIn' { conds << load.in_ints('id', gql_int_ids(v)!) }
+			'idNotIn' { conds << load.not_in_ints('id', gql_int_ids(v)!) }
+			'idGT' { conds << load.gt('id', gql_int_id(v)!) }
+			'idGTE' { conds << load.ge('id', gql_int_id(v)!) }
+			'idLT' { conds << load.lt('id', gql_int_id(v)!) }
+			'idLTE' { conds << load.le('id', gql_int_id(v)!) }
+			'userID' { conds << load.eq('user_id', gql_int_id(v)!) }
+			'userIDNEQ' { conds << load.ne('user_id', gql_int_id(v)!) }
+			'userIDIn' { conds << load.in_ints('user_id', gql_int_ids(v)!) }
+			'userIDNotIn' { conds << load.not_in_ints('user_id', gql_int_ids(v)!) }
+			'gadgetID' { conds << load.eq('gadget_id', gql_i64_id(v)!) }
+			'gadgetIDNEQ' { conds << load.ne('gadget_id', gql_i64_id(v)!) }
+			'gadgetIDIn' { conds << load.in_i64s('gadget_id', gql_i64s(v)!) }
+			'gadgetIDNotIn' { conds << load.not_in_i64s('gadget_id', gql_i64s(v)!) }
+			'likedAt' { conds << load.eq('liked_at', gql_time(v)!) }
+			'likedAtNEQ' { conds << load.ne('liked_at', gql_time(v)!) }
+			'likedAtGT' { conds << load.gt('liked_at', gql_time(v)!) }
+			'likedAtGTE' { conds << load.ge('liked_at', gql_time(v)!) }
+			'likedAtLT' { conds << load.lt('liked_at', gql_time(v)!) }
+			'likedAtLTE' { conds << load.le('liked_at', gql_time(v)!) }
+			else {}
+		}
+	}
+	return conds
+}
+
 // resolve_login_field resolves the columns of `Login`.
 fn resolve_login_field(_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 	return parents.map(graphql.Resolved(login_value((it as LoginNode).login, info.field_name)))
@@ -1200,7 +1957,7 @@ fn login_value(row models.Login, field string) graphql.Value {
 	return match field {
 		'id' { graphql.Value(row.id.str()) }
 		'deviceID' { graphql.Value(row.device_id.str()) }
-		'at' { graphql.Value(row.at) }
+		'at' { graphql.Value(int(row.at)) }
 		else { graphql.null }
 	}
 }
@@ -1285,7 +2042,7 @@ fn resolve_node_field(_ graphql.Context, info graphql.FieldInfo, parents []graph
 fn node_value(row models.Node, field string) graphql.Value {
 	return match field {
 		'id' { graphql.Value(row.id.str()) }
-		'value' { graphql.Value(row.value) }
+		'value' { graphql.Value(int(row.value)) }
 		'nextID' {
 			if v := row.next_id { graphql.Value(v.str()) } else { graphql.null }
 		}
@@ -1371,6 +2128,108 @@ fn node_where(w map[string]graphql.Value) ![]load.Cond {
 	return conds
 }
 
+// resolve_owned_pet_field resolves the columns of `OwnedPet`.
+fn resolve_owned_pet_field(_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	return parents.map(graphql.Resolved(owned_pet_value((it as OwnedPetNode).owned_pet, info.field_name)))
+}
+
+fn owned_pet_value(row models.OwnedPet, field string) graphql.Value {
+	return match field {
+		'id' { graphql.Value(row.id.str()) }
+		'petName' { graphql.Value(string(row.pet_name)) }
+		'ownerID' { graphql.Value(row.owner_id.str()) }
+		'ownerName' { graphql.Value(string(row.owner_name)) }
+		else { graphql.null }
+	}
+}
+
+// graphql_args applies the arguments of a `OwnedPet` list: `where`, `orderBy`,
+// `limit` and `offset`.
+fn (q OwnedPetQuery) graphql_args(args map[string]graphql.Value) !OwnedPetQuery {
+	mut next := q
+	if w := args['where'] {
+		if w is map[string]graphql.Value {
+			next = next.where(...owned_pet_where(w)!)
+		}
+	}
+	if o := args['orderBy'] {
+		if o is map[string]graphql.Value {
+			field := (o['field'] or { graphql.null }).as_string()
+			column := match field {
+				'ID' { 'id' }
+				'PET_NAME' { 'pet_name' }
+				'OWNER_ID' { 'owner_id' }
+				'OWNER_NAME' { 'owner_name' }
+				else { '' }
+			}
+			next.query = load.Query{
+				...next.query
+				order: column
+				desc:  (o['direction'] or { graphql.null }).as_string() == 'DESC'
+			}
+		}
+	}
+	if limit := args['limit'] {
+		if limit is int {
+			next = next.limit(limit)
+		}
+	}
+	if offset := args['offset'] {
+		if offset is int {
+			next = next.offset(offset)
+		}
+	}
+	return next
+}
+
+// owned_pet_where returns the conditions of a `OwnedPetWhereInput`.
+fn owned_pet_where(w map[string]graphql.Value) ![]load.Cond {
+	mut conds := []load.Cond{}
+	for key, v in w {
+		if v is graphql.Null {
+			continue
+		}
+		match key {
+			'id' { conds << load.eq('id', gql_int_id(v)!) }
+			'idNEQ' { conds << load.ne('id', gql_int_id(v)!) }
+			'idIn' { conds << load.in_ints('id', gql_int_ids(v)!) }
+			'idNotIn' { conds << load.not_in_ints('id', gql_int_ids(v)!) }
+			'idGT' { conds << load.gt('id', gql_int_id(v)!) }
+			'idGTE' { conds << load.ge('id', gql_int_id(v)!) }
+			'idLT' { conds << load.lt('id', gql_int_id(v)!) }
+			'idLTE' { conds << load.le('id', gql_int_id(v)!) }
+			'petName' { conds << load.eq('pet_name', v.as_string()) }
+			'petNameNEQ' { conds << load.ne('pet_name', v.as_string()) }
+			'petNameIn' { conds << load.in_strings('pet_name', gql_strings(v)) }
+			'petNameNotIn' { conds << load.not_in_strings('pet_name', gql_strings(v)) }
+			'petNameGT' { conds << load.gt('pet_name', v.as_string()) }
+			'petNameGTE' { conds << load.ge('pet_name', v.as_string()) }
+			'petNameLT' { conds << load.lt('pet_name', v.as_string()) }
+			'petNameLTE' { conds << load.le('pet_name', v.as_string()) }
+			'petNameContains' { conds << load.contains('pet_name', v.as_string()) }
+			'petNameHasPrefix' { conds << load.has_prefix('pet_name', v.as_string()) }
+			'petNameHasSuffix' { conds << load.has_suffix('pet_name', v.as_string()) }
+			'ownerID' { conds << load.eq('owner_id', gql_int_id(v)!) }
+			'ownerIDNEQ' { conds << load.ne('owner_id', gql_int_id(v)!) }
+			'ownerIDIn' { conds << load.in_ints('owner_id', gql_int_ids(v)!) }
+			'ownerIDNotIn' { conds << load.not_in_ints('owner_id', gql_int_ids(v)!) }
+			'ownerName' { conds << load.eq('owner_name', v.as_string()) }
+			'ownerNameNEQ' { conds << load.ne('owner_name', v.as_string()) }
+			'ownerNameIn' { conds << load.in_strings('owner_name', gql_strings(v)) }
+			'ownerNameNotIn' { conds << load.not_in_strings('owner_name', gql_strings(v)) }
+			'ownerNameGT' { conds << load.gt('owner_name', v.as_string()) }
+			'ownerNameGTE' { conds << load.ge('owner_name', v.as_string()) }
+			'ownerNameLT' { conds << load.lt('owner_name', v.as_string()) }
+			'ownerNameLTE' { conds << load.le('owner_name', v.as_string()) }
+			'ownerNameContains' { conds << load.contains('owner_name', v.as_string()) }
+			'ownerNameHasPrefix' { conds << load.has_prefix('owner_name', v.as_string()) }
+			'ownerNameHasSuffix' { conds << load.has_suffix('owner_name', v.as_string()) }
+			else {}
+		}
+	}
+	return conds
+}
+
 // resolve_pet_field resolves the columns of `Pet`.
 fn resolve_pet_field(_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 	return parents.map(graphql.Resolved(pet_value((it as PetNode).pet, info.field_name)))
@@ -1379,7 +2238,7 @@ fn resolve_pet_field(_ graphql.Context, info graphql.FieldInfo, parents []graphq
 fn pet_value(row models.Pet, field string) graphql.Value {
 	return match field {
 		'id' { graphql.Value(row.id.str()) }
-		'name' { graphql.Value(row.name) }
+		'name' { graphql.Value(string(row.name)) }
 		'ownerID' {
 			if v := row.owner_id { graphql.Value(v.str()) } else { graphql.null }
 		}
@@ -1492,7 +2351,7 @@ fn resolve_user_field(_ graphql.Context, info graphql.FieldInfo, parents []graph
 fn user_value(row models.User, field string) graphql.Value {
 	return match field {
 		'id' { graphql.Value(row.id.str()) }
-		'name' { graphql.Value(row.name) }
+		'name' { graphql.Value(string(row.name)) }
 		'spouseID' {
 			if v := row.spouse_id { graphql.Value(v.str()) } else { graphql.null }
 		}
@@ -1608,6 +2467,24 @@ fn gql_int_ids(v graphql.Value) ![]int {
 	mut out := []int{}
 	for item in v.as_list() {
 		out << gql_int_id(item)!
+	}
+	return out
+}
+
+// gql_i64_id reads an i64 key from an ID.
+fn gql_i64_id(v graphql.Value) !i64 {
+	s := v.as_string()
+	n := s.i64()
+	if n.str() != s {
+		return error('invalid ID "${s}"')
+	}
+	return n
+}
+
+fn gql_i64s(v graphql.Value) ![]i64 {
+	mut out := []i64{}
+	for item in v.as_list() {
+		out << if item is string { gql_i64_id(item)! } else { i64(item.as_float()) }
 	}
 	return out
 }

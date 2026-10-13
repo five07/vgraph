@@ -929,11 +929,11 @@ fn resolve_article_field(_ graphql.Context, info graphql.FieldInfo, parents []gr
 fn article_value(row articles_models.Article, field string) graphql.Value {
 	return match field {
 		'id' { graphql.Value(row.id.str()) }
-		'slug' { graphql.Value(row.slug) }
+		'slug' { graphql.Value(string(row.slug)) }
 		'userID' { graphql.Value(row.user_id.str()) }
-		'title' { graphql.Value(row.title) }
-		'summary' { graphql.Value(row.summary) }
-		'body' { graphql.Value(row.body) }
+		'title' { graphql.Value(string(row.title)) }
+		'summary' { graphql.Value(string(row.summary)) }
+		'body' { graphql.Value(string(row.body)) }
 		'publishedAt' {
 			if v := row.published_at { graphql.Value(v.format_rfc3339()) } else { graphql.null }
 		}
@@ -1105,14 +1105,14 @@ fn resolve_comment_field(_ graphql.Context, info graphql.FieldInfo, parents []gr
 fn comment_value(row comments_models.Comment, field string) graphql.Value {
 	return match field {
 		'id' { graphql.Value(row.id.str()) }
-		'slug' { graphql.Value(row.slug) }
+		'slug' { graphql.Value(string(row.slug)) }
 		'userID' { graphql.Value(row.user_id.str()) }
-		'ownerType' { graphql.Value(row.owner_type) }
+		'ownerType' { graphql.Value(string(row.owner_type)) }
 		'ownerID' { graphql.Value(row.owner_id.str()) }
 		'parentID' {
 			if v := row.parent_id { graphql.Value(v.str()) } else { graphql.null }
 		}
-		'body' { graphql.Value(row.body) }
+		'body' { graphql.Value(string(row.body)) }
 		'createdAt' { graphql.Value(row.created_at.format_rfc3339()) }
 		'updatedAt' { graphql.Value(row.updated_at.format_rfc3339()) }
 		'deletedAt' {
@@ -1272,9 +1272,9 @@ fn resolve_post_field(_ graphql.Context, info graphql.FieldInfo, parents []graph
 fn post_value(row posts_models.Post, field string) graphql.Value {
 	return match field {
 		'id' { graphql.Value(row.id.str()) }
-		'slug' { graphql.Value(row.slug) }
+		'slug' { graphql.Value(string(row.slug)) }
 		'userID' { graphql.Value(row.user_id.str()) }
-		'body' { graphql.Value(row.body) }
+		'body' { graphql.Value(string(row.body)) }
 		'createdAt' { graphql.Value(row.created_at.format_rfc3339()) }
 		'updatedAt' { graphql.Value(row.updated_at.format_rfc3339()) }
 		'deletedAt' {
@@ -1406,9 +1406,9 @@ fn resolve_user_field(_ graphql.Context, info graphql.FieldInfo, parents []graph
 fn user_value(row users_models.User, field string) graphql.Value {
 	return match field {
 		'id' { graphql.Value(row.id.str()) }
-		'slug' { graphql.Value(row.slug) }
-		'name' { graphql.Value(row.name) }
-		'email' { graphql.Value(row.email) }
+		'slug' { graphql.Value(string(row.slug)) }
+		'name' { graphql.Value(string(row.name)) }
+		'email' { graphql.Value(string(row.email)) }
 		'createdAt' { graphql.Value(row.created_at.format_rfc3339()) }
 		'updatedAt' { graphql.Value(row.updated_at.format_rfc3339()) }
 		'deletedAt' {

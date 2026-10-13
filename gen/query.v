@@ -75,44 +75,47 @@ fn predicates(info Info, infos map[string]Info) ![]Pred {
 	prefix := snake(info.entity.struct_name)
 	mut preds := []Pred{}
 	for c in t.columns {
-		base := c.typ.trim_left('?')
-		if base !in ['int', 'i64', 'f64', 'bool', 'string', 'time.Time'] {
-			continue
-		}
 		col := "'${c.name}'"
-		add_pred(mut preds, prefix, c, 'eq', 'value ${base}', 'value', 'load.eq(${col}, value)', '`${c.name}` is `value`')
-		add_pred(mut preds, prefix, c, 'ne', 'value ${base}', 'value', 'load.ne(${col}, value)', '`${c.name}` is not `value`')
-		if base in ['int', 'i64', 'f64', 'time.Time'] {
-			for op, words in {
-				'lt': 'comes before'
-				'le': 'comes at or before'
-				'gt': 'comes after'
-				'ge': 'comes at or after'
-			} {
-				add_pred(mut preds, prefix, c, op, 'value ${base}', 'value', 'load.${op}(${col}, value)', '`${c.name}` ${words} `value`')
+		if c.scalar() && c.json_type == '' {
+			vt := c.v_type(info)
+			value := c.to_prim('value')
+			add_pred(mut preds, prefix, c, 'eq', 'value ${vt}', 'value', 'load.eq(${col}, ${value})',
+				'`${c.name}` is `value`')
+			add_pred(mut preds, prefix, c, 'ne', 'value ${vt}', 'value', 'load.ne(${col}, ${value})',
+				'`${c.name}` is not `value`')
+			if c.ordered() {
+				for op, words in {
+					'lt': 'comes before'
+					'le': 'comes at or before'
+					'gt': 'comes after'
+					'ge': 'comes at or after'
+				} {
+					add_pred(mut preds, prefix, c, op, 'value ${vt}', 'value', 'load.${op}(${col}, ${value})',
+						'`${c.name}` ${words} `value`')
+				}
 			}
-		}
-		if base in ['int', 'i64', 'string'] {
-			list := match base {
-				'int' { 'ints' }
-				'i64' { 'i64s' }
-				else { 'strings' }
+			if c.base() in int_types || c.base() in ['string', 'enum'] {
+				list, conv := c.list()
+				values := if conv == '' { 'values' } else { 'values.map(${conv})' }
+				add_pred(mut preds, prefix, c, 'in', 'values []${vt}', 'values', 'load.in_${list}(${col}, ${values})',
+					'`${c.name}` is one of `values`')
+				add_pred(mut preds, prefix, c, 'not_in', 'values []${vt}', 'values', 'load.not_in_${list}(${col}, ${values})',
+					'`${c.name}` is none of `values`')
 			}
-			add_pred(mut preds, prefix, c, 'in', 'values []${base}', 'values', 'load.in_${list}(${col}, values)', '`${c.name}` is one of `values`')
-			add_pred(mut preds, prefix, c, 'not_in', 'values []${base}', 'values', 'load.not_in_${list}(${col}, values)',
-				'`${c.name}` is none of `values`')
-		}
-		if base == 'string' {
-			add_pred(mut preds, prefix, c, 'like', 'pattern string', 'pattern', 'load.like(${col}, pattern)', '`${c.name}` matches the SQL LIKE `pattern`')
-			add_pred(mut preds, prefix, c, 'contains', 'value string', 'value', 'load.contains(${col}, value)', '`${c.name}` contains `value`')
-			add_pred(mut preds, prefix, c, 'has_prefix', 'value string', 'value', 'load.has_prefix(${col}, value)',
-				'`${c.name}` starts with `value`')
-			add_pred(mut preds, prefix, c, 'has_suffix', 'value string', 'value', 'load.has_suffix(${col}, value)',
-				'`${c.name}` ends with `value`')
-			add_pred(mut preds, prefix, c, 'equal_fold', 'value string', 'value', 'load.equal_fold(${col}, value)',
-				'`${c.name}` is `value`, ignoring case')
-			add_pred(mut preds, prefix, c, 'contains_fold', 'value string', 'value', 'load.contains_fold(${col}, value)',
-				'`${c.name}` contains `value`, ignoring case')
+			if c.base() == 'string' {
+				add_pred(mut preds, prefix, c, 'like', 'pattern string', 'pattern', 'load.like(${col}, pattern)',
+					'`${c.name}` matches the SQL LIKE `pattern`')
+				add_pred(mut preds, prefix, c, 'contains', 'value string', 'value', 'load.contains(${col}, value)',
+					'`${c.name}` contains `value`')
+				add_pred(mut preds, prefix, c, 'has_prefix', 'value string', 'value', 'load.has_prefix(${col}, value)',
+					'`${c.name}` starts with `value`')
+				add_pred(mut preds, prefix, c, 'has_suffix', 'value string', 'value', 'load.has_suffix(${col}, value)',
+					'`${c.name}` ends with `value`')
+				add_pred(mut preds, prefix, c, 'equal_fold', 'value string', 'value', 'load.equal_fold(${col}, value)',
+					'`${c.name}` is `value`, ignoring case')
+				add_pred(mut preds, prefix, c, 'contains_fold', 'value string', 'value', 'load.contains_fold(${col}, value)',
+					'`${c.name}` contains `value`, ignoring case')
+			}
 		}
 		if c.nullable {
 			add_pred(mut preds, prefix, c, 'is_null', '', '', 'load.is_null(${col})', '`${c.name}` is null')
@@ -409,7 +412,7 @@ pub fn (q ${q}) ${opt}() ${q} {
 
 	// aggregates
 	for c in t.columns {
-		if c.typ.trim_left('?') !in ['int', 'i64', 'f64'] {
+		if !c.numeric() {
 			continue
 		}
 		for name, kind in {
@@ -512,7 +515,7 @@ pub fn (q ${q}) with_named_${e.name}(name string, configure ...fn (${target.quer
 }')
 		} else {
 			for c in target.table.columns {
-				if c.typ.trim_left('?') !in ['int', 'i64', 'f64', 'bool', 'string', 'time.Time'] {
+				if !c.scalar() || c.json_type != '' {
 					continue
 				}
 				// a many_to_one edge's key is its own column; and a field's order

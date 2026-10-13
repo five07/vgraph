@@ -94,24 +94,42 @@ fn nillable(value string) string {
 // update may set.
 fn field_setters(info Info, create bool) []Setter {
 	mut setters := []Setter{}
+	immutable_columns := info.table.edges.filter(it.immutable && it.kind == 'many_to_one').map(it.column)
 	for c in info.table.columns {
-		base := c.typ.trim_left('?')
-		if base !in ['int', 'i64', 'f64', 'bool', 'string', 'time.Time'] {
+		if !c.scalar() {
 			continue
 		}
+		base := c.base()
 		if create && c.serial {
 			continue
 		}
-		if !create && (c.name == info.table.key || c.immutable) {
+		if !create && (c.name == info.table.key || c.immutable || c.name in immutable_columns) {
 			continue
 		}
 		setters << Setter{
 			name:   'set_${c.field}'
-			params: 'value ${base}'
-			data:   "b.data.with_value('${c.name}', ${primitive('value')})"
+			params: 'value ${c.v_type(info)}'
+			data:   "b.data.with_value('${c.name}', ${primitive(c.to_prim('value'))})"
 			doc:    'sets `${c.name}`'
 		}
-		if c.nullable {
+		if c.json_type != '' {
+			jt := c.json_v_type(info)
+			setters << Setter{
+				name:   'set_${c.field}_value'
+				params: 'value ${jt}'
+				data:   "b.data.with_value('${c.name}', orm.Primitive(json2.encode(value)))"
+				doc:    'sets `${c.name}` to `value`, as JSON'
+			}
+			if !create && jt.starts_with('[]') {
+				setters << Setter{
+					name:   'append_${c.field}'
+					params: 'items ...${jt[2..]}'
+					data:   "b.data.with_append('${c.name}', json2.encode(items))"
+					doc:    'appends `items` to the JSON array in `${c.name}`, in the database'
+				}
+			}
+		}
+		if c.nullable && c.type_name == '' {
 			setters << Setter{
 				name:   'set_nillable_${c.field}'
 				params: 'value ?${base}'
@@ -128,11 +146,11 @@ fn field_setters(info Info, create bool) []Setter {
 		}
 		// not on a column that holds another row's key
 		holds_key := info.table.edges.any(it.kind == 'many_to_one' && it.column == c.name)
-		if !create && base in ['int', 'i64', 'f64'] && !holds_key {
+		if !create && c.numeric() && !holds_key {
 			setters << Setter{
 				name:   'add_${c.field}'
-				params: 'delta ${base}'
-				data:   "b.data.with_add('${c.name}', ${primitive('delta')})"
+				params: 'delta ${c.v_type(info)}'
+				data:   "b.data.with_add('${c.name}', ${primitive(c.to_prim('delta'))})"
 				doc:    'adds `delta` to `${c.name}`, in the database'
 			}
 		}
@@ -146,6 +164,9 @@ fn edge_setters(info Info, infos map[string]Info, create bool) ![]Setter {
 	mut setters := []Setter{}
 	t := info.table
 	for e in t.edges {
+		if !create && e.immutable {
+			continue
+		}
 		target := infos[e.to] or { continue }
 		key := target.key_type()!
 		target_key := '${target.field()}.${target.key_field()!}'
@@ -284,6 +305,12 @@ fn mutation_file(out_module string, info Info, infos map[string]Info) !string {
 	b.writeln(header)
 	b.writeln('module ${out_module}\n')
 	mut imports := ['orm', 'five07.vgraph', 'five07.vgraph.graphql', 'five07.vgraph.load']
+	if t.columns.any(it.json_type != '') {
+		imports << 'json2'
+	}
+	if t.columns.any(it.type_name != '') {
+		imports << import_line(info.entity.module_path)
+	}
 	if t.columns.any(it.typ.trim_left('?') == 'time.Time') {
 		imports << 'time'
 	}
@@ -364,9 +391,18 @@ pub fn (${recv} ${mt}) ${d.name}(${d.params})${ret} {
 }')
 	}
 	for c in t.columns {
-		base := c.typ.trim_left('?')
-		if base !in ['int', 'i64', 'f64', 'bool', 'string', 'time.Time'] {
+		if !c.scalar() {
 			continue
+		}
+		vt := c.v_type(info)
+		// how the write holds the value, and back to the column's type
+		held := if c.base() == 'enum' { 'int' } else { c.base() }
+		from := if c.base() == 'enum' {
+			'unsafe { ${vt}(value) }'
+		} else if c.type_name != '' {
+			'${vt}(value)'
+		} else {
+			'value'
 		}
 		for name in [c.field, 'set_${c.field}', 'clear_${c.field}', 'old_${c.field}'] {
 			if name in reserved_getters {
@@ -376,14 +412,14 @@ pub fn (${recv} ${mt}) ${d.name}(${d.params})${ret} {
 		b.writeln('
 // ${c.field} returns the value the write sets `${c.name}` to, or `none` when it
 // doesn\'t set it, or sets it to null.
-pub fn (m ${mt}) ${c.field}() ?${base} {
+pub fn (m ${mt}) ${c.field}() ?${vt} {
 	value := m.inner.field_value(\'${c.name}\') or { return none }
-	return if value is ${base} { value } else { none }
+	return if value is ${held} { ${from} } else { none }
 }
 
 // set_${c.field} makes the write set `${c.name}` to `value`.
-pub fn (mut m ${mt}) set_${c.field}(value ${base}) {
-	m.inner.set_field_value(\'${c.name}\', value)
+pub fn (mut m ${mt}) set_${c.field}(value ${vt}) {
+	m.inner.set_field_value(\'${c.name}\', ${c.to_prim('value')})
 }')
 		if c.nullable {
 			b.writeln('
@@ -395,9 +431,9 @@ pub fn (mut m ${mt}) clear_${c.field}() {
 			b.writeln('
 // old_${c.field} returns the stored `${c.name}` of the row an update_one or
 // delete_one is to.
-pub fn (mut m ${mt}) old_${c.field}() !${base} {
+pub fn (mut m ${mt}) old_${c.field}() !${vt} {
 	value := m.inner.old_field(\'${c.name}\')!
-	return if value is ${base} { value } else { error(\'`${t.name}.${c.name}` is not a ${base}\') }
+	return if value is ${held} { ${from} } else { error(\'`${t.name}.${c.name}` is not a ${held}\') }
 }')
 		}
 	}

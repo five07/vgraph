@@ -8,8 +8,9 @@ import db.pg
 import five07.vgraph.pg as vpg
 import os
 
-const relation_tables = ['schema_migrations', 'users', 'cards', 'pets', 'groups', 'group_users',
-	'follows', 'friendships', 'nodes', 'categories', 'devices', 'logins', 'device_groups']
+const relation_tables = ['schema_migrations', 'vgraph_types', 'likes', 'gadgets', 'users', 'cards',
+	'pets', 'groups', 'group_users', 'follows', 'friendships', 'nodes', 'categories', 'devices',
+	'logins', 'device_groups']
 
 fn fixture() !Fixture {
 	// v.migrations runs on a direct connection, not a pool
@@ -21,8 +22,9 @@ fn fixture() !Fixture {
 		dbname:   os.getenv_opt('PGDATABASE') or { 'postgres' }
 	})!
 	db.exec('SET client_min_messages = warning')!
+	db.exec('DROP VIEW IF EXISTS pet_owners')!
 	for table in relation_tables {
-		db.exec('DROP TABLE IF EXISTS "${table}"')!
+		db.exec('DROP TABLE IF EXISTS "${table}" CASCADE')!
 	}
 	migrate(mut db, .pg)!
 	return seed(db, vpg.direct(db))!
@@ -82,4 +84,8 @@ fn test_soft_delete() {
 
 fn test_queries() {
 	check_queries(fixture()!)!
+}
+
+fn test_schema() {
+	check_schema(fixture()!)!
 }

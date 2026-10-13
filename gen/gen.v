@@ -41,6 +41,94 @@ pub:
 	deprecated   string
 	has_default  bool
 	auto_update  bool
+	type_name    string
+	enum_values  []string
+	embedded     string
+	json_type    string
+}
+
+const int_types = ['i8', 'i16', 'int', 'i64', 'u8', 'u16', 'u32', 'u64']
+const float_types = ['f32', 'f64']
+
+// base returns the column's V type without its option, such as `u32` or
+// `enum`.
+fn (c Column) base() string {
+	return c.typ.trim_left('?')
+}
+
+// scalar reports whether the generator writes predicates, setters and orders
+// for the column: a number, bool, string, time or enum.
+fn (c Column) scalar() bool {
+	b := c.base()
+	return b in int_types || b in float_types || b in ['bool', 'string', 'time.Time', 'enum']
+}
+
+// numeric reports whether the column is a number: it can be added to, and
+// aggregated.
+fn (c Column) numeric() bool {
+	return c.base() in int_types || c.base() in float_types
+}
+
+// ordered reports whether the column has `lt` / `gt` predicates.
+fn (c Column) ordered() bool {
+	return c.numeric() || c.base() == 'time.Time'
+}
+
+// v_type returns the column's V type as the generated code names it: an alias
+// or enum of the model's module, or the base type.
+fn (c Column) v_type(info Info) string {
+	return if c.type_name != '' { '${info.entity.alias()}.${c.type_name}' } else { c.base() }
+}
+
+// to_prim returns the V expression `expr`, of the column's type, as an
+// `orm.Primitive`'s value: an enum as its int, an alias as its base type.
+fn (c Column) to_prim(expr string) string {
+	if c.base() == 'enum' {
+		return 'int(${expr})'
+	}
+	if c.type_name != '' {
+		return '${c.base()}(${expr})'
+	}
+	return expr
+}
+
+// list returns the `load.in_<list>` the column's `in` predicates use, and how
+// each value is converted for it ('' when not).
+fn (c Column) list() (string, string) {
+	b := c.base()
+	return match true {
+		b in ['i64', 'u64'] { 'i64s', if b == 'i64' && c.type_name == '' { '' } else { 'i64(it)' } }
+		b == 'string' { 'strings', if c.type_name == '' { '' } else { 'string(it)' } }
+		else { 'ints', if b == 'int' && c.type_name == '' { '' } else { 'int(it)' } }
+	}
+}
+
+// v_type_name returns an alias's or enum's type name, or the base type.
+fn (c Column) v_type_name() string {
+	return if c.type_name != '' { c.type_name } else { c.base() }
+}
+
+// json_v_type returns a JSON field's V type as the generated code names it:
+// the model module's types qualified, such as `[]articles_models.Tag`.
+fn (c Column) json_v_type(info Info) string {
+	mut out := ''
+	mut word := ''
+	for ch in c.json_type + ' ' {
+		if ch.is_letter() || ch.is_digit() || ch == `_` || ch == `.` {
+			word += ch.ascii_str()
+			continue
+		}
+		if word.len > 0 && word[0].is_capital() && !word.contains('.') {
+			out += '${info.entity.alias()}.${word}'
+		} else {
+			out += word
+		}
+		word = ''
+		if ch != ` ` {
+			out += ch.ascii_str()
+		}
+	}
+	return out
 }
 
 // Edge mirrors `vgraph.Edge`, as the loader prints it.
@@ -55,6 +143,20 @@ pub:
 	through    string
 	through_to string
 	soft_del   string
+	ref        string
+	unique     bool
+	bidi       bool
+	required   bool
+	immutable  bool
+}
+
+// Index mirrors `vgraph.Index`, as the loader prints it.
+pub struct Index {
+pub:
+	name    string
+	columns []string
+	unique  bool
+	where   string
 }
 
 // Table mirrors `vgraph.Table`, as the loader prints it.
@@ -66,6 +168,11 @@ pub:
 	columns      []Column
 	edges        []Edge
 	graphql_skip bool
+	indexes      []Index
+	view         bool
+	hooks        int
+	interceptors int
+	rules        int
 }
 
 fn (t Table) column(name string) !Column {

@@ -30,9 +30,12 @@ pub fn schema() !vgraph.Schema {
 	s.add[models.Card]()!
 	s.add[models.Category]()!
 	s.add[models.Device]()!
+	s.add[models.Gadget]()!
 	s.add[models.Group]()!
+	s.add[models.Like]()!
 	s.add[models.Login]()!
 	s.add[models.Node]()!
+	s.add[models.OwnedPet]()!
 	s.add[models.Pet]()!
 	s.add[models.User]()!
 	return s

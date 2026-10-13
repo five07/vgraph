@@ -9,50 +9,60 @@ import models
 pub struct UserQuery {
 	graph Graph
 mut:
-	query           load.Query
-	with_card       bool
-	card_fns        []fn (CardQuery) CardQuery
-	with_spouse     bool
-	spouse_fns      []fn (UserQuery) UserQuery
-	with_pets       bool
-	pets_fns        []fn (PetQuery) PetQuery
-	named_pets      map[string][]fn (PetQuery) PetQuery
-	with_groups     bool
-	groups_fns      []fn (GroupQuery) GroupQuery
-	named_groups    map[string][]fn (GroupQuery) GroupQuery
-	with_following  bool
-	following_fns   []fn (UserQuery) UserQuery
-	named_following map[string][]fn (UserQuery) UserQuery
-	with_followers  bool
-	followers_fns   []fn (UserQuery) UserQuery
-	named_followers map[string][]fn (UserQuery) UserQuery
-	with_friends    bool
-	friends_fns     []fn (UserQuery) UserQuery
-	named_friends   map[string][]fn (UserQuery) UserQuery
-	with_devices    bool
-	devices_fns     []fn (DeviceQuery) DeviceQuery
-	named_devices   map[string][]fn (DeviceQuery) DeviceQuery
+	query               load.Query
+	with_card           bool
+	card_fns            []fn (CardQuery) CardQuery
+	with_spouse         bool
+	spouse_fns          []fn (UserQuery) UserQuery
+	with_pets           bool
+	pets_fns            []fn (PetQuery) PetQuery
+	named_pets          map[string][]fn (PetQuery) PetQuery
+	with_groups         bool
+	groups_fns          []fn (GroupQuery) GroupQuery
+	named_groups        map[string][]fn (GroupQuery) GroupQuery
+	with_following      bool
+	following_fns       []fn (UserQuery) UserQuery
+	named_following     map[string][]fn (UserQuery) UserQuery
+	with_followers      bool
+	followers_fns       []fn (UserQuery) UserQuery
+	named_followers     map[string][]fn (UserQuery) UserQuery
+	with_friends        bool
+	friends_fns         []fn (UserQuery) UserQuery
+	named_friends       map[string][]fn (UserQuery) UserQuery
+	with_devices        bool
+	devices_fns         []fn (DeviceQuery) DeviceQuery
+	named_devices       map[string][]fn (DeviceQuery) DeviceQuery
+	with_gadgets        bool
+	gadgets_fns         []fn (GadgetQuery) GadgetQuery
+	named_gadgets       map[string][]fn (GadgetQuery) GadgetQuery
+	with_liked_gadgets  bool
+	liked_gadgets_fns   []fn (GadgetQuery) GadgetQuery
+	named_liked_gadgets map[string][]fn (GadgetQuery) GadgetQuery
 }
 
 // UserNode is a `users` row, with the edges its query loaded.
 pub struct UserNode {
 	graph Graph
 pub mut:
-	user            models.User
-	card            ?&CardNode              // set by `with_card()`
-	spouse          ?&UserNode              // set by `with_spouse()`
-	pets            []PetNode               // set by `with_pets()`
-	named_pets      map[string][]PetNode    // set by `with_named_pets()`
-	groups          []GroupNode             // set by `with_groups()`
-	named_groups    map[string][]GroupNode  // set by `with_named_groups()`
-	following       []UserNode              // set by `with_following()`
-	named_following map[string][]UserNode   // set by `with_named_following()`
-	followers       []UserNode              // set by `with_followers()`
-	named_followers map[string][]UserNode   // set by `with_named_followers()`
-	friends         []UserNode              // set by `with_friends()`
-	named_friends   map[string][]UserNode   // set by `with_named_friends()`
-	devices         []DeviceNode            // set by `with_devices()`
-	named_devices   map[string][]DeviceNode // set by `with_named_devices()`
+	user                models.User
+	card                ?&CardNode              // set by `with_card()`
+	spouse              ?&UserNode              // set by `with_spouse()`
+	pets                []PetNode               // set by `with_pets()`
+	named_pets          map[string][]PetNode    // set by `with_named_pets()`
+	groups              []GroupNode             // set by `with_groups()`
+	named_groups        map[string][]GroupNode  // set by `with_named_groups()`
+	following           []UserNode              // set by `with_following()`
+	named_following     map[string][]UserNode   // set by `with_named_following()`
+	followers           []UserNode              // set by `with_followers()`
+	named_followers     map[string][]UserNode   // set by `with_named_followers()`
+	friends             []UserNode              // set by `with_friends()`
+	named_friends       map[string][]UserNode   // set by `with_named_friends()`
+	devices             []DeviceNode            // set by `with_devices()`
+	named_devices       map[string][]DeviceNode // set by `with_named_devices()`
+	gadgets             []GadgetNode            // set by `with_gadgets()`
+	named_gadgets       map[string][]GadgetNode // set by `with_named_gadgets()`
+	liked_gadgets       []GadgetNode            // set by `with_liked_gadgets()`
+	named_liked_gadgets map[string][]GadgetNode // set by `with_named_liked_gadgets()`
 	// loaded: the edges the query loaded
 	loaded []string
 }
@@ -325,6 +335,26 @@ pub fn user_has_devices_with(conds ...load.Cond) load.Cond {
 	return load.in_sub('id', load.Sub{ table: 'devices', column: 'owner_id', kind: .int, conds: conds })
 }
 
+// user_has_gadgets returns the condition that it has a `gadgets`.
+pub fn user_has_gadgets() load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'gadgets', column: 'owner_id', kind: .int, conds: []load.Cond{} })
+}
+
+// user_has_gadgets_with returns the condition that it has a `gadgets` that matches `conds`.
+pub fn user_has_gadgets_with(conds ...load.Cond) load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'gadgets', column: 'owner_id', kind: .int, conds: conds })
+}
+
+// user_has_liked_gadgets returns the condition that it has a `liked_gadgets`.
+pub fn user_has_liked_gadgets() load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'likes', column: 'user_id', kind: .int, conds: [load.in_sub('gadget_id', load.Sub{ table: 'gadgets', column: 'id', kind: .i64, conds: []load.Cond{} })] })
+}
+
+// user_has_liked_gadgets_with returns the condition that it has a `liked_gadgets` that matches `conds`.
+pub fn user_has_liked_gadgets_with(conds ...load.Cond) load.Cond {
+	return load.in_sub('id', load.Sub{ table: 'likes', column: 'user_id', kind: .int, conds: [load.in_sub('gadget_id', load.Sub{ table: 'gadgets', column: 'id', kind: .i64, conds: conds })] })
+}
+
 // order_by_id orders the rows by `id`, ascending, after the orders
 // given before.
 pub fn (q UserQuery) order_by_id() UserQuery {
@@ -581,6 +611,26 @@ pub fn (q UserQuery) has_devices_with(configure fn (DeviceQuery) DeviceQuery) Us
 	return q.where(user_has_devices_with(...configure(q.graph.devices()).query.conds))
 }
 
+// has_gadgets keeps the rows where it has a `gadgets`.
+pub fn (q UserQuery) has_gadgets() UserQuery {
+	return q.where(user_has_gadgets())
+}
+
+// has_gadgets_with keeps the rows that have a `gadgets` that `configure` keeps.
+pub fn (q UserQuery) has_gadgets_with(configure fn (GadgetQuery) GadgetQuery) UserQuery {
+	return q.where(user_has_gadgets_with(...configure(q.graph.gadgets()).query.conds))
+}
+
+// has_liked_gadgets keeps the rows where it has a `liked_gadgets`.
+pub fn (q UserQuery) has_liked_gadgets() UserQuery {
+	return q.where(user_has_liked_gadgets())
+}
+
+// has_liked_gadgets_with keeps the rows that have a `liked_gadgets` that `configure` keeps.
+pub fn (q UserQuery) has_liked_gadgets_with(configure fn (GadgetQuery) GadgetQuery) UserQuery {
+	return q.where(user_has_liked_gadgets_with(...configure(q.graph.gadgets()).query.conds))
+}
+
 // query_card starts a query of the `card` of the rows that match this
 // query's conditions; its order, limit and offset don't apply.
 pub fn (q UserQuery) query_card() CardQuery {
@@ -627,6 +677,18 @@ pub fn (q UserQuery) query_friends() UserQuery {
 // query's conditions; its order, limit and offset don't apply.
 pub fn (q UserQuery) query_devices() DeviceQuery {
 	return q.graph.devices().where(load.in_sub('owner_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: q.query.conds }))
+}
+
+// query_gadgets starts a query of the `gadgets` of the rows that match this
+// query's conditions; its order, limit and offset don't apply.
+pub fn (q UserQuery) query_gadgets() GadgetQuery {
+	return q.graph.gadgets().where(load.in_sub('owner_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: q.query.conds }))
+}
+
+// query_liked_gadgets starts a query of the `liked_gadgets` of the rows that match this
+// query's conditions; its order, limit and offset don't apply.
+pub fn (q UserQuery) query_liked_gadgets() GadgetQuery {
+	return q.graph.gadgets().where(load.in_sub('id', load.Sub{ table: 'likes', column: 'gadget_id', kind: .i64, conds: [load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: q.query.conds })] }))
 }
 
 // only returns the one matching row, with the requested edges: a
@@ -757,7 +819,7 @@ pub fn (q UserQuery) for_share() UserQuery {
 	return next
 }
 
-// no_wait: a lock fails at once on a row another transaction locked.
+// no_wait makes the lock one that fails at once on a row another transaction locked.
 pub fn (q UserQuery) no_wait() UserQuery {
 	mut next := q
 	next.query = load.Query{
@@ -770,7 +832,7 @@ pub fn (q UserQuery) no_wait() UserQuery {
 	return next
 }
 
-// skip_locked: a lock leaves out the rows other transactions locked.
+// skip_locked makes the lock one that leaves out the rows other transactions locked.
 pub fn (q UserQuery) skip_locked() UserQuery {
 	mut next := q
 	next.query = load.Query{
@@ -1119,6 +1181,58 @@ pub fn (q UserQuery) with_named_devices(name string, configure ...fn (DeviceQuer
 	return next
 }
 
+// order_by_gadgets_count orders the rows by their number of `gadgets`.
+pub fn (q UserQuery) order_by_gadgets_count() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "gadgets" AS "t1" WHERE "t1"."owner_id" = "t0"."id")'
+	})
+}
+
+// order_by_gadgets_count_desc orders the rows by their number of `gadgets`, most
+// first.
+pub fn (q UserQuery) order_by_gadgets_count_desc() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "gadgets" AS "t1" WHERE "t1"."owner_id" = "t0"."id")'
+		desc: true
+	})
+}
+
+// with_named_gadgets loads `gadgets` as `configure` says into
+// `named_gadgets[name]`, besides any other load of it.
+pub fn (q UserQuery) with_named_gadgets(name string, configure ...fn (GadgetQuery) GadgetQuery) UserQuery {
+	mut next := q
+	mut named := q.named_gadgets.clone()
+	named[name] = configure
+	next.named_gadgets = named
+	return next
+}
+
+// order_by_liked_gadgets_count orders the rows by their number of `liked_gadgets`.
+pub fn (q UserQuery) order_by_liked_gadgets_count() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "likes" AS "t1" WHERE "t1"."user_id" = "t0"."id")'
+	})
+}
+
+// order_by_liked_gadgets_count_desc orders the rows by their number of `liked_gadgets`, most
+// first.
+pub fn (q UserQuery) order_by_liked_gadgets_count_desc() UserQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT COUNT(*) FROM "likes" AS "t1" WHERE "t1"."user_id" = "t0"."id")'
+		desc: true
+	})
+}
+
+// with_named_liked_gadgets loads `liked_gadgets` as `configure` says into
+// `named_liked_gadgets[name]`, besides any other load of it.
+pub fn (q UserQuery) with_named_liked_gadgets(name string, configure ...fn (GadgetQuery) GadgetQuery) UserQuery {
+	mut next := q
+	mut named := q.named_liked_gadgets.clone()
+	named[name] = configure
+	next.named_liked_gadgets = named
+	return next
+}
+
 // with_card loads each row's `card` (one_to_one `cards`) with it, in one
 // query for all the rows. `configure` narrows them, and can load their edges.
 pub fn (q UserQuery) with_card(configure ...fn (CardQuery) CardQuery) UserQuery {
@@ -1188,6 +1302,24 @@ pub fn (q UserQuery) with_devices(configure ...fn (DeviceQuery) DeviceQuery) Use
 	mut next := q
 	next.with_devices = true
 	next.devices_fns = configure
+	return next
+}
+
+// with_gadgets loads each row's `gadgets` (one_to_many `gadgets`) with it, in one
+// query for all the rows. `configure` narrows them, and can load their edges.
+pub fn (q UserQuery) with_gadgets(configure ...fn (GadgetQuery) GadgetQuery) UserQuery {
+	mut next := q
+	next.with_gadgets = true
+	next.gadgets_fns = configure
+	return next
+}
+
+// with_liked_gadgets loads each row's `liked_gadgets` (many_to_many `gadgets`) with it, in one
+// query for all the rows. `configure` narrows them, and can load their edges.
+pub fn (q UserQuery) with_liked_gadgets(configure ...fn (GadgetQuery) GadgetQuery) UserQuery {
+	mut next := q
+	next.with_liked_gadgets = true
+	next.liked_gadgets_fns = configure
 	return next
 }
 
@@ -1318,6 +1450,32 @@ pub fn (q UserQuery) nodes(rows []models.User) ![]UserNode {
 		found := q.load_devices(rows, fns)!
 		for mut node in nodes {
 			node.named_devices[name] = found[node.user.id.str()] or { [] }
+		}
+	}
+	if q.with_gadgets {
+		found := q.load_gadgets(rows, q.gadgets_fns)!
+		for mut node in nodes {
+			node.gadgets = found[node.user.id.str()] or { [] }
+			node.loaded << 'gadgets'
+		}
+	}
+	for name, fns in q.named_gadgets {
+		found := q.load_gadgets(rows, fns)!
+		for mut node in nodes {
+			node.named_gadgets[name] = found[node.user.id.str()] or { [] }
+		}
+	}
+	if q.with_liked_gadgets {
+		found := q.load_liked_gadgets(rows, q.liked_gadgets_fns)!
+		for mut node in nodes {
+			node.liked_gadgets = found[node.user.id.str()] or { [] }
+			node.loaded << 'liked_gadgets'
+		}
+	}
+	for name, fns in q.named_liked_gadgets {
+		found := q.load_liked_gadgets(rows, fns)!
+		for mut node in nodes {
+			node.named_liked_gadgets[name] = found[node.user.id.str()] or { [] }
 		}
 	}
 	return nodes
@@ -1607,6 +1765,71 @@ pub fn (n UserNode) devices_or_err() ![]DeviceNode {
 	return n.devices
 }
 
+// load_gadgets loads the `gadgets` of `rows`, keyed by each row's key.
+fn (q UserQuery) load_gadgets(rows []models.User, fns []fn (GadgetQuery) GadgetQuery) !map[string][]GadgetNode {
+	mut sub := q.graph.gadgets()
+	for configure in fns {
+		sub = configure(sub)
+	}
+	children := sub.nodes(load.select_in[models.Gadget](q.graph.client.conn, 'owner_id',
+		rows.map(it.id.str()),
+		query: q.graph.client.prepare_query('gadgets', sub.query)!
+	)!)!
+	mut by_parent := map[string][]GadgetNode{}
+	for child in children {
+		by_parent[child.gadget.owner_id.str()] << child
+	}
+	return by_parent
+}
+
+// gadgets_or_err returns the `gadgets`, or a `NotLoadedError` when the query
+// didn't load them.
+pub fn (n UserNode) gadgets_or_err() ![]GadgetNode {
+	if 'gadgets' !in n.loaded {
+		return NotLoadedError{
+			edge: 'users.gadgets'
+		}
+	}
+	return n.gadgets
+}
+
+// load_liked_gadgets loads the `liked_gadgets` of `rows`, keyed by each row's key.
+fn (q UserQuery) load_liked_gadgets(rows []models.User, fns []fn (GadgetQuery) GadgetQuery) !map[string][]GadgetNode {
+	mut sub := q.graph.gadgets()
+	for configure in fns {
+		sub = configure(sub)
+	}
+	pairs := load.link_pairs(q.graph.client.conn, 'likes', 'user_id',
+		'gadget_id', rows.map(it.id.str()), .int, .i64)!
+	targets := sub.nodes(load.select_in[models.Gadget](q.graph.client.conn, 'id',
+		load.unique(pairs.map(it[1])),
+		query: q.graph.client.prepare_query('gadgets', sub.query)!
+	)!)!
+	// each parent's targets in the order of the query
+	mut parents_of := map[string][]string{}
+	for pair in pairs {
+		parents_of[pair[1]] << pair[0]
+	}
+	mut linked := map[string][]GadgetNode{}
+	for target in targets {
+		for parent in parents_of[target.gadget.id.str()] or { [] } {
+			linked[parent] << target
+		}
+	}
+	return linked
+}
+
+// liked_gadgets_or_err returns the `liked_gadgets`, or a `NotLoadedError` when the query
+// didn't load them.
+pub fn (n UserNode) liked_gadgets_or_err() ![]GadgetNode {
+	if 'liked_gadgets' !in n.loaded {
+		return NotLoadedError{
+			edge: 'users.liked_gadgets'
+		}
+	}
+	return n.liked_gadgets
+}
+
 // query_card starts a query of this row's `card`.
 pub fn (n UserNode) query_card() CardQuery {
 	return n.graph.cards().where(load.eq('owner_id', n.user.id))
@@ -1659,4 +1882,17 @@ pub fn (n UserNode) query_friends() !UserQuery {
 // query_devices starts a query of this row's `devices`.
 pub fn (n UserNode) query_devices() DeviceQuery {
 	return n.graph.devices().where(load.eq('owner_id', n.user.id))
+}
+
+// query_gadgets starts a query of this row's `gadgets`.
+pub fn (n UserNode) query_gadgets() GadgetQuery {
+	return n.graph.gadgets().where(load.eq('owner_id', n.user.id))
+}
+
+// query_liked_gadgets starts a query of this row's `liked_gadgets`. It reads the join
+// table `likes` first, so it can fail.
+pub fn (n UserNode) query_liked_gadgets() !GadgetQuery {
+	pairs := load.link_pairs(n.graph.client.conn, 'likes', 'user_id',
+		'gadget_id', [n.user.id.str()], .int, .i64)!
+	return n.graph.gadgets().where(load.in_keys('id', pairs.map(it[1]), .i64))
 }

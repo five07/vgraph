@@ -350,3 +350,71 @@ fn test_postgres_writes_on_a_pool() {
 		conds: [load.eq('article_id', 4)]
 	})! == 0
 }
+
+@[table: 'vg_first_ids']
+struct PgFirstId {
+	id   i64 @[primary; sql: serial]
+	name string
+}
+
+@[table: 'vg_second_ids']
+struct PgSecondId {
+	id   i64 @[primary; sql: serial]
+	name string
+}
+
+// Global ids on PostgreSQL: each table's BIGSERIAL starts at its own range,
+// which a table keeps when a later migration adds another.
+fn test_postgres_global_ids() {
+	mut db := pg.connect_direct(pg_config())!
+	defer {
+		db.close() or {}
+	}
+	db.exec('SET client_min_messages = warning')!
+	for table in ['vg_id_migrations', 'vgraph_types', 'vg_first_ids', 'vg_second_ids'] {
+		db.exec('DROP TABLE IF EXISTS ${table}')!
+	}
+	mut first := Schema{}
+	first.add[PgFirstId]()!
+	mut both := Schema{}
+	both.add[PgSecondId]()!
+	both.add[PgFirstId]()!
+	mut m := migrations.new(mut db, [
+		migrations.Migration{
+			version: 1
+			name:    'first'
+			up:      fn [first] (mut ctx migrations.Context) ! {
+				create_table(mut ctx, first, 'vg_first_ids')!
+				global_ids(mut ctx, first)!
+			}
+			down:    fn (mut ctx migrations.Context) ! {}
+		},
+		migrations.Migration{
+			version: 2
+			name:    'second'
+			up:      fn [both] (mut ctx migrations.Context) ! {
+				create_table(mut ctx, both, 'vg_second_ids')!
+				global_ids(mut ctx, both)!
+			}
+			down:    fn (mut ctx migrations.Context) ! {}
+		},
+	], dialect: .pg, table: 'vg_id_migrations')!
+	m.migrate()!
+	c := Client.new(vpg.direct(db), both)!
+	first_key := c.create(MutationData{
+		table:  'vg_first_ids'
+		values: {
+			'name': orm.Primitive('a')
+		}
+	})!
+	second_key := c.create(MutationData{
+		table:  'vg_second_ids'
+		values: {
+			'name': orm.Primitive('b')
+		}
+	})!
+	assert first_key.i64() == (i64(1) << 32) + 1
+	assert second_key.i64() == (i64(2) << 32) + 1
+	assert c.table_of(first_key.i64())! == 'vg_first_ids'
+	assert c.table_of(second_key.i64())! == 'vg_second_ids'
+}

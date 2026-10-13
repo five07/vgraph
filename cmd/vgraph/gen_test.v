@@ -484,7 +484,7 @@ fn test_gen_writes_a_working_client() {
 	os.write_file(os.join_path(root, 'main_test.v'), project_test)!
 
 	os.write_file(os.join_path(root, 'api.graphql'), api_sdl)!
-	run(root, 'graph')!
+	run(root, 'graph', true)!
 	assert os.ls(os.join_path(root, 'graph'))!.sorted() == ['articles.v', 'articles_mutation.v',
 		'audits.v', 'audits_mutation.v', 'comments.v', 'comments_mutation.v', 'graph.v', 'graphql.v',
 		'resolvers.v', 'schema.graphql', 'tags.v', 'tags_mutation.v', 'users.v', 'users_mutation.v']
@@ -495,22 +495,22 @@ fn test_gen_writes_a_working_client() {
 	}
 	// the stubs are the project's: written once, never overwritten
 	os.write_file(os.join_path(root, 'graph', 'resolvers.v'), resolvers)!
-	run(root, 'graph')!
+	run(root, 'graph', true)!
 	assert os.read_file(os.join_path(root, 'graph', 'resolvers.v'))! == resolvers
 	// a new field gets a new stub, after what is there
 	os.write_file(os.join_path(root, 'api.graphql'), api_sdl + 'extend type Tag { slug: String! }\n')!
-	run(root, 'graph')!
+	run(root, 'graph', true)!
 	with_stub := os.read_file(os.join_path(root, 'graph', 'resolvers.v'))!
 	assert with_stub.starts_with(resolvers.trim_right('\n'))
 	assert with_stub.contains(') tag_slug(')
 	os.write_file(os.join_path(root, 'api.graphql'), api_sdl)!
 	os.write_file(os.join_path(root, 'graph', 'resolvers.v'), resolvers)!
-	run(root, 'graph')!
+	run(root, 'graph', true)!
 
 	// a stale generated file goes away; a hand-written one stays
 	os.write_file(os.join_path(root, 'graph', 'old.v'), '${header()}\nmodule graph\n')!
 	os.write_file(os.join_path(root, 'graph', 'mine.v'), 'module graph\n')!
-	run(root, 'graph')!
+	run(root, 'graph', true)!
 	assert !os.exists(os.join_path(root, 'graph', 'old.v'))
 	assert os.exists(os.join_path(root, 'graph', 'mine.v'))
 
@@ -584,7 +584,7 @@ pub fn (a A) edges() []vgraph.Edge {
 	]
 }
 ")!
-	run(root, 'graph') or {
+	run(root, 'graph', true) or {
 		assert err.msg() == 'the schema has problems:\nas.bs: no table `nowhere` is registered'
 		assert !os.exists(os.join_path(root, 'graph'))
 		assert !os.exists(os.join_path(root, '.vgraph-gen')), 'the loader is cleaned up'
@@ -604,10 +604,53 @@ fn test_gen_reports_graphql_problems_where_they_are() {
 	os.write_file(os.join_path(root, 'shop', 'models', 'models.v'), models)!
 	os.mkdir_all(os.join_path(root, 'schema'))!
 	os.write_file(os.join_path(root, 'schema', 'bad.graphql'), '# a mistake\nextend type Query {\n  x: Nope\n}\n')!
-	run(root, 'graph') or {
+	run(root, 'graph', true) or {
 		// the file and line of the mistake, not of the merged schema
 		assert err.msg().starts_with('schema/bad.graphql:3:6: Unknown type "Nope".'), err.msg()
 		return
 	}
 	assert false, 'gen should fail'
+}
+
+// `vgraph describe` on `examples/relations`, which has every schema option.
+fn test_describe() {
+	text := describe_project(os.real_path(os.join_path(@VMODROOT, 'examples', 'relations')),
+		'graph')!
+	assert text.contains('Gadget (gadgets):')
+	assert text.contains('OwnedPet (pet_owners) (view):')
+	for parts in [
+		['Stamps.created_at', 'time.Time', 'immutable, default, from Stamps'],
+		['color', 'Color (enum)', 'values red|green|blue'],
+		['serial_no', 'Serial (string)'],
+		['tags', 'json []string'],
+		['owner', 'many_to_one', 'owner_id', 'ref gadgets, required, immutable'],
+		['likers', 'many_to_many', 'likes.user_id', 'ref liked_gadgets'],
+		['gadgets_rated_owner_idx', 'owner_id', 'rating IS NOT NULL'],
+		['spouse', 'many_to_one', 'spouse_id', 'bidi'],
+	] {
+		assert text.split_into_lines().any(fn [parts] (line string) bool {
+			return parts.all(line.contains(it))
+		}), parts.str()
+	}
+	// pets have a soft-delete hook and interceptor, groups a policy
+	pets := text.all_after('Pet (pets):').all_before('\n\n')
+	assert pets.contains('hooks: 1, interceptors: 1, policy rules: 0')
+	groups := text.all_after('Group (groups):').all_before('\n\n')
+	assert groups.contains('policy rules: 1')
+}
+
+// `--no-graphql` writes the client alone.
+fn test_gen_without_graphql() {
+	root := os.join_path(os.vtmp_dir(), 'vgraph_plain_test_${os.getpid()}')
+	os.rmdir_all(root) or {}
+	defer {
+		os.rmdir_all(root) or {}
+	}
+	os.mkdir_all(os.join_path(root, 'shop', 'models'))!
+	os.write_file(os.join_path(root, 'v.mod'), "Module {\n\tname: 'shop'\n\tversion: '0.0.0'\n}\n")!
+	os.write_file(os.join_path(root, 'shop', 'models', 'models.v'), models)!
+	run(root, 'graph', false)!
+	files := os.ls(os.join_path(root, 'graph'))!
+	assert 'graph.v' in files && 'articles.v' in files
+	assert 'graphql.v' !in files && 'schema.graphql' !in files && 'resolvers.v' !in files
 }

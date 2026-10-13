@@ -156,7 +156,7 @@ tests each one:
 |-----|--------|
 | O2O two types (user, card) | `one_to_one` + `many_to_one` |
 | O2O same type (linked list next/prev) | self `many_to_one` + self `one_to_one` |
-| O2O bidirectional (spouse) | self `many_to_one`, set on both rows by the app |
+| O2O bidirectional (spouse) | self `many_to_one` with `unique` and `bidi` (6d): a unique index, and both rows written |
 | O2M two types (user, pets) | `one_to_many` + `many_to_one` |
 | O2M same type (tree) | self `one_to_many` + self `many_to_one` |
 | M2M two types (groups, users) | `many_to_many` on both sides, join columns swapped |
@@ -644,24 +644,24 @@ that Ent doesn't.
 
 | Area | Ent feature | vgraph today | Phase |
 |---|---|---|---|
-| **Fields** | types: ints of every size, floats, bool, string/text, time, bytes, JSON, enum, UUID, `Other` | `int`, `i64`, `f64`, `bool`, `string`, `time.Time`, and options of these | 6d |
+| **Fields** | types: ints of every size, floats, bool, string/text, time, bytes, JSON, enum, UUID, `Other` | all but bytes, which V's ORM can't store (`TODO.md`); JSON through `Field.json`; UUID as `string` | 6d (done) |
 | | `Optional`, `Nillable` | `Field.optional`; option types are nullable; `set_nillable_<field>` | 6a (done) |
 | | `Default`, `DefaultFunc`, `UpdateDefault` | `default`, `default_now`, `update_default`, `update_now` | 6a (done) |
 | | `Immutable`, `Sensitive` | `immutable` (no update setter); `sensitive` leaves GraphQL only, as V's `str()` can't be changed | 6a (done) |
-| | `Unique`, `StorageKey`, `SchemaType`, `Comment`, `Deprecated` | through V's ORM attributes: `@[unique]`, `@[sql: 'col']`, `sql_type` | 6d |
+| | `Unique`, `StorageKey`, `SchemaType`, `Comment`, `Deprecated` | `@[unique]` / `Field.unique`, `@[sql: 'col']`, `sql_type`, `Field.comment` / `deprecated` | 6a, 6d (done); in GraphQL 6e |
 | | validators: `Validate`, `MinLen`, `MaxLen`, `NotEmpty`, `Match`, `Range`, `Positive` | `validate`, `min_len`, `max_len`, `not_empty`, `pattern`, `min` / `max`, `positive` | 6a (done) |
-| | custom types: `GoType`, `ValueScanner` | none | 6d |
+| | custom types: `GoType`, `ValueScanner` | type aliases; no `ValueScanner` (Q84) | 6d (done) |
 | | id types: `i64`, string (UUID) | `int` only (Q6) | 3.2 (Q43) |
-| | id types: custom (`GoType`, `ValueScanner`) | none | 6d |
-| **Edges** | `To` / `From` with `Ref` (an edge and its inverse, checked together) | each direction declared on its own, with no link between them | 6d |
+| | id types: custom (`GoType`, `ValueScanner`) | aliases of `int`, `i64`, `string` | 6d (done) |
+| **Edges** | `To` / `From` with `Ref` (an edge and its inverse, checked together) | `Edge.ref`, checked by `validate`; `bidi` for bidirectional self edges | 6d (done) |
 | | `Unique`, `Field` (the column holding the key) | the kind and `column` | done |
-| | `Required`, `Immutable`, `StorageKey` | none | 6d (moved from 6a: edge options are schema work) |
-| | `Through`: edge schemas, join tables with fields of their own | join tables have only the two keys | 6d |
+| | `Required`, `Immutable`, `StorageKey` | `required`, `immutable`; `column` / `through` | 6d (done) |
+| | `Through`: edge schemas, join tables with fields of their own | a registered join struct | 6d (done) |
 | | — | polymorphic edges, per-edge soft delete (extra) | done |
-| **Schema** | declared indexes (fields, edges, unique, partial) | edge columns and join pairs, through the migration helpers | 5 (done) / 6d |
-| | mixins (shared fields, edges, hooks) | none; V's embedded structs may serve | 6d |
+| **Schema** | declared indexes (fields, edges, unique, partial) | `indexes()`, unique and partial | 5, 6d (done) |
+| | mixins (shared fields, edges, hooks) | embedded structs | 6d (done) |
 | | annotations (`entsql`, `entgql`) | `@[table]`; `@[graphql]` in Phase 4 (Q29) | 4 / 6d |
-| | views, multiple database schemas | none | 6d |
+| | views, multiple database schemas | views (`@[vgraph: 'view']`); schemas §8 (Q91) | 6d (done) |
 | **Queries** | predicates `EQ`, `NEQ`, `In`, `NotIn`, `GT`/`GTE`/`LT`/`LTE`, `IsNil`, `NotNil` | all, as methods and functions | 6b (done) |
 | | `Contains`, `HasPrefix`, `HasSuffix`, `EqualFold`, `ContainsFold` | all, escaped; GraphQL's escaped too | 6b (done) |
 | | `And`, `Or`, `Not` | `load.and`, `or`, `not` | 6b (done) |
@@ -692,12 +692,12 @@ that Ent doesn't.
 | | privacy: policies, rules, viewer context | `policy()`, `g.policy`, query and mutation rules, filter rules, `privileged()` | 6c (done) |
 | | `context.Context` on every call | `g.with_ctx(ctx)`, passed on by the GraphQL server, to hooks, interceptors and rules | 6a, 6c (done) |
 | | debug logging of queries | `vgraph.trace`, without values (Q67) | 6c (done) |
-| **Codegen** | `entc` feature flags, external templates, extensions | `vgraph gen`, no options | 6d |
-| | `ent describe` | none | 6d (`vgraph describe`) |
+| **Codegen** | `entc` feature flags, external templates, extensions | `--no-graphql`; templates and extensions §8 (Q93) | 6d (done) |
+| | `ent describe` | `vgraph describe` | 6d (done) |
 | | schema visualization (entviz) | none | §8 |
 | **Migrations** | automatic and versioned migrations, diffing through Atlas | versioned through `v.migrations`, written by hand, with vgraph's helpers (Q10) | 5 (done); no diffing |
 | **entgql** | schema generation | none | 4 |
-| | `Node` interface, global ids, `node` / `nodes` | none | 6d, with globally unique ids (Q42) |
+| | `Node` interface, global ids, `node` / `nodes` | global ids (`global_ids`, `table_of`); `Node` in 6e | 6d (done), 6e |
 | | `CollectFields`: eager loads from the selection set | none | 4 (Q32) |
 | | `WhereInput`: every predicate, `and`/`or`/`not`, `has<Edge>` | the predicates `load` can run, ANDed (Phase 4) | rest 6e |
 | | `OrderBy` inputs, multi-field ordering | none | 4 (one field); 6e |
@@ -798,14 +798,85 @@ Work per sub-phase (Q51–Q60 answered):
   `delete<T>` mutations with `Create<T>Input` / `Update<T>Input`; Relay connections
   with cursors, `totalCount` and per-parent pagination in SQL; the full
   `WhereInput`; multi-field `orderBy`; the remaining annotations.
+- **Also for 6e** (2026-10-13, asked in chat; questions when 6e starts): named
+  operations (`query GetUser { … }`) in the project's `.graphql` files are silently
+  dropped by `vgraph gen` today: `validate_sdl` accepts them and `build_ast_schema`
+  ignores them.
+  - (a) report them: `vgraph gen` fails on an operation in a schema file, with its
+    file and line; a convention such as `operations/*.graphql` for operations;
+  - (b) stored operations ("trusted documents"): the server loads named operations
+    at startup, clients send `operationName` and variables only, and the server can
+    refuse anything else; close to Q30's persisted queries, fixed at build time;
+  - (c) a typed V client per operation, generated from those files (as gqlgen's and
+    graphql-codegen's clients); likely §8.
 - **After 6e** (Q58): `examples/service` drops its REST API and stores, and runs on
   vgraph alone.
 
 Decisions before 6c (Q61–Q69, 2026-10-13): the defaults. Trace events carry no
 values: no parameters, and no error messages (Q67).
 
+Decisions before 6d (Q82–Q94, 2026-10-13): the defaults.
+
 Decisions before 6b (Q70–Q81, 2026-10-13): the defaults; reads that need SQL the
 ORM can't express run keys first (Q70 (a)).
+
+*6d result (2026-10-13, done):*
+- **Reflection** (`load/fields.v`, `schema.v`): every type of V's ORM but bytes, type
+  aliases (through `unaliased_typ`), enums (their values listed with `$for v in
+  field.typ.values`) and embedded structs (a nested `$for sub in field.typ.fields`:
+  calling a generic function on `field.typ` still fails,
+  `regressions/comptime_generic_call.vv`). The long type chains are generated text.
+  `Column` gained `type_name`, `enum_values`, `embedded` and `json_type`; `Table`
+  gained `indexes`, `view` and counts of hooks, interceptors and rules. `?i64`,
+  `?f64`, `?bool` and the rest now read.
+- **Bytes: left out** (Q82). V's ORM can bind `[]u8` but can't create the column on
+  SQLite or read it back on either database (`TODO.md`).
+- **`db.pg` decodes `u32` and `u64` wrongly** (0, or a wrong number): vgraph reads
+  them as `i64` (`TODO.md`).
+- **Mixins** (Q89): the ORM names an embedded struct's columns `<Struct>.<field>`
+  (`Stamps.created_at`), so vgraph does too, and works with tables the ORM creates and
+  the app's own `sql { }` blocks. `v.migrations` refuses such names, so
+  `vgraph.create_table` writes the table's SQL itself.
+- **JSON** (Q83): `Field.json`; `node.<field>_value()`, `set_<field>_value()`,
+  `append_<field>()` (read, joined and written in the update's transaction, the row
+  locked on PostgreSQL); a `JSON` scalar in GraphQL.
+- **Edges** (Q86–Q88): `ref` checked against its inverse; `bidi` many_to_one keeps
+  pairs consistent (whoever pointed at either side stops), `bidi` many_to_many writes
+  and deletes both join rows; `required` on create, `immutable` refused on update and
+  absent from the update builders. Edge schemas are recognized when `through` names a
+  registered struct, rather than through a `through_struct` option (Q88): the join
+  rows then go through that struct's create, with its defaults and hooks.
+- **Indexes and views** (Q90, Q91): `indexes()`; `Schema.partial_indexes()`, created
+  by `add_edge_indexes` with SQL; views have no write builders, no indexes and no
+  foreign keys, and a write to one is refused.
+- **Global ids** (Q85): `vgraph.create_table`, `vgraph.global_ids` and
+  `Client.table_of`, with `Schema.migration_table`. Ranges count from index 1, not
+  0, so a global id is always past 2^32. Without a driver, a new `i64` key can't be
+  read back (`last_id()` is 32 bits on SQLite), and such a create is refused.
+- **Unique many_to_one edges** (2026-10-13, after review): `examples/relations`
+  declared `spouse` as a `bidi` many_to_one with nothing to make it one-to-one: only
+  vgraph's own writes kept pairs, and any other write could give two users one
+  spouse. `Edge.unique` now marks a many_to_one edge as the key side of a one-to-one
+  relationship, as Ent's `Unique()`: its column gets a unique index
+  (`users_spouse_id_idx`), a `bidi` many_to_one must be `unique`, and a `bidi` write
+  clears the old partner before setting the new one, so the index holds throughout.
+  `card` and `next` were one-to-one already, through their inverse one_to_one edges'
+  indexes. Two checks also stopped relying on the unordered order of a many_to_many
+  load, which PostgreSQL changed.
+- **Generator:** predicates, setters, typed getters, orders and aggregates for the
+  new types (aliases and enums typed); GraphQL `Int` / `Float` for the sized types,
+  an enum type per enum field (`GadgetColor`); predicate functions that two tables
+  would both produce (`pet_owner_id_eq` for `pets.owner_id` and `pet_owners.id`) are
+  an error. `vgraph describe` (`gen/describe.v`) and `vgraph gen --no-graphql`.
+- **Tests:** `schema_test.v` (types, mixins, the new validation, views, global ids
+  across two migrations); `pg_test.v` (global ids on PostgreSQL);
+  `examples/relations` `check_schema` on both databases (every new type, JSON and
+  `append`, a mixin, the unique and partial indexes, required and immutable edges, an
+  edge schema, global ids, a view in queries and GraphQL) and `bidi` / `ref` in its
+  self edges, replacing the hand-written both-ways writes; `cmd/vgraph/gen_test.v`
+  (`describe` on `examples/relations`, `--no-graphql`). All 22 test files pass, both
+  PostgreSQL tests against PostgreSQL 18, and graphql-js 16.11.0 reads the generated
+  schemas unchanged.
 
 *6b result (2026-10-13, done):*
 - **Conditions** (`load/cond.v`, Q71): `load.Cond` is a tree (`Junction`: leaf, and,
@@ -1846,6 +1917,151 @@ connections stay in 6e, which builds them on 6b.
 - the existing query-count tests unchanged: what the ORM can run still runs in one
   query.
 >  A: good
+
+### Phase 6d (schema): answer before 6d starts
+
+Background (checked 2026-10-13, V master `53dd72c`):
+- **The ORM's types:** `i8`, `i16`, `int`, `i64`, `u8`–`u64`, `f32`, `f64`, `bool`,
+  `string`, `time.Time`, enums (stored as integers), `[]u8` (BLOB / BYTEA), and
+  embedded structs, whose fields become the table's columns. No JSON type: a field
+  of a struct type is a relation to the ORM, not a column. vgraph reads only `int`,
+  `i64`, `f64`, `bool`, `string` and `time.Time` (and their options, but `?i64`,
+  `?f64` and `?bool` fail when a row is read), and skips every array field, `[]u8`
+  included.
+- **Serial keys:** the ORM creates a `@[sql: serial]` key as `SERIAL` on PostgreSQL,
+  which is 32 bits, and as `INTEGER` on SQLite, without `AUTOINCREMENT`, so SQLite
+  gives a new row the largest key plus one, and a table's first key can't be set
+  ahead of time. V's `int` is 64 bits on this build.
+- **`v.migrations`:** `Index{table, columns, name, unique}` has no `WHERE`, so a
+  partial index needs `ctx.execute` with SQL.
+- **Moved here from earlier sub-phases:** `Append` (with JSON fields), and edge
+  `required` / `immutable`.
+
+**Q82. More field types.** **Default:** vgraph reads, writes, checks and generates
+for all of the ORM's types:
+- `i8`, `i16`, `u8`, `u16`, `u32`, `u64` and `f32` as the ints and floats are today:
+  the same predicates, orders and aggregates; in GraphQL `Int` or `Float`, with
+  values past 32 bits failing, as for `i64` today;
+- enums: stored as integers, as the ORM does; predicates `eq`, `ne`, `in`, `not_in`;
+  setters take the enum; in GraphQL an enum type generated from the V enum's values;
+- `[]u8`: a bytes column; predicates `eq`, `ne`, `is_null`; left out of GraphQL, as
+  entgql leaves bytes out unless told otherwise;
+- and the missing options: `?i64`, `?f64`, `?bool` and the rest read as they should.
+
+Keys stay `int`, `i64` or `string`.
+>  A: agreed
+
+**Q83. JSON fields.** **Default:** a JSON field is a `string` column in the model
+(`sql_type: 'jsonb'` on PostgreSQL, text on SQLite), with an option naming its V
+type: `vgraph.Field{name: 'tags', json: '[]string'}`. The generator then writes
+`node.tags_value() ![]string` (decoded with `json2`) and `set_tags_value(v []string)`
+(encoded) beside the plain string setter; `append_tags(items ...string)` on
+`update_one` reads, appends and writes in the update's transaction (locking the row
+on PostgreSQL). Predicates: `is_null` and the raw-SQL predicate only. In GraphQL a
+`JSON` scalar carrying the decoded value, as entgql's `Map` does for maps.
+>  A: agreed
+
+**Q84. Custom types** (Ent's `GoType`, `ValueScanner`). **Default:** a V type alias
+of a supported type (`type Email = string`, `type UserID = i64`) works as its base
+type, as a field and as a key, and the generated API takes the alias. Anything else
+(a struct stored in one column, a custom encoding) needs a JSON field (Q83). There
+is no `ValueScanner` hook: the ORM has none to call.
+>  A: agreed
+
+**Q85. Globally unique ids, for GraphQL's `Node`** (Q42). Each table's keys start at
+its own multiple of 2^32, so a key names its table. **Default:**
+- opt-in, per schema, for tables with `i64` serial keys; an `int` key table keeps
+  its own sequence and is left out of `Node`;
+- `vgraph.global_ids(mut ctx, schema)!` in a migration records each table's index in
+  a `vgraph_types` table (appending new tables, so ranges never move), and sets each
+  table's next key: on PostgreSQL by `ALTER SEQUENCE … RESTART`, with the key column
+  `BIGSERIAL` (`sql_type`); on SQLite by creating the table with `AUTOINCREMENT` and
+  setting `sqlite_sequence`, which the ORM's `create table` doesn't do, so these
+  tables are created through `migrations.Table`, or a helper vgraph adds for it;
+- `Client.table_of(key i64) !string` reads it back; `Node`, `node` and `nodes` in
+  GraphQL come with 6e. 
+
+The other choice is Relay's typed global ids (`Article:3`, base64): no ranges and no
+migration, but not entgql's convention, which Q28 and Q42 chose.
+>  A: go with the default
+
+**Q86. Edge inverses and bidirectional edges.** **Default:**
+- `Edge.ref`: the name of the inverse edge on the target, as Ent's `From(…).Ref(…)`.
+  `validate` checks the pair: the inverse exists and points back, over the same
+  column (one_to_many or one_to_one with many_to_one), or the same join table with
+  its columns swapped (many_to_many), with the same polymorphic type. Optional; it
+  changes no SQL;
+- `Edge.bidi`: on a self edge (a spouse, friends), a write stores both directions,
+  as Ent's bidirectional edges do: setting ada's spouse to bob sets bob's to ada,
+  and adding a friend adds both join rows. `examples/relations` then stops doing it
+  by hand.
+>  A: agreed
+
+**Q87. Edge options.** **Default:**
+- `required: true` on a many_to_one edge: a create must set it, even when its column
+  is nullable (Ent's `Required`);
+- `immutable: true`: the update builders have no setter or clear for the edge, and
+  the write engine refuses a change;
+- Ent's `StorageKey` is already `column` / `through` / `through_to`: nothing to add.
+>  A: agreed
+
+**Q88. Edge schemas** (Ent's `Through`: a join table with fields of its own). Today
+a join table holds only the two keys. **Default:** a many_to_many edge may name a
+registered struct as its join table (`through_struct: 'likes'`): the struct has its
+own fields and its two many_to_one edges, and gets its own client and builders.
+`validate` checks that its columns are the edge's. `add_<edge>_ids` still writes
+join rows when the struct's other fields are optional or have defaults, and is
+refused otherwise (create the join rows through their builder). Edge loads can load
+the join rows (`with_<join edge>`) as well as the targets. Join tables keep their own
+`id`: vgraph keys are one column (Q46).
+>  A: agreed
+
+**Q89. Mixins.** **Default:** an embedded struct is a mixin, as V and its ORM already
+treat it as part of the table: its fields are the table's columns, and its own
+`fields()`, `edges()`, `hooks()`, `interceptors()` and `policy()`, if it has them, are
+merged before the table's own. For example a `Timestamps` struct with `created_at` /
+`updated_at` and their `default_now` / `update_now`, embedded in every model.
+>  A: agreed
+
+**Q90. Declared indexes.** **Default:** `fn (Article) indexes() []vgraph.Index`, beside
+`edges()`: `vgraph.Index{columns: ['user_id', 'slug'], unique: true, where:
+'deleted_at IS NULL'}`. `migration_indexes()` and `add_edge_indexes` include them;
+a partial one (`where`) is created with `ctx.execute`, on SQLite and PostgreSQL
+alike; `validate` checks that the columns exist.
+>  A: agreed
+
+**Q91. Views and database schemas.** **Default:**
+- views: a struct marked `@[vgraph: 'view']` reads from a view: queries, edges and
+  GraphQL work; the generator writes no write builders for it, and the migration
+  helpers leave it to the app's own `CREATE VIEW`;
+- several database schemas (PostgreSQL's `billing.invoices`): out, to §8. The ORM
+  quotes a table name as one identifier, so `schema.table` would need changes there.
+>  A: agreed
+
+**Q92. `vgraph describe`.** **Default:** `vgraph describe [folder]` prints each table:
+its columns (type, null, key, options), edges (kind, target, column or join table,
+inverse), indexes, and how many hooks, interceptors and policy rules its model
+declares, as `ent describe` does. Text only.
+>  A: agreed
+
+**Q93. Generator options** (entc's feature flags, external templates, extensions).
+**Default:** every feature stays on (vgraph has nothing like Ent's opt-in flags to
+keep small); `vgraph gen` gains `--no-graphql`, for apps without GraphQL. External
+templates and extensions: out, to §8. The generator writes V code, not templates,
+and a project's own `.graphql` files and `resolvers.v` already cover the common
+case. 
+>  A: agreed
+
+**Q94. Exit criteria for 6d.** **Default:** Q59's, and:
+- `examples/relations` gains a table with every new field type, a JSON field, an enum,
+  a mixin, a declared and a partial index, an edge schema, and `ref` / `bidi` on its
+  self edges (replacing the hand-written both-ways writes); tested on SQLite and
+  PostgreSQL;
+- globally unique ids tested on both databases: ranges set, kept when a table is
+  added in a later migration, and `table_of` correct;
+- a view tested through queries and GraphQL;
+- `vgraph describe` tested on `examples/relations`.
+>  A: agreed
 
 ## 8. Future state
 

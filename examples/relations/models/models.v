@@ -27,12 +27,15 @@ pub fn (u User) edges() []vgraph.Edge {
 			to:     'cards'
 			column: 'owner_id'
 		},
-		// O2O bidirectional: each spouse holds the other's id
+		// O2O bidirectional: each spouse holds the other's id. `unique` makes it
+		// one to one (a unique index on `spouse_id`), and `bidi` sets both sides
 		vgraph.Edge{
 			name:   'spouse'
 			kind:   .many_to_one
 			to:     'users'
 			column: 'spouse_id'
+			unique: true
+			bidi:   true
 		},
 		// O2M two types
 		vgraph.Edge{
@@ -40,6 +43,7 @@ pub fn (u User) edges() []vgraph.Edge {
 			kind:   .one_to_many
 			to:     'pets'
 			column: 'owner_id'
+			ref:    'owner'
 		},
 		// M2M two types
 		vgraph.Edge{
@@ -49,6 +53,7 @@ pub fn (u User) edges() []vgraph.Edge {
 			column:     'user_id'
 			through:    'group_users'
 			through_to: 'group_id'
+			ref:        'users'
 		},
 		// M2M same type, both directions through one join table
 		vgraph.Edge{
@@ -58,6 +63,7 @@ pub fn (u User) edges() []vgraph.Edge {
 			column:     'follower_id'
 			through:    'follows'
 			through_to: 'followee_id'
+			ref:        'followers'
 		},
 		vgraph.Edge{
 			name:       'followers'
@@ -66,8 +72,10 @@ pub fn (u User) edges() []vgraph.Edge {
 			column:     'followee_id'
 			through:    'follows'
 			through_to: 'follower_id'
+			ref:        'following'
 		},
-		// M2M bidirectional: a friendship is stored in both directions
+		// M2M bidirectional: a friendship is stored in both directions, which a
+		// write does
 		vgraph.Edge{
 			name:       'friends'
 			kind:       .many_to_many
@@ -75,6 +83,7 @@ pub fn (u User) edges() []vgraph.Edge {
 			column:     'user_id'
 			through:    'friendships'
 			through_to: 'friend_id'
+			bidi:       true
 		},
 		// O2M to a table with UUID keys
 		vgraph.Edge{
@@ -82,6 +91,23 @@ pub fn (u User) edges() []vgraph.Edge {
 			kind:   .one_to_many
 			to:     'devices'
 			column: 'owner_id'
+		},
+		// gadgets: every other field type (6d)
+		vgraph.Edge{
+			name:   'gadgets'
+			kind:   .one_to_many
+			to:     'gadgets'
+			column: 'owner_id'
+			ref:    'owner'
+		},
+		// an edge schema: a like is a row of its own, with a time
+		vgraph.Edge{
+			name:       'liked_gadgets'
+			kind:       .many_to_many
+			to:         'gadgets'
+			column:     'user_id'
+			through:    'likes'
+			through_to: 'gadget_id'
 		},
 	]
 }
@@ -136,6 +162,7 @@ pub fn (p Pet) edges() []vgraph.Edge {
 			kind:   .many_to_one
 			to:     'users'
 			column: 'owner_id'
+			ref:    'pets'
 		},
 	]
 }
@@ -177,6 +204,7 @@ pub fn (g Group) edges() []vgraph.Edge {
 			column:     'group_id'
 			through:    'group_users'
 			through_to: 'user_id'
+			ref:        'groups'
 		},
 		vgraph.Edge{
 			name:       'devices'
@@ -338,4 +366,170 @@ pub:
 	id        int    @[primary; sql: serial]
 	device_id string @[sql_type: 'uuid']
 	group_id  int
+}
+
+// Color is a gadget's color: an enum, stored as an integer.
+pub enum Color {
+	red
+	green
+	blue
+}
+
+// Serial is a gadget's serial number: an alias of string.
+pub type Serial = string
+
+// Stamps is a mixin: the times every table that embeds it has, set by their
+// field options.
+pub struct Stamps {
+pub:
+	created_at time.Time
+	updated_at time.Time
+}
+
+// fields sets the times on create and update.
+pub fn (s Stamps) fields() []vgraph.Field {
+	return [
+		vgraph.Field{
+			name:        'created_at'
+			default_now: true
+			immutable:   true
+		},
+		vgraph.Field{
+			name:        'updated_at'
+			default_now: true
+			update_now:  true
+		},
+	]
+}
+
+// Gadget has every field type the others don't: sized and unsigned integers,
+// `f32`, an enum, an alias, options, JSON, and a mixin. Its `i64` key is a
+// globally unique id (see `migrate`).
+@[table: 'gadgets']
+pub struct Gadget {
+	Stamps
+pub:
+	id        i64 @[primary; sql: serial]
+	owner_id  int
+	serial_no Serial
+	color     Color
+	level     i8
+	weight    u16
+	parts     u32
+	big       u64
+	ratio     f32
+	rating    ?f64
+	score     ?i64
+	active    ?bool
+	tags      string
+}
+
+// fields: `tags` holds a JSON list of strings.
+pub fn (g Gadget) fields() []vgraph.Field {
+	return [
+		vgraph.Field{
+			name: 'tags'
+			json: '[]string'
+		},
+	]
+}
+
+// edges declares a gadget's owner, which every gadget has, and which doesn't
+// change, and the users who like it, through `Like`.
+pub fn (g Gadget) edges() []vgraph.Edge {
+	return [
+		vgraph.Edge{
+			name:      'owner'
+			kind:      .many_to_one
+			to:        'users'
+			column:    'owner_id'
+			ref:       'gadgets'
+			required:  true
+			immutable: true
+		},
+		vgraph.Edge{
+			name:       'likers'
+			kind:       .many_to_many
+			to:         'users'
+			column:     'gadget_id'
+			through:    'likes'
+			through_to: 'user_id'
+			ref:        'liked_gadgets'
+		},
+	]
+}
+
+// indexes: serial numbers are unique, and rated gadgets are looked up by owner.
+pub fn (g Gadget) indexes() []vgraph.Index {
+	return [
+		vgraph.Index{
+			columns: ['serial_no']
+			unique:  true
+		},
+		vgraph.Index{
+			name:    'gadgets_rated_owner_idx'
+			columns: ['owner_id']
+			where:   'rating IS NOT NULL'
+		},
+	]
+}
+
+// Like is the join row of `User.liked_gadgets`: an edge schema, with a time
+// of its own.
+@[table: 'likes']
+pub struct Like {
+pub:
+	id        int @[primary; sql: serial]
+	user_id   int
+	gadget_id i64
+	liked_at  time.Time
+}
+
+// fields sets when a like happened.
+pub fn (l Like) fields() []vgraph.Field {
+	return [vgraph.Field{
+		name:        'liked_at'
+		default_now: true
+	}]
+}
+
+// edges declares a like's user and gadget.
+pub fn (l Like) edges() []vgraph.Edge {
+	return [
+		vgraph.Edge{
+			name:   'user'
+			kind:   .many_to_one
+			to:     'users'
+			column: 'user_id'
+		},
+		vgraph.Edge{
+			name:   'gadget'
+			kind:   .many_to_one
+			to:     'gadgets'
+			column: 'gadget_id'
+		},
+	]
+}
+
+// OwnedPet reads the view `pet_owners`: each pet with an owner, and the
+// owner's name.
+@[table: 'pet_owners'; vgraph: 'view']
+pub struct OwnedPet {
+pub:
+	id         int
+	pet_name   string
+	owner_id   int
+	owner_name string
+}
+
+// edges declares an owned pet's owner.
+pub fn (p OwnedPet) edges() []vgraph.Edge {
+	return [
+		vgraph.Edge{
+			name:   'owner'
+			kind:   .many_to_one
+			to:     'users'
+			column: 'owner_id'
+		},
+	]
 }

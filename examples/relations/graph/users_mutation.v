@@ -383,6 +383,38 @@ pub fn (b UserCreate) add_devices(nodes ...DeviceNode) UserCreate {
 	}
 }
 
+// add_gadgets_ids adds the `gadgets` rows with the keys `ids` to `gadgets`.
+pub fn (b UserCreate) add_gadgets_ids(ids ...i64) UserCreate {
+	return UserCreate{
+		...b
+		data: b.data.with_added('gadgets', ids.map(it.str()))
+	}
+}
+
+// add_gadgets adds `nodes` to `gadgets`.
+pub fn (b UserCreate) add_gadgets(nodes ...GadgetNode) UserCreate {
+	return UserCreate{
+		...b
+		data: b.data.with_added('gadgets', nodes.map(it.gadget.id.str()))
+	}
+}
+
+// add_liked_gadgets_ids adds the `gadgets` rows with the keys `ids` to `liked_gadgets`.
+pub fn (b UserCreate) add_liked_gadgets_ids(ids ...i64) UserCreate {
+	return UserCreate{
+		...b
+		data: b.data.with_added('liked_gadgets', ids.map(it.str()))
+	}
+}
+
+// add_liked_gadgets adds `nodes` to `liked_gadgets`.
+pub fn (b UserCreate) add_liked_gadgets(nodes ...GadgetNode) UserCreate {
+	return UserCreate{
+		...b
+		data: b.data.with_added('liked_gadgets', nodes.map(it.gadget.id.str()))
+	}
+}
+
 // update_new_values sets what a conflict on `on_conflict_columns` does: the stored row takes the values of the create, but for immutable ones.
 // It needs a vgraph driver.
 pub fn (b UserCreate) update_new_values() UserCreate {
@@ -854,6 +886,86 @@ pub fn (b UserUpdateOne) clear_devices() UserUpdateOne {
 	}
 }
 
+// add_gadgets_ids adds the `gadgets` rows with the keys `ids` to `gadgets`.
+pub fn (b UserUpdateOne) add_gadgets_ids(ids ...i64) UserUpdateOne {
+	return UserUpdateOne{
+		...b
+		data: b.data.with_added('gadgets', ids.map(it.str()))
+	}
+}
+
+// add_gadgets adds `nodes` to `gadgets`.
+pub fn (b UserUpdateOne) add_gadgets(nodes ...GadgetNode) UserUpdateOne {
+	return UserUpdateOne{
+		...b
+		data: b.data.with_added('gadgets', nodes.map(it.gadget.id.str()))
+	}
+}
+
+// remove_gadgets_ids removes the `gadgets` rows with the keys `ids` from `gadgets`.
+pub fn (b UserUpdateOne) remove_gadgets_ids(ids ...i64) UserUpdateOne {
+	return UserUpdateOne{
+		...b
+		data: b.data.with_removed('gadgets', ids.map(it.str()))
+	}
+}
+
+// remove_gadgets removes `nodes` from `gadgets`.
+pub fn (b UserUpdateOne) remove_gadgets(nodes ...GadgetNode) UserUpdateOne {
+	return UserUpdateOne{
+		...b
+		data: b.data.with_removed('gadgets', nodes.map(it.gadget.id.str()))
+	}
+}
+
+// clear_gadgets removes every row from `gadgets`, before any are added.
+pub fn (b UserUpdateOne) clear_gadgets() UserUpdateOne {
+	return UserUpdateOne{
+		...b
+		data: b.data.with_cleared('gadgets')
+	}
+}
+
+// add_liked_gadgets_ids adds the `gadgets` rows with the keys `ids` to `liked_gadgets`.
+pub fn (b UserUpdateOne) add_liked_gadgets_ids(ids ...i64) UserUpdateOne {
+	return UserUpdateOne{
+		...b
+		data: b.data.with_added('liked_gadgets', ids.map(it.str()))
+	}
+}
+
+// add_liked_gadgets adds `nodes` to `liked_gadgets`.
+pub fn (b UserUpdateOne) add_liked_gadgets(nodes ...GadgetNode) UserUpdateOne {
+	return UserUpdateOne{
+		...b
+		data: b.data.with_added('liked_gadgets', nodes.map(it.gadget.id.str()))
+	}
+}
+
+// remove_liked_gadgets_ids removes the `gadgets` rows with the keys `ids` from `liked_gadgets`.
+pub fn (b UserUpdateOne) remove_liked_gadgets_ids(ids ...i64) UserUpdateOne {
+	return UserUpdateOne{
+		...b
+		data: b.data.with_removed('liked_gadgets', ids.map(it.str()))
+	}
+}
+
+// remove_liked_gadgets removes `nodes` from `liked_gadgets`.
+pub fn (b UserUpdateOne) remove_liked_gadgets(nodes ...GadgetNode) UserUpdateOne {
+	return UserUpdateOne{
+		...b
+		data: b.data.with_removed('liked_gadgets', nodes.map(it.gadget.id.str()))
+	}
+}
+
+// clear_liked_gadgets removes every row from `liked_gadgets`, before any are added.
+pub fn (b UserUpdateOne) clear_liked_gadgets() UserUpdateOne {
+	return UserUpdateOne{
+		...b
+		data: b.data.with_cleared('liked_gadgets')
+	}
+}
+
 // save updates the row and its edges, in one transaction, and returns it, read
 // back, or a `NotFoundError`.
 pub fn (b UserUpdateOne) save() !UserNode {
@@ -1118,6 +1230,26 @@ pub fn (q UserUpdate) has_devices() UserUpdate {
 // has_devices_with keeps the rows that have a `devices` that `configure` keeps.
 pub fn (q UserUpdate) has_devices_with(configure fn (DeviceQuery) DeviceQuery) UserUpdate {
 	return q.where(user_has_devices_with(...configure(q.graph.devices()).query.conds))
+}
+
+// has_gadgets keeps the rows where it has a `gadgets`.
+pub fn (q UserUpdate) has_gadgets() UserUpdate {
+	return q.where(user_has_gadgets())
+}
+
+// has_gadgets_with keeps the rows that have a `gadgets` that `configure` keeps.
+pub fn (q UserUpdate) has_gadgets_with(configure fn (GadgetQuery) GadgetQuery) UserUpdate {
+	return q.where(user_has_gadgets_with(...configure(q.graph.gadgets()).query.conds))
+}
+
+// has_liked_gadgets keeps the rows where it has a `liked_gadgets`.
+pub fn (q UserUpdate) has_liked_gadgets() UserUpdate {
+	return q.where(user_has_liked_gadgets())
+}
+
+// has_liked_gadgets_with keeps the rows that have a `liked_gadgets` that `configure` keeps.
+pub fn (q UserUpdate) has_liked_gadgets_with(configure fn (GadgetQuery) GadgetQuery) UserUpdate {
+	return q.where(user_has_liked_gadgets_with(...configure(q.graph.gadgets()).query.conds))
 }
 
 // set_name sets `name`.
@@ -1436,6 +1568,86 @@ pub fn (b UserUpdate) clear_devices() UserUpdate {
 	}
 }
 
+// add_gadgets_ids adds the `gadgets` rows with the keys `ids` to `gadgets`.
+pub fn (b UserUpdate) add_gadgets_ids(ids ...i64) UserUpdate {
+	return UserUpdate{
+		...b
+		data: b.data.with_added('gadgets', ids.map(it.str()))
+	}
+}
+
+// add_gadgets adds `nodes` to `gadgets`.
+pub fn (b UserUpdate) add_gadgets(nodes ...GadgetNode) UserUpdate {
+	return UserUpdate{
+		...b
+		data: b.data.with_added('gadgets', nodes.map(it.gadget.id.str()))
+	}
+}
+
+// remove_gadgets_ids removes the `gadgets` rows with the keys `ids` from `gadgets`.
+pub fn (b UserUpdate) remove_gadgets_ids(ids ...i64) UserUpdate {
+	return UserUpdate{
+		...b
+		data: b.data.with_removed('gadgets', ids.map(it.str()))
+	}
+}
+
+// remove_gadgets removes `nodes` from `gadgets`.
+pub fn (b UserUpdate) remove_gadgets(nodes ...GadgetNode) UserUpdate {
+	return UserUpdate{
+		...b
+		data: b.data.with_removed('gadgets', nodes.map(it.gadget.id.str()))
+	}
+}
+
+// clear_gadgets removes every row from `gadgets`, before any are added.
+pub fn (b UserUpdate) clear_gadgets() UserUpdate {
+	return UserUpdate{
+		...b
+		data: b.data.with_cleared('gadgets')
+	}
+}
+
+// add_liked_gadgets_ids adds the `gadgets` rows with the keys `ids` to `liked_gadgets`.
+pub fn (b UserUpdate) add_liked_gadgets_ids(ids ...i64) UserUpdate {
+	return UserUpdate{
+		...b
+		data: b.data.with_added('liked_gadgets', ids.map(it.str()))
+	}
+}
+
+// add_liked_gadgets adds `nodes` to `liked_gadgets`.
+pub fn (b UserUpdate) add_liked_gadgets(nodes ...GadgetNode) UserUpdate {
+	return UserUpdate{
+		...b
+		data: b.data.with_added('liked_gadgets', nodes.map(it.gadget.id.str()))
+	}
+}
+
+// remove_liked_gadgets_ids removes the `gadgets` rows with the keys `ids` from `liked_gadgets`.
+pub fn (b UserUpdate) remove_liked_gadgets_ids(ids ...i64) UserUpdate {
+	return UserUpdate{
+		...b
+		data: b.data.with_removed('liked_gadgets', ids.map(it.str()))
+	}
+}
+
+// remove_liked_gadgets removes `nodes` from `liked_gadgets`.
+pub fn (b UserUpdate) remove_liked_gadgets(nodes ...GadgetNode) UserUpdate {
+	return UserUpdate{
+		...b
+		data: b.data.with_removed('liked_gadgets', nodes.map(it.gadget.id.str()))
+	}
+}
+
+// clear_liked_gadgets removes every row from `liked_gadgets`, before any are added.
+pub fn (b UserUpdate) clear_liked_gadgets() UserUpdate {
+	return UserUpdate{
+		...b
+		data: b.data.with_cleared('liked_gadgets')
+	}
+}
+
 // exec updates the rows and their edges, in one transaction, and returns how
 // many there were.
 pub fn (b UserUpdate) exec() !int {
@@ -1724,6 +1936,26 @@ pub fn (q UserDelete) has_devices() UserDelete {
 // has_devices_with keeps the rows that have a `devices` that `configure` keeps.
 pub fn (q UserDelete) has_devices_with(configure fn (DeviceQuery) DeviceQuery) UserDelete {
 	return q.where(user_has_devices_with(...configure(q.graph.devices()).query.conds))
+}
+
+// has_gadgets keeps the rows where it has a `gadgets`.
+pub fn (q UserDelete) has_gadgets() UserDelete {
+	return q.where(user_has_gadgets())
+}
+
+// has_gadgets_with keeps the rows that have a `gadgets` that `configure` keeps.
+pub fn (q UserDelete) has_gadgets_with(configure fn (GadgetQuery) GadgetQuery) UserDelete {
+	return q.where(user_has_gadgets_with(...configure(q.graph.gadgets()).query.conds))
+}
+
+// has_liked_gadgets keeps the rows where it has a `liked_gadgets`.
+pub fn (q UserDelete) has_liked_gadgets() UserDelete {
+	return q.where(user_has_liked_gadgets())
+}
+
+// has_liked_gadgets_with keeps the rows that have a `liked_gadgets` that `configure` keeps.
+pub fn (q UserDelete) has_liked_gadgets_with(configure fn (GadgetQuery) GadgetQuery) UserDelete {
+	return q.where(user_has_liked_gadgets_with(...configure(q.graph.gadgets()).query.conds))
 }
 
 // exec deletes the rows, with their join table rows, in one transaction, and

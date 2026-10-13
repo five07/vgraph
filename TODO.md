@@ -18,3 +18,7 @@
   `dialect()`), implemented by the SQLite, PostgreSQL and MySQL drivers through their
   typed bind paths (`sqlite_stmt_binder`, `pg_stmt_binder`), so raw SQL gets typed
   params, NULL and typed results; then drop vgraph's SQLite/PostgreSQL adapters
+- upstream, found in 6d: V's ORM can't create (SQLite: `Unknown type`) or read
+  (`sqlite_select_column`, `db.pg`) a `[]u8` column, only bind one as a value; and
+  `db.pg` decodes `u32` and `u64` cells wrongly (`*unsafe { &u32(&data) }` after
+  `str.int()`), which vgraph works around by reading them as `i64`

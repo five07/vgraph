@@ -958,7 +958,7 @@ pub fn (q UserQuery) for_share() UserQuery {
 	return next
 }
 
-// no_wait: a lock fails at once on a row another transaction locked.
+// no_wait makes the lock one that fails at once on a row another transaction locked.
 pub fn (q UserQuery) no_wait() UserQuery {
 	mut next := q
 	next.query = load.Query{
@@ -971,7 +971,7 @@ pub fn (q UserQuery) no_wait() UserQuery {
 	return next
 }
 
-// skip_locked: a lock leaves out the rows other transactions locked.
+// skip_locked makes the lock one that leaves out the rows other transactions locked.
 pub fn (q UserQuery) skip_locked() UserQuery {
 	mut next := q
 	next.query = load.Query{
