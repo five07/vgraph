@@ -459,7 +459,7 @@ fn filters(edge Edge, with_type bool) string {
 	if edge.soft_del != '' {
 		parts << "soft_del: '${edge.soft_del}'"
 	}
-	parts << "query: q.graph.client.prepare_query('${edge.to}', sub.query)!"
+	parts << "query: q.graph.client.prepare_edge_query('${edge.to}', sub.query)!"
 	return parts.join(', ')
 }
 

@@ -741,7 +741,7 @@ fn (q LoginQuery) load_device(rows []models.Login, fns []fn (DeviceQuery) Device
 		keys << row.device_id.str()
 	}
 	targets := sub.nodes(load.select_in[models.Device](q.graph.client.conn, 'id', load.unique(keys),
-		query: q.graph.client.prepare_query('devices', sub.query)!
+		query: q.graph.client.prepare_edge_query('devices', sub.query)!
 	)!)!
 	mut by_key := map[string]DeviceNode{}
 	for target in targets {

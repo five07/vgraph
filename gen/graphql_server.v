@@ -698,7 +698,7 @@ fn ${p}_order_value(row ${info.typ()}, column string) orm.Primitive {
 fn write_edge_count(mut b strings.Builder, info Info, e Edge, target Info) ! {
 	p := info.prefix()
 	key := info.key_field()!
-	conds := sub_conds("g.client.prepare_query('${target.table.name}', sub.query)!.conds",
+	conds := sub_conds("g.client.prepare_edge_query('${target.table.name}', sub.query)!.conds",
 		edge_extras(e, true))
 	b.writeln('
 // ${p}_count_${e.name} counts the `${e.name}` of each of `rows` that `sub` keeps, by the

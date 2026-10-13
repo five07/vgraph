@@ -634,7 +634,7 @@ fn (q ${q}) load_${e.name}(rows []${info.typ()}, fns []fn (${tq}) ${tq}) !map[st
 				// a limit or offset applies to each row's targets: the join rows
 				// come cut, in the targets' order
 				b.writeln("	if sub.query.limit > 0 || sub.query.offset > 0 {
-		prepared := q.graph.client.prepare_query('${e.to}', sub.query)!
+		prepared := q.graph.client.prepare_edge_query('${e.to}', sub.query)!
 		cut := load.link_each(q.graph.client.conn, '${e.through}', '${e.column}', '${e.through_to}',
 			rows.map(it.${key}.str()), .${info.key_type()!}, .${target.key_type()!}, '${target.table.name}', '${target.table.key}', load.Query{
 			...prepared

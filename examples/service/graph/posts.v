@@ -3,9 +3,7 @@ module graph
 
 import five07.vgraph.load
 import time
-import posts.models as posts_models
-import users.models as users_models
-import comments.models as comments_models
+import models
 
 // PostQuery selects `posts` rows, and the edges to load with them. Start one with
 // `Graph.posts()`.
@@ -24,7 +22,7 @@ mut:
 pub struct PostNode {
 	graph Graph
 pub mut:
-	post           posts_models.Post
+	post           models.Post
 	author         ?&UserNode               // set by `with_author()`
 	comments       []CommentNode            // set by `with_comments()`
 	named_comments map[string][]CommentNode // set by `with_named_comments()`
@@ -77,137 +75,147 @@ pub fn (q PostQuery) offset(count int) PostQuery {
 // count returns how many rows match, in one query; order, limit and offset
 // do not apply.
 pub fn (q PostQuery) count() !int {
-	return load.count_where[posts_models.Post](q.graph.client.conn, q.graph.client.prepare_query('posts', q.query)!)
+	return load.count_where[models.Post](q.graph.client.conn, q.graph.client.prepare_query('posts', q.query)!)
+}
+
+// post_created_at_eq returns the condition that `Stamps.created_at` is `value`.
+pub fn post_created_at_eq(value time.Time) load.Cond {
+	return load.eq('Stamps.created_at', value)
+}
+
+// post_created_at_ne returns the condition that `Stamps.created_at` is not `value`.
+pub fn post_created_at_ne(value time.Time) load.Cond {
+	return load.ne('Stamps.created_at', value)
+}
+
+// post_created_at_lt returns the condition that `Stamps.created_at` comes before `value`.
+pub fn post_created_at_lt(value time.Time) load.Cond {
+	return load.lt('Stamps.created_at', value)
+}
+
+// post_created_at_le returns the condition that `Stamps.created_at` comes at or before `value`.
+pub fn post_created_at_le(value time.Time) load.Cond {
+	return load.le('Stamps.created_at', value)
+}
+
+// post_created_at_gt returns the condition that `Stamps.created_at` comes after `value`.
+pub fn post_created_at_gt(value time.Time) load.Cond {
+	return load.gt('Stamps.created_at', value)
+}
+
+// post_created_at_ge returns the condition that `Stamps.created_at` comes at or after `value`.
+pub fn post_created_at_ge(value time.Time) load.Cond {
+	return load.ge('Stamps.created_at', value)
+}
+
+// post_updated_at_eq returns the condition that `Stamps.updated_at` is `value`.
+pub fn post_updated_at_eq(value time.Time) load.Cond {
+	return load.eq('Stamps.updated_at', value)
+}
+
+// post_updated_at_ne returns the condition that `Stamps.updated_at` is not `value`.
+pub fn post_updated_at_ne(value time.Time) load.Cond {
+	return load.ne('Stamps.updated_at', value)
+}
+
+// post_updated_at_lt returns the condition that `Stamps.updated_at` comes before `value`.
+pub fn post_updated_at_lt(value time.Time) load.Cond {
+	return load.lt('Stamps.updated_at', value)
+}
+
+// post_updated_at_le returns the condition that `Stamps.updated_at` comes at or before `value`.
+pub fn post_updated_at_le(value time.Time) load.Cond {
+	return load.le('Stamps.updated_at', value)
+}
+
+// post_updated_at_gt returns the condition that `Stamps.updated_at` comes after `value`.
+pub fn post_updated_at_gt(value time.Time) load.Cond {
+	return load.gt('Stamps.updated_at', value)
+}
+
+// post_updated_at_ge returns the condition that `Stamps.updated_at` comes at or after `value`.
+pub fn post_updated_at_ge(value time.Time) load.Cond {
+	return load.ge('Stamps.updated_at', value)
 }
 
 // post_id_eq returns the condition that `id` is `value`.
-pub fn post_id_eq(value int) load.Cond {
+pub fn post_id_eq(value i64) load.Cond {
 	return load.eq('id', value)
 }
 
 // post_id_ne returns the condition that `id` is not `value`.
-pub fn post_id_ne(value int) load.Cond {
+pub fn post_id_ne(value i64) load.Cond {
 	return load.ne('id', value)
 }
 
 // post_id_lt returns the condition that `id` comes before `value`.
-pub fn post_id_lt(value int) load.Cond {
+pub fn post_id_lt(value i64) load.Cond {
 	return load.lt('id', value)
 }
 
 // post_id_le returns the condition that `id` comes at or before `value`.
-pub fn post_id_le(value int) load.Cond {
+pub fn post_id_le(value i64) load.Cond {
 	return load.le('id', value)
 }
 
 // post_id_gt returns the condition that `id` comes after `value`.
-pub fn post_id_gt(value int) load.Cond {
+pub fn post_id_gt(value i64) load.Cond {
 	return load.gt('id', value)
 }
 
 // post_id_ge returns the condition that `id` comes at or after `value`.
-pub fn post_id_ge(value int) load.Cond {
+pub fn post_id_ge(value i64) load.Cond {
 	return load.ge('id', value)
 }
 
 // post_id_in returns the condition that `id` is one of `values`.
-pub fn post_id_in(values []int) load.Cond {
-	return load.in_ints('id', values)
+pub fn post_id_in(values []i64) load.Cond {
+	return load.in_i64s('id', values)
 }
 
 // post_id_not_in returns the condition that `id` is none of `values`.
-pub fn post_id_not_in(values []int) load.Cond {
-	return load.not_in_ints('id', values)
-}
-
-// post_slug_eq returns the condition that `slug` is `value`.
-pub fn post_slug_eq(value string) load.Cond {
-	return load.eq('slug', value)
-}
-
-// post_slug_ne returns the condition that `slug` is not `value`.
-pub fn post_slug_ne(value string) load.Cond {
-	return load.ne('slug', value)
-}
-
-// post_slug_in returns the condition that `slug` is one of `values`.
-pub fn post_slug_in(values []string) load.Cond {
-	return load.in_strings('slug', values)
-}
-
-// post_slug_not_in returns the condition that `slug` is none of `values`.
-pub fn post_slug_not_in(values []string) load.Cond {
-	return load.not_in_strings('slug', values)
-}
-
-// post_slug_like returns the condition that `slug` matches the SQL LIKE `pattern`.
-pub fn post_slug_like(pattern string) load.Cond {
-	return load.like('slug', pattern)
-}
-
-// post_slug_contains returns the condition that `slug` contains `value`.
-pub fn post_slug_contains(value string) load.Cond {
-	return load.contains('slug', value)
-}
-
-// post_slug_has_prefix returns the condition that `slug` starts with `value`.
-pub fn post_slug_has_prefix(value string) load.Cond {
-	return load.has_prefix('slug', value)
-}
-
-// post_slug_has_suffix returns the condition that `slug` ends with `value`.
-pub fn post_slug_has_suffix(value string) load.Cond {
-	return load.has_suffix('slug', value)
-}
-
-// post_slug_equal_fold returns the condition that `slug` is `value`, ignoring case.
-pub fn post_slug_equal_fold(value string) load.Cond {
-	return load.equal_fold('slug', value)
-}
-
-// post_slug_contains_fold returns the condition that `slug` contains `value`, ignoring case.
-pub fn post_slug_contains_fold(value string) load.Cond {
-	return load.contains_fold('slug', value)
+pub fn post_id_not_in(values []i64) load.Cond {
+	return load.not_in_i64s('id', values)
 }
 
 // post_user_id_eq returns the condition that `user_id` is `value`.
-pub fn post_user_id_eq(value int) load.Cond {
+pub fn post_user_id_eq(value i64) load.Cond {
 	return load.eq('user_id', value)
 }
 
 // post_user_id_ne returns the condition that `user_id` is not `value`.
-pub fn post_user_id_ne(value int) load.Cond {
+pub fn post_user_id_ne(value i64) load.Cond {
 	return load.ne('user_id', value)
 }
 
 // post_user_id_lt returns the condition that `user_id` comes before `value`.
-pub fn post_user_id_lt(value int) load.Cond {
+pub fn post_user_id_lt(value i64) load.Cond {
 	return load.lt('user_id', value)
 }
 
 // post_user_id_le returns the condition that `user_id` comes at or before `value`.
-pub fn post_user_id_le(value int) load.Cond {
+pub fn post_user_id_le(value i64) load.Cond {
 	return load.le('user_id', value)
 }
 
 // post_user_id_gt returns the condition that `user_id` comes after `value`.
-pub fn post_user_id_gt(value int) load.Cond {
+pub fn post_user_id_gt(value i64) load.Cond {
 	return load.gt('user_id', value)
 }
 
 // post_user_id_ge returns the condition that `user_id` comes at or after `value`.
-pub fn post_user_id_ge(value int) load.Cond {
+pub fn post_user_id_ge(value i64) load.Cond {
 	return load.ge('user_id', value)
 }
 
 // post_user_id_in returns the condition that `user_id` is one of `values`.
-pub fn post_user_id_in(values []int) load.Cond {
-	return load.in_ints('user_id', values)
+pub fn post_user_id_in(values []i64) load.Cond {
+	return load.in_i64s('user_id', values)
 }
 
 // post_user_id_not_in returns the condition that `user_id` is none of `values`.
-pub fn post_user_id_not_in(values []int) load.Cond {
-	return load.not_in_ints('user_id', values)
+pub fn post_user_id_not_in(values []i64) load.Cond {
+	return load.not_in_i64s('user_id', values)
 }
 
 // post_body_eq returns the condition that `body` is `value`.
@@ -260,66 +268,6 @@ pub fn post_body_contains_fold(value string) load.Cond {
 	return load.contains_fold('body', value)
 }
 
-// post_created_at_eq returns the condition that `created_at` is `value`.
-pub fn post_created_at_eq(value time.Time) load.Cond {
-	return load.eq('created_at', value)
-}
-
-// post_created_at_ne returns the condition that `created_at` is not `value`.
-pub fn post_created_at_ne(value time.Time) load.Cond {
-	return load.ne('created_at', value)
-}
-
-// post_created_at_lt returns the condition that `created_at` comes before `value`.
-pub fn post_created_at_lt(value time.Time) load.Cond {
-	return load.lt('created_at', value)
-}
-
-// post_created_at_le returns the condition that `created_at` comes at or before `value`.
-pub fn post_created_at_le(value time.Time) load.Cond {
-	return load.le('created_at', value)
-}
-
-// post_created_at_gt returns the condition that `created_at` comes after `value`.
-pub fn post_created_at_gt(value time.Time) load.Cond {
-	return load.gt('created_at', value)
-}
-
-// post_created_at_ge returns the condition that `created_at` comes at or after `value`.
-pub fn post_created_at_ge(value time.Time) load.Cond {
-	return load.ge('created_at', value)
-}
-
-// post_updated_at_eq returns the condition that `updated_at` is `value`.
-pub fn post_updated_at_eq(value time.Time) load.Cond {
-	return load.eq('updated_at', value)
-}
-
-// post_updated_at_ne returns the condition that `updated_at` is not `value`.
-pub fn post_updated_at_ne(value time.Time) load.Cond {
-	return load.ne('updated_at', value)
-}
-
-// post_updated_at_lt returns the condition that `updated_at` comes before `value`.
-pub fn post_updated_at_lt(value time.Time) load.Cond {
-	return load.lt('updated_at', value)
-}
-
-// post_updated_at_le returns the condition that `updated_at` comes at or before `value`.
-pub fn post_updated_at_le(value time.Time) load.Cond {
-	return load.le('updated_at', value)
-}
-
-// post_updated_at_gt returns the condition that `updated_at` comes after `value`.
-pub fn post_updated_at_gt(value time.Time) load.Cond {
-	return load.gt('updated_at', value)
-}
-
-// post_updated_at_ge returns the condition that `updated_at` comes at or after `value`.
-pub fn post_updated_at_ge(value time.Time) load.Cond {
-	return load.ge('updated_at', value)
-}
-
 // post_deleted_at_eq returns the condition that `deleted_at` is `value`.
 pub fn post_deleted_at_eq(value time.Time) load.Cond {
 	return load.eq('deleted_at', value)
@@ -362,22 +310,46 @@ pub fn post_deleted_at_is_not_null() load.Cond {
 
 // post_has_author returns the condition that it has a `author`.
 pub fn post_has_author() load.Cond {
-	return load.and(load.is_not_null('user_id'), load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} }))
+	return load.and(load.is_not_null('user_id'), load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .i64, conds: []load.Cond{} }))
 }
 
 // post_has_author_with returns the condition that it has a `author` that matches `conds`.
 pub fn post_has_author_with(conds ...load.Cond) load.Cond {
-	return load.and(load.is_not_null('user_id'), load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds }))
+	return load.and(load.is_not_null('user_id'), load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .i64, conds: conds }))
 }
 
 // post_has_comments returns the condition that it has a `comments`.
 pub fn post_has_comments() load.Cond {
-	return load.in_sub('id', load.Sub{ table: 'comments', column: 'owner_id', kind: .int, conds: with_conds([]load.Cond{}, load.eq('owner_type', 'Post'), load.is_null('deleted_at')) })
+	return load.in_sub('id', load.Sub{ table: 'comments', column: 'owner_id', kind: .i64, conds: with_conds([]load.Cond{}, load.eq('owner_type', 'Post'), load.is_null('deleted_at')) })
 }
 
 // post_has_comments_with returns the condition that it has a `comments` that matches `conds`.
 pub fn post_has_comments_with(conds ...load.Cond) load.Cond {
-	return load.in_sub('id', load.Sub{ table: 'comments', column: 'owner_id', kind: .int, conds: with_conds(conds, load.eq('owner_type', 'Post'), load.is_null('deleted_at')) })
+	return load.in_sub('id', load.Sub{ table: 'comments', column: 'owner_id', kind: .i64, conds: with_conds(conds, load.eq('owner_type', 'Post'), load.is_null('deleted_at')) })
+}
+
+// order_by_created_at orders the rows by `Stamps.created_at`, ascending, after the orders
+// given before.
+pub fn (q PostQuery) order_by_created_at() PostQuery {
+	return q.order_by(load.asc('Stamps.created_at'))
+}
+
+// order_by_created_at_desc orders the rows by `Stamps.created_at`, descending, after the
+// orders given before.
+pub fn (q PostQuery) order_by_created_at_desc() PostQuery {
+	return q.order_by(load.desc('Stamps.created_at'))
+}
+
+// order_by_updated_at orders the rows by `Stamps.updated_at`, ascending, after the orders
+// given before.
+pub fn (q PostQuery) order_by_updated_at() PostQuery {
+	return q.order_by(load.asc('Stamps.updated_at'))
+}
+
+// order_by_updated_at_desc orders the rows by `Stamps.updated_at`, descending, after the
+// orders given before.
+pub fn (q PostQuery) order_by_updated_at_desc() PostQuery {
+	return q.order_by(load.desc('Stamps.updated_at'))
 }
 
 // order_by_id orders the rows by `id`, ascending, after the orders
@@ -390,18 +362,6 @@ pub fn (q PostQuery) order_by_id() PostQuery {
 // orders given before.
 pub fn (q PostQuery) order_by_id_desc() PostQuery {
 	return q.order_by(load.desc('id'))
-}
-
-// order_by_slug orders the rows by `slug`, ascending, after the orders
-// given before.
-pub fn (q PostQuery) order_by_slug() PostQuery {
-	return q.order_by(load.asc('slug'))
-}
-
-// order_by_slug_desc orders the rows by `slug`, descending, after the
-// orders given before.
-pub fn (q PostQuery) order_by_slug_desc() PostQuery {
-	return q.order_by(load.desc('slug'))
 }
 
 // order_by_user_id orders the rows by `user_id`, ascending, after the orders
@@ -428,30 +388,6 @@ pub fn (q PostQuery) order_by_body_desc() PostQuery {
 	return q.order_by(load.desc('body'))
 }
 
-// order_by_created_at orders the rows by `created_at`, ascending, after the orders
-// given before.
-pub fn (q PostQuery) order_by_created_at() PostQuery {
-	return q.order_by(load.asc('created_at'))
-}
-
-// order_by_created_at_desc orders the rows by `created_at`, descending, after the
-// orders given before.
-pub fn (q PostQuery) order_by_created_at_desc() PostQuery {
-	return q.order_by(load.desc('created_at'))
-}
-
-// order_by_updated_at orders the rows by `updated_at`, ascending, after the orders
-// given before.
-pub fn (q PostQuery) order_by_updated_at() PostQuery {
-	return q.order_by(load.asc('updated_at'))
-}
-
-// order_by_updated_at_desc orders the rows by `updated_at`, descending, after the
-// orders given before.
-pub fn (q PostQuery) order_by_updated_at_desc() PostQuery {
-	return q.order_by(load.desc('updated_at'))
-}
-
 // order_by_deleted_at orders the rows by `deleted_at`, ascending, after the orders
 // given before.
 pub fn (q PostQuery) order_by_deleted_at() PostQuery {
@@ -464,133 +400,143 @@ pub fn (q PostQuery) order_by_deleted_at_desc() PostQuery {
 	return q.order_by(load.desc('deleted_at'))
 }
 
+// where_created_at keeps the rows where `Stamps.created_at` is `value`.
+pub fn (q PostQuery) where_created_at(value time.Time) PostQuery {
+	return q.where(post_created_at_eq(value))
+}
+
+// where_created_at_ne keeps the rows where `Stamps.created_at` is not `value`.
+pub fn (q PostQuery) where_created_at_ne(value time.Time) PostQuery {
+	return q.where(post_created_at_ne(value))
+}
+
+// where_created_at_lt keeps the rows where `Stamps.created_at` comes before `value`.
+pub fn (q PostQuery) where_created_at_lt(value time.Time) PostQuery {
+	return q.where(post_created_at_lt(value))
+}
+
+// where_created_at_le keeps the rows where `Stamps.created_at` comes at or before `value`.
+pub fn (q PostQuery) where_created_at_le(value time.Time) PostQuery {
+	return q.where(post_created_at_le(value))
+}
+
+// where_created_at_gt keeps the rows where `Stamps.created_at` comes after `value`.
+pub fn (q PostQuery) where_created_at_gt(value time.Time) PostQuery {
+	return q.where(post_created_at_gt(value))
+}
+
+// where_created_at_ge keeps the rows where `Stamps.created_at` comes at or after `value`.
+pub fn (q PostQuery) where_created_at_ge(value time.Time) PostQuery {
+	return q.where(post_created_at_ge(value))
+}
+
+// where_updated_at keeps the rows where `Stamps.updated_at` is `value`.
+pub fn (q PostQuery) where_updated_at(value time.Time) PostQuery {
+	return q.where(post_updated_at_eq(value))
+}
+
+// where_updated_at_ne keeps the rows where `Stamps.updated_at` is not `value`.
+pub fn (q PostQuery) where_updated_at_ne(value time.Time) PostQuery {
+	return q.where(post_updated_at_ne(value))
+}
+
+// where_updated_at_lt keeps the rows where `Stamps.updated_at` comes before `value`.
+pub fn (q PostQuery) where_updated_at_lt(value time.Time) PostQuery {
+	return q.where(post_updated_at_lt(value))
+}
+
+// where_updated_at_le keeps the rows where `Stamps.updated_at` comes at or before `value`.
+pub fn (q PostQuery) where_updated_at_le(value time.Time) PostQuery {
+	return q.where(post_updated_at_le(value))
+}
+
+// where_updated_at_gt keeps the rows where `Stamps.updated_at` comes after `value`.
+pub fn (q PostQuery) where_updated_at_gt(value time.Time) PostQuery {
+	return q.where(post_updated_at_gt(value))
+}
+
+// where_updated_at_ge keeps the rows where `Stamps.updated_at` comes at or after `value`.
+pub fn (q PostQuery) where_updated_at_ge(value time.Time) PostQuery {
+	return q.where(post_updated_at_ge(value))
+}
+
 // where_id keeps the rows where `id` is `value`.
-pub fn (q PostQuery) where_id(value int) PostQuery {
+pub fn (q PostQuery) where_id(value i64) PostQuery {
 	return q.where(post_id_eq(value))
 }
 
 // where_id_ne keeps the rows where `id` is not `value`.
-pub fn (q PostQuery) where_id_ne(value int) PostQuery {
+pub fn (q PostQuery) where_id_ne(value i64) PostQuery {
 	return q.where(post_id_ne(value))
 }
 
 // where_id_lt keeps the rows where `id` comes before `value`.
-pub fn (q PostQuery) where_id_lt(value int) PostQuery {
+pub fn (q PostQuery) where_id_lt(value i64) PostQuery {
 	return q.where(post_id_lt(value))
 }
 
 // where_id_le keeps the rows where `id` comes at or before `value`.
-pub fn (q PostQuery) where_id_le(value int) PostQuery {
+pub fn (q PostQuery) where_id_le(value i64) PostQuery {
 	return q.where(post_id_le(value))
 }
 
 // where_id_gt keeps the rows where `id` comes after `value`.
-pub fn (q PostQuery) where_id_gt(value int) PostQuery {
+pub fn (q PostQuery) where_id_gt(value i64) PostQuery {
 	return q.where(post_id_gt(value))
 }
 
 // where_id_ge keeps the rows where `id` comes at or after `value`.
-pub fn (q PostQuery) where_id_ge(value int) PostQuery {
+pub fn (q PostQuery) where_id_ge(value i64) PostQuery {
 	return q.where(post_id_ge(value))
 }
 
 // where_id_in keeps the rows where `id` is one of `values`.
-pub fn (q PostQuery) where_id_in(values []int) PostQuery {
+pub fn (q PostQuery) where_id_in(values []i64) PostQuery {
 	return q.where(post_id_in(values))
 }
 
 // where_id_not_in keeps the rows where `id` is none of `values`.
-pub fn (q PostQuery) where_id_not_in(values []int) PostQuery {
+pub fn (q PostQuery) where_id_not_in(values []i64) PostQuery {
 	return q.where(post_id_not_in(values))
 }
 
-// where_slug keeps the rows where `slug` is `value`.
-pub fn (q PostQuery) where_slug(value string) PostQuery {
-	return q.where(post_slug_eq(value))
-}
-
-// where_slug_ne keeps the rows where `slug` is not `value`.
-pub fn (q PostQuery) where_slug_ne(value string) PostQuery {
-	return q.where(post_slug_ne(value))
-}
-
-// where_slug_in keeps the rows where `slug` is one of `values`.
-pub fn (q PostQuery) where_slug_in(values []string) PostQuery {
-	return q.where(post_slug_in(values))
-}
-
-// where_slug_not_in keeps the rows where `slug` is none of `values`.
-pub fn (q PostQuery) where_slug_not_in(values []string) PostQuery {
-	return q.where(post_slug_not_in(values))
-}
-
-// where_slug_like keeps the rows where `slug` matches the SQL LIKE `pattern`.
-pub fn (q PostQuery) where_slug_like(pattern string) PostQuery {
-	return q.where(post_slug_like(pattern))
-}
-
-// where_slug_contains keeps the rows where `slug` contains `value`.
-pub fn (q PostQuery) where_slug_contains(value string) PostQuery {
-	return q.where(post_slug_contains(value))
-}
-
-// where_slug_has_prefix keeps the rows where `slug` starts with `value`.
-pub fn (q PostQuery) where_slug_has_prefix(value string) PostQuery {
-	return q.where(post_slug_has_prefix(value))
-}
-
-// where_slug_has_suffix keeps the rows where `slug` ends with `value`.
-pub fn (q PostQuery) where_slug_has_suffix(value string) PostQuery {
-	return q.where(post_slug_has_suffix(value))
-}
-
-// where_slug_equal_fold keeps the rows where `slug` is `value`, ignoring case.
-pub fn (q PostQuery) where_slug_equal_fold(value string) PostQuery {
-	return q.where(post_slug_equal_fold(value))
-}
-
-// where_slug_contains_fold keeps the rows where `slug` contains `value`, ignoring case.
-pub fn (q PostQuery) where_slug_contains_fold(value string) PostQuery {
-	return q.where(post_slug_contains_fold(value))
-}
-
 // where_user_id keeps the rows where `user_id` is `value`.
-pub fn (q PostQuery) where_user_id(value int) PostQuery {
+pub fn (q PostQuery) where_user_id(value i64) PostQuery {
 	return q.where(post_user_id_eq(value))
 }
 
 // where_user_id_ne keeps the rows where `user_id` is not `value`.
-pub fn (q PostQuery) where_user_id_ne(value int) PostQuery {
+pub fn (q PostQuery) where_user_id_ne(value i64) PostQuery {
 	return q.where(post_user_id_ne(value))
 }
 
 // where_user_id_lt keeps the rows where `user_id` comes before `value`.
-pub fn (q PostQuery) where_user_id_lt(value int) PostQuery {
+pub fn (q PostQuery) where_user_id_lt(value i64) PostQuery {
 	return q.where(post_user_id_lt(value))
 }
 
 // where_user_id_le keeps the rows where `user_id` comes at or before `value`.
-pub fn (q PostQuery) where_user_id_le(value int) PostQuery {
+pub fn (q PostQuery) where_user_id_le(value i64) PostQuery {
 	return q.where(post_user_id_le(value))
 }
 
 // where_user_id_gt keeps the rows where `user_id` comes after `value`.
-pub fn (q PostQuery) where_user_id_gt(value int) PostQuery {
+pub fn (q PostQuery) where_user_id_gt(value i64) PostQuery {
 	return q.where(post_user_id_gt(value))
 }
 
 // where_user_id_ge keeps the rows where `user_id` comes at or after `value`.
-pub fn (q PostQuery) where_user_id_ge(value int) PostQuery {
+pub fn (q PostQuery) where_user_id_ge(value i64) PostQuery {
 	return q.where(post_user_id_ge(value))
 }
 
 // where_user_id_in keeps the rows where `user_id` is one of `values`.
-pub fn (q PostQuery) where_user_id_in(values []int) PostQuery {
+pub fn (q PostQuery) where_user_id_in(values []i64) PostQuery {
 	return q.where(post_user_id_in(values))
 }
 
 // where_user_id_not_in keeps the rows where `user_id` is none of `values`.
-pub fn (q PostQuery) where_user_id_not_in(values []int) PostQuery {
+pub fn (q PostQuery) where_user_id_not_in(values []i64) PostQuery {
 	return q.where(post_user_id_not_in(values))
 }
 
@@ -642,66 +588,6 @@ pub fn (q PostQuery) where_body_equal_fold(value string) PostQuery {
 // where_body_contains_fold keeps the rows where `body` contains `value`, ignoring case.
 pub fn (q PostQuery) where_body_contains_fold(value string) PostQuery {
 	return q.where(post_body_contains_fold(value))
-}
-
-// where_created_at keeps the rows where `created_at` is `value`.
-pub fn (q PostQuery) where_created_at(value time.Time) PostQuery {
-	return q.where(post_created_at_eq(value))
-}
-
-// where_created_at_ne keeps the rows where `created_at` is not `value`.
-pub fn (q PostQuery) where_created_at_ne(value time.Time) PostQuery {
-	return q.where(post_created_at_ne(value))
-}
-
-// where_created_at_lt keeps the rows where `created_at` comes before `value`.
-pub fn (q PostQuery) where_created_at_lt(value time.Time) PostQuery {
-	return q.where(post_created_at_lt(value))
-}
-
-// where_created_at_le keeps the rows where `created_at` comes at or before `value`.
-pub fn (q PostQuery) where_created_at_le(value time.Time) PostQuery {
-	return q.where(post_created_at_le(value))
-}
-
-// where_created_at_gt keeps the rows where `created_at` comes after `value`.
-pub fn (q PostQuery) where_created_at_gt(value time.Time) PostQuery {
-	return q.where(post_created_at_gt(value))
-}
-
-// where_created_at_ge keeps the rows where `created_at` comes at or after `value`.
-pub fn (q PostQuery) where_created_at_ge(value time.Time) PostQuery {
-	return q.where(post_created_at_ge(value))
-}
-
-// where_updated_at keeps the rows where `updated_at` is `value`.
-pub fn (q PostQuery) where_updated_at(value time.Time) PostQuery {
-	return q.where(post_updated_at_eq(value))
-}
-
-// where_updated_at_ne keeps the rows where `updated_at` is not `value`.
-pub fn (q PostQuery) where_updated_at_ne(value time.Time) PostQuery {
-	return q.where(post_updated_at_ne(value))
-}
-
-// where_updated_at_lt keeps the rows where `updated_at` comes before `value`.
-pub fn (q PostQuery) where_updated_at_lt(value time.Time) PostQuery {
-	return q.where(post_updated_at_lt(value))
-}
-
-// where_updated_at_le keeps the rows where `updated_at` comes at or before `value`.
-pub fn (q PostQuery) where_updated_at_le(value time.Time) PostQuery {
-	return q.where(post_updated_at_le(value))
-}
-
-// where_updated_at_gt keeps the rows where `updated_at` comes after `value`.
-pub fn (q PostQuery) where_updated_at_gt(value time.Time) PostQuery {
-	return q.where(post_updated_at_gt(value))
-}
-
-// where_updated_at_ge keeps the rows where `updated_at` comes at or after `value`.
-pub fn (q PostQuery) where_updated_at_ge(value time.Time) PostQuery {
-	return q.where(post_updated_at_ge(value))
 }
 
 // where_deleted_at keeps the rows where `deleted_at` is `value`.
@@ -767,13 +653,13 @@ pub fn (q PostQuery) has_comments_with(configure fn (CommentQuery) CommentQuery)
 // query_author starts a query of the `author` of the rows that match this
 // query's conditions; its order, limit and offset don't apply.
 pub fn (q PostQuery) query_author() UserQuery {
-	return q.graph.users().where(load.in_sub('id', load.Sub{ table: 'posts', column: 'user_id', kind: .int, conds: q.query.conds }))
+	return q.graph.users().where(load.in_sub('id', load.Sub{ table: 'posts', column: 'user_id', kind: .i64, conds: q.query.conds }))
 }
 
 // query_comments starts a query of the `comments` of the rows that match this
 // query's conditions; its order, limit and offset don't apply.
 pub fn (q PostQuery) query_comments() CommentQuery {
-	return q.graph.comments().where(load.in_sub('owner_id', load.Sub{ table: 'posts', column: 'id', kind: .int, conds: q.query.conds }), load.eq('owner_type', 'Post'), load.is_null('deleted_at'))
+	return q.graph.comments().where(load.in_sub('owner_id', load.Sub{ table: 'posts', column: 'id', kind: .i64, conds: q.query.conds }), load.eq('owner_type', 'Post'), load.is_null('deleted_at'))
 }
 
 // only returns the one matching row, with the requested edges: a
@@ -794,13 +680,13 @@ pub fn (q PostQuery) only() !PostNode {
 }
 
 // ids returns the keys of the matching rows, in order, and no edges.
-pub fn (q PostQuery) ids() ![]int {
-	keys := load.select_keys_where(q.graph.client.conn, 'posts', 'id', .int, q.graph.client.prepare_query('posts', q.query)!, true)!
-	return keys.map(it.int())
+pub fn (q PostQuery) ids() ![]i64 {
+	keys := load.select_keys_where(q.graph.client.conn, 'posts', 'id', .i64, q.graph.client.prepare_query('posts', q.query)!, true)!
+	return keys.map(it.i64())
 }
 
 // first_id returns the key of the first matching row, or a `NotFoundError`.
-pub fn (q PostQuery) first_id() !int {
+pub fn (q PostQuery) first_id() !i64 {
 	ids := q.limit(1).ids()!
 	if ids.len == 0 {
 		return NotFoundError{
@@ -812,7 +698,7 @@ pub fn (q PostQuery) first_id() !int {
 
 // only_id returns the key of the one matching row: a `NotFoundError` when
 // there is none, a `NotSingularError` when there are more.
-pub fn (q PostQuery) only_id() !int {
+pub fn (q PostQuery) only_id() !i64 {
 	ids := q.limit(2).ids()!
 	if ids.len == 0 {
 		return NotFoundError{
@@ -860,7 +746,7 @@ pub fn (q PostQuery) unique() PostQuery {
 // scan reads the matching rows into `T`, the app's struct for some of the
 // columns, by column name.
 pub fn (q PostQuery) scan[T]() ![]T {
-	return load.select_into[T](q.graph.client.conn, 'posts', 'id', .int, q.graph.client.prepare_query('posts', q.query)!)
+	return load.select_into[T](q.graph.client.conn, 'posts', 'id', .i64, q.graph.client.prepare_query('posts', q.query)!)
 }
 
 // order_by orders the rows by `orders` too, after the orders given before,
@@ -1023,29 +909,44 @@ pub fn (g PostGroupBy) scan[T]() ![]T {
 // post_column_type returns the V type of a column of `posts`.
 fn post_column_type(column string) string {
 	return match column {
-		'id' { 'int' }
-		'slug' { 'string' }
-		'user_id' { 'int' }
+		'Stamps.created_at' { 'time.Time' }
+		'Stamps.updated_at' { 'time.Time' }
+		'id' { 'i64' }
+		'user_id' { 'i64' }
 		'body' { 'string' }
-		'created_at' { 'time.Time' }
-		'updated_at' { 'time.Time' }
 		'deleted_at' { '?time.Time' }
 		else { '' }
 	}
 }
 
-// order_by_author_slug orders the rows by the `slug` of their `author`.
-pub fn (q PostQuery) order_by_author_slug() PostQuery {
+// order_by_author_created_at orders the rows by the `Stamps.created_at` of their `author`.
+pub fn (q PostQuery) order_by_author_created_at() PostQuery {
 	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."slug" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
+		expr: '(SELECT "t1"."Stamps.created_at" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
 	})
 }
 
-// order_by_author_slug_desc orders the rows by the `slug` of their
+// order_by_author_created_at_desc orders the rows by the `Stamps.created_at` of their
 // `author`, descending.
-pub fn (q PostQuery) order_by_author_slug_desc() PostQuery {
+pub fn (q PostQuery) order_by_author_created_at_desc() PostQuery {
 	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."slug" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
+		expr: '(SELECT "t1"."Stamps.created_at" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
+		desc: true
+	})
+}
+
+// order_by_author_updated_at orders the rows by the `Stamps.updated_at` of their `author`.
+pub fn (q PostQuery) order_by_author_updated_at() PostQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."Stamps.updated_at" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
+	})
+}
+
+// order_by_author_updated_at_desc orders the rows by the `Stamps.updated_at` of their
+// `author`, descending.
+pub fn (q PostQuery) order_by_author_updated_at_desc() PostQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."Stamps.updated_at" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
 		desc: true
 	})
 }
@@ -1078,38 +979,6 @@ pub fn (q PostQuery) order_by_author_email() PostQuery {
 pub fn (q PostQuery) order_by_author_email_desc() PostQuery {
 	return q.order_by(load.Order{
 		expr: '(SELECT "t1"."email" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
-		desc: true
-	})
-}
-
-// order_by_author_created_at orders the rows by the `created_at` of their `author`.
-pub fn (q PostQuery) order_by_author_created_at() PostQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."created_at" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
-	})
-}
-
-// order_by_author_created_at_desc orders the rows by the `created_at` of their
-// `author`, descending.
-pub fn (q PostQuery) order_by_author_created_at_desc() PostQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."created_at" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
-		desc: true
-	})
-}
-
-// order_by_author_updated_at orders the rows by the `updated_at` of their `author`.
-pub fn (q PostQuery) order_by_author_updated_at() PostQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."updated_at" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
-	})
-}
-
-// order_by_author_updated_at_desc orders the rows by the `updated_at` of their
-// `author`, descending.
-pub fn (q PostQuery) order_by_author_updated_at_desc() PostQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."updated_at" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
 		desc: true
 	})
 }
@@ -1176,7 +1045,7 @@ pub fn (q PostQuery) with_comments(configure ...fn (CommentQuery) CommentQuery) 
 
 // all returns the matching rows, with the requested edges.
 pub fn (q PostQuery) all() ![]PostNode {
-	rows := load.select_where[posts_models.Post](q.graph.client.conn, q.graph.client.prepare_query('posts', q.query)!)!
+	rows := load.select_where[models.Post](q.graph.client.conn, q.graph.client.prepare_query('posts', q.query)!)!
 	return q.nodes(rows)
 }
 
@@ -1194,7 +1063,7 @@ pub fn (q PostQuery) first() !PostNode {
 
 // nodes loads the requested edges onto `rows`, which the caller already has: one
 // query per edge, however many rows there are.
-pub fn (q PostQuery) nodes(rows []posts_models.Post) ![]PostNode {
+pub fn (q PostQuery) nodes(rows []models.Post) ![]PostNode {
 	mut nodes := rows.map(PostNode{
 		graph: q.graph
 		post:  it
@@ -1229,7 +1098,7 @@ pub fn (q PostQuery) nodes(rows []posts_models.Post) ![]PostNode {
 }
 
 // load_author loads the `author` of `rows`, keyed by each row's key.
-fn (q PostQuery) load_author(rows []posts_models.Post, fns []fn (UserQuery) UserQuery) !map[string][]UserNode {
+fn (q PostQuery) load_author(rows []models.Post, fns []fn (UserQuery) UserQuery) !map[string][]UserNode {
 	mut sub := q.graph.users()
 	for configure in fns {
 		sub = configure(sub)
@@ -1238,9 +1107,8 @@ fn (q PostQuery) load_author(rows []posts_models.Post, fns []fn (UserQuery) User
 	for row in rows {
 		keys << row.user_id.str()
 	}
-	targets := sub.nodes(load.select_in[users_models.User](q.graph.client.conn, 'id',
-		load.unique(keys),
-		query: q.graph.client.prepare_query('users', sub.query)!
+	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id', load.unique(keys),
+		query: q.graph.client.prepare_edge_query('users', sub.query)!
 	)!)!
 	mut by_key := map[string]UserNode{}
 	for target in targets {
@@ -1272,17 +1140,17 @@ pub fn (n PostNode) author_or_err() !&UserNode {
 }
 
 // load_comments loads the `comments` of `rows`, keyed by each row's key.
-fn (q PostQuery) load_comments(rows []posts_models.Post, fns []fn (CommentQuery) CommentQuery) !map[string][]CommentNode {
+fn (q PostQuery) load_comments(rows []models.Post, fns []fn (CommentQuery) CommentQuery) !map[string][]CommentNode {
 	mut sub := q.graph.comments()
 	for configure in fns {
 		sub = configure(sub)
 	}
-	children := sub.nodes(load.select_each[comments_models.Comment](q.graph.client.conn,
-		'owner_id', rows.map(it.id.str()),
+	children := sub.nodes(load.select_each[models.Comment](q.graph.client.conn, 'owner_id',
+		rows.map(it.id.str()),
 		type_col: 'owner_type'
 		type_val: 'Post'
 		soft_del: 'deleted_at'
-		query:    q.graph.client.prepare_query('comments', sub.query)!
+		query:    q.graph.client.prepare_edge_query('comments', sub.query)!
 	)!)!
 	mut by_parent := map[string][]CommentNode{}
 	for child in children {

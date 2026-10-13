@@ -695,7 +695,7 @@ fn (q GroupQuery) load_users(rows []models.Group, fns []fn (UserQuery) UserQuery
 		sub = configure(sub)
 	}
 	if sub.query.limit > 0 || sub.query.offset > 0 {
-		prepared := q.graph.client.prepare_query('users', sub.query)!
+		prepared := q.graph.client.prepare_edge_query('users', sub.query)!
 		cut := load.link_each(q.graph.client.conn, 'group_users', 'group_id', 'user_id',
 			rows.map(it.id.str()), .int, .int, 'users', 'id', load.Query{
 				...prepared
@@ -722,7 +722,7 @@ fn (q GroupQuery) load_users(rows []models.Group, fns []fn (UserQuery) UserQuery
 		'user_id', rows.map(it.id.str()), .int, .int)!
 	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
 		load.unique(pairs.map(it[1])),
-		query: q.graph.client.prepare_query('users', sub.query)!
+		query: q.graph.client.prepare_edge_query('users', sub.query)!
 	)!)!
 	// each parent's targets in the order of the query
 	mut parents_of := map[string][]string{}
@@ -756,7 +756,7 @@ fn (q GroupQuery) load_devices(rows []models.Group, fns []fn (DeviceQuery) Devic
 		sub = configure(sub)
 	}
 	if sub.query.limit > 0 || sub.query.offset > 0 {
-		prepared := q.graph.client.prepare_query('devices', sub.query)!
+		prepared := q.graph.client.prepare_edge_query('devices', sub.query)!
 		cut := load.link_each(q.graph.client.conn, 'device_groups', 'group_id', 'device_id',
 			rows.map(it.id.str()), .int, .string, 'devices', 'id', load.Query{
 				...prepared
@@ -783,7 +783,7 @@ fn (q GroupQuery) load_devices(rows []models.Group, fns []fn (DeviceQuery) Devic
 		'device_id', rows.map(it.id.str()), .int, .string)!
 	targets := sub.nodes(load.select_in[models.Device](q.graph.client.conn, 'id',
 		load.unique(pairs.map(it[1])),
-		query: q.graph.client.prepare_query('devices', sub.query)!
+		query: q.graph.client.prepare_edge_query('devices', sub.query)!
 	)!)!
 	// each parent's targets in the order of the query
 	mut parents_of := map[string][]string{}

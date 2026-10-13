@@ -866,7 +866,7 @@ fn (q NodeQuery) load_next(rows []models.Node, fns []fn (NodeQuery) NodeQuery) !
 		}
 	}
 	targets := sub.nodes(load.select_in[models.Node](q.graph.client.conn, 'id', load.unique(keys),
-		query: q.graph.client.prepare_query('nodes', sub.query)!
+		query: q.graph.client.prepare_edge_query('nodes', sub.query)!
 	)!)!
 	mut by_key := map[string]NodeNode{}
 	for target in targets {
@@ -906,7 +906,7 @@ fn (q NodeQuery) load_prev(rows []models.Node, fns []fn (NodeQuery) NodeQuery) !
 	}
 	children := sub.nodes(load.select_each[models.Node](q.graph.client.conn, 'next_id',
 		rows.map(it.id.str()),
-		query: q.graph.client.prepare_query('nodes', sub.query)!
+		query: q.graph.client.prepare_edge_query('nodes', sub.query)!
 	)!)!
 	mut by_parent := map[string][]NodeNode{}
 	for child in children {

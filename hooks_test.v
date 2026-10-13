@@ -412,6 +412,42 @@ fn test_soft_delete() {
 	}
 }
 
+// An interceptor with `edges: false` hides rows from root queries, but not
+// from edge loads: a post keeps its hidden author.
+fn test_interceptors_left_out_of_edge_loads() {
+	for c in hook_clients()! {
+		for name in ['ada', 'bob'] {
+			c.create(MutationData{
+				table:  'authors'
+				values: {
+					'name': orm.Primitive(name)
+				}
+			})!
+		}
+		c.create(MutationData{
+			table:  'posts'
+			values: {
+				'title':     orm.Primitive('by ada')
+				'author_id': orm.Primitive(1)
+			}
+		})!
+		c.intercept_on('authors', Interceptor{
+			name:  'hide_ada'
+			edges: false
+			run:   fn (_ graphql.Context, _ string, mut q load.Query) ! {
+				q.conds << load.ne('name', 'ada')
+			}
+		})
+		roots := load.select_where[Author](c.conn, c.prepare_query('authors', load.Query{})!)!
+		assert roots.map(it.name) == ['bob']
+		found := c.load_one[Post, Author](posts(c)!, 'author')!
+		assert found.values().map(it.name) == ['ada']
+		// an edge load's query is prepared without it, any other with it
+		assert c.prepare_edge_query('authors', load.Query{})!.conds.len == 0
+		assert c.prepare_query('authors', load.Query{})!.conds.len == 1
+	}
+}
+
 fn test_privacy() {
 	for c in hook_clients()! {
 		// the model's rule denies a title

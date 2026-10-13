@@ -1344,7 +1344,6 @@ input CreateUserInput {
   followerIDs: [ID!]
   friendIDs: [ID!]
   deviceIDs: [ID!]
-  gadgetIDs: [ID!]
   likedGadgetIDs: [ID!]
 }
 
@@ -1373,9 +1372,6 @@ input UpdateUserInput {
   addDeviceIDs: [ID!]
   removeDeviceIDs: [ID!]
   clearDevices: Boolean
-  addGadgetIDs: [ID!]
-  removeGadgetIDs: [ID!]
-  clearGadgets: Boolean
   addLikedGadgetIDs: [ID!]
   removeLikedGadgetIDs: [ID!]
   clearLikedGadgets: Boolean

@@ -238,8 +238,11 @@ bulk create is one statement. Every ORM call passes through. On a plain
 `orm.Connection`, writes still work: a new key comes from `last_id()` (`int` keys
 only, so a string key must be set or have a default), upserts are refused, and
 without `orm.TransactionalConnection` statements run one by one. On a pool,
-`pg.pool(db)` holds one connection for each transaction. The adapters pass values
-as text, stored the way V's ORM stores them (on SQLite, times as Unix seconds).
+`pg.pool(db)` holds one connection for each transaction. SQLite has one transaction
+per connection, so threads that share `sqlite.new(db)` take turns at them: one
+begun while another is open waits for it to end. The adapters pass values as
+text, stored the way V's ORM stores them (on SQLite, times as Unix seconds), and
+the SQLite one keeps SQL out of its error messages.
 
 ## Schema options
 
@@ -362,7 +365,9 @@ g.users().intercept(fn (ctx graphql.Context, q graph.UserQuery) !graph.UserQuery
   stops the write. A bulk create runs them per row.
 - **Interceptors** run before every select of their table: root queries, counts,
   edge loads, traversals and the GraphQL resolvers. They narrow the query or fail
-  it; they can't change its results.
+  it; they can't change its results. One with `edges: false` leaves edge loads
+  out, so a record still shows the soft-deleted author it refers to, while lists of
+  authors leave them out: `vgraph.Interceptor{...vgraph.soft_delete_query('deleted_at'), edges: false}`.
 - **Privacy:** query and mutation rules return `.allow`, `.deny` or `.skip`; the
   first to allow or deny decides, and when all skip the operation runs. A query rule
   can narrow the query and skip, as a filter. A deny is a `vgraph.PrivacyError`; in
@@ -533,7 +538,7 @@ SQLite and PostgreSQL.
 - `gen/`, `cmd/vgraph/`: the generator and the `vgraph` command.
 - `load/`: `vgraph.load`, the batched loads that `Client` runs.
 - `graphql/`: the GraphQL server library, independent of the rest of vgraph.
-- `examples/service/`: a JSON REST API that uses vgraph, and its test bed.
+- `examples/service/`: a GraphQL API that runs on vgraph alone, and its test bed.
 - `examples/relations/`: every Ent relationship kind, declared and tested.
 - `regressions/`: one small program per V compiler bug that vgraph works around.
 

@@ -162,61 +162,88 @@ pub fn (mut m CommentMutation) on_rollback(f fn ()) {
 	m.inner.on_rollback(f)
 }
 
+// created_at returns the value the write sets `Stamps.created_at` to, or `none` when it
+// doesn't set it, or sets it to null.
+pub fn (m CommentMutation) created_at() ?time.Time {
+	value := m.inner.field_value('Stamps.created_at') or { return none }
+	return if value is time.Time { value } else { none }
+}
+
+// set_created_at makes the write set `Stamps.created_at` to `value`.
+pub fn (mut m CommentMutation) set_created_at(value time.Time) {
+	m.inner.set_field_value('Stamps.created_at', value)
+}
+
+// old_created_at returns the stored `Stamps.created_at` of the row an update_one or
+// delete_one is to.
+pub fn (mut m CommentMutation) old_created_at() !time.Time {
+	value := m.inner.old_field('Stamps.created_at')!
+	return if value is time.Time {
+		value
+	} else {
+		error('`comments.Stamps.created_at` is not a time.Time')
+	}
+}
+
+// updated_at returns the value the write sets `Stamps.updated_at` to, or `none` when it
+// doesn't set it, or sets it to null.
+pub fn (m CommentMutation) updated_at() ?time.Time {
+	value := m.inner.field_value('Stamps.updated_at') or { return none }
+	return if value is time.Time { value } else { none }
+}
+
+// set_updated_at makes the write set `Stamps.updated_at` to `value`.
+pub fn (mut m CommentMutation) set_updated_at(value time.Time) {
+	m.inner.set_field_value('Stamps.updated_at', value)
+}
+
+// old_updated_at returns the stored `Stamps.updated_at` of the row an update_one or
+// delete_one is to.
+pub fn (mut m CommentMutation) old_updated_at() !time.Time {
+	value := m.inner.old_field('Stamps.updated_at')!
+	return if value is time.Time {
+		value
+	} else {
+		error('`comments.Stamps.updated_at` is not a time.Time')
+	}
+}
+
 // id returns the value the write sets `id` to, or `none` when it
 // doesn't set it, or sets it to null.
-pub fn (m CommentMutation) id() ?int {
+pub fn (m CommentMutation) id() ?i64 {
 	value := m.inner.field_value('id') or { return none }
-	return if value is int { value } else { none }
+	return if value is i64 { value } else { none }
 }
 
 // set_id makes the write set `id` to `value`.
-pub fn (mut m CommentMutation) set_id(value int) {
+pub fn (mut m CommentMutation) set_id(value i64) {
 	m.inner.set_field_value('id', value)
 }
 
 // old_id returns the stored `id` of the row an update_one or
 // delete_one is to.
-pub fn (mut m CommentMutation) old_id() !int {
+pub fn (mut m CommentMutation) old_id() !i64 {
 	value := m.inner.old_field('id')!
-	return if value is int { value } else { error('`comments.id` is not a int') }
-}
-
-// slug returns the value the write sets `slug` to, or `none` when it
-// doesn't set it, or sets it to null.
-pub fn (m CommentMutation) slug() ?string {
-	value := m.inner.field_value('slug') or { return none }
-	return if value is string { value } else { none }
-}
-
-// set_slug makes the write set `slug` to `value`.
-pub fn (mut m CommentMutation) set_slug(value string) {
-	m.inner.set_field_value('slug', value)
-}
-
-// old_slug returns the stored `slug` of the row an update_one or
-// delete_one is to.
-pub fn (mut m CommentMutation) old_slug() !string {
-	value := m.inner.old_field('slug')!
-	return if value is string { value } else { error('`comments.slug` is not a string') }
+	return if value is i64 { value } else { error('`comments.id` is not a i64') }
 }
 
 // user_id returns the value the write sets `user_id` to, or `none` when it
 // doesn't set it, or sets it to null.
-pub fn (m CommentMutation) user_id() ?int {
+pub fn (m CommentMutation) user_id() ?i64 {
 	value := m.inner.field_value('user_id') or { return none }
-	return if value is int { value } else { none }
+	return if value is i64 { value } else { none }
 }
 
 // set_user_id makes the write set `user_id` to `value`.
-pub fn (mut m CommentMutation) set_user_id(value int) {
+pub fn (mut m CommentMutation) set_user_id(value i64) {
 	m.inner.set_field_value('user_id', value)
 }
 
 // old_user_id returns the stored `user_id` of the row an update_one or
 // delete_one is to.
-pub fn (mut m CommentMutation) old_user_id() !int {
+pub fn (mut m CommentMutation) old_user_id() !i64 {
 	value := m.inner.old_field('user_id')!
-	return if value is int { value } else { error('`comments.user_id` is not a int') }
+	return if value is i64 { value } else { error('`comments.user_id` is not a i64') }
 }
 
 // owner_type returns the value the write sets `owner_type` to, or `none` when it
@@ -240,32 +267,32 @@ pub fn (mut m CommentMutation) old_owner_type() !string {
 
 // owner_id returns the value the write sets `owner_id` to, or `none` when it
 // doesn't set it, or sets it to null.
-pub fn (m CommentMutation) owner_id() ?int {
+pub fn (m CommentMutation) owner_id() ?i64 {
 	value := m.inner.field_value('owner_id') or { return none }
-	return if value is int { value } else { none }
+	return if value is i64 { value } else { none }
 }
 
 // set_owner_id makes the write set `owner_id` to `value`.
-pub fn (mut m CommentMutation) set_owner_id(value int) {
+pub fn (mut m CommentMutation) set_owner_id(value i64) {
 	m.inner.set_field_value('owner_id', value)
 }
 
 // old_owner_id returns the stored `owner_id` of the row an update_one or
 // delete_one is to.
-pub fn (mut m CommentMutation) old_owner_id() !int {
+pub fn (mut m CommentMutation) old_owner_id() !i64 {
 	value := m.inner.old_field('owner_id')!
-	return if value is int { value } else { error('`comments.owner_id` is not a int') }
+	return if value is i64 { value } else { error('`comments.owner_id` is not a i64') }
 }
 
 // parent_id returns the value the write sets `parent_id` to, or `none` when it
 // doesn't set it, or sets it to null.
-pub fn (m CommentMutation) parent_id() ?int {
+pub fn (m CommentMutation) parent_id() ?i64 {
 	value := m.inner.field_value('parent_id') or { return none }
-	return if value is int { value } else { none }
+	return if value is i64 { value } else { none }
 }
 
 // set_parent_id makes the write set `parent_id` to `value`.
-pub fn (mut m CommentMutation) set_parent_id(value int) {
+pub fn (mut m CommentMutation) set_parent_id(value i64) {
 	m.inner.set_field_value('parent_id', value)
 }
 
@@ -291,52 +318,6 @@ pub fn (mut m CommentMutation) set_body(value string) {
 pub fn (mut m CommentMutation) old_body() !string {
 	value := m.inner.old_field('body')!
 	return if value is string { value } else { error('`comments.body` is not a string') }
-}
-
-// created_at returns the value the write sets `created_at` to, or `none` when it
-// doesn't set it, or sets it to null.
-pub fn (m CommentMutation) created_at() ?time.Time {
-	value := m.inner.field_value('created_at') or { return none }
-	return if value is time.Time { value } else { none }
-}
-
-// set_created_at makes the write set `created_at` to `value`.
-pub fn (mut m CommentMutation) set_created_at(value time.Time) {
-	m.inner.set_field_value('created_at', value)
-}
-
-// old_created_at returns the stored `created_at` of the row an update_one or
-// delete_one is to.
-pub fn (mut m CommentMutation) old_created_at() !time.Time {
-	value := m.inner.old_field('created_at')!
-	return if value is time.Time {
-		value
-	} else {
-		error('`comments.created_at` is not a time.Time')
-	}
-}
-
-// updated_at returns the value the write sets `updated_at` to, or `none` when it
-// doesn't set it, or sets it to null.
-pub fn (m CommentMutation) updated_at() ?time.Time {
-	value := m.inner.field_value('updated_at') or { return none }
-	return if value is time.Time { value } else { none }
-}
-
-// set_updated_at makes the write set `updated_at` to `value`.
-pub fn (mut m CommentMutation) set_updated_at(value time.Time) {
-	m.inner.set_field_value('updated_at', value)
-}
-
-// old_updated_at returns the stored `updated_at` of the row an update_one or
-// delete_one is to.
-pub fn (mut m CommentMutation) old_updated_at() !time.Time {
-	value := m.inner.old_field('updated_at')!
-	return if value is time.Time {
-		value
-	} else {
-		error('`comments.updated_at` is not a time.Time')
-	}
 }
 
 // deleted_at returns the value the write sets `deleted_at` to, or `none` when it
@@ -375,16 +356,24 @@ pub fn (q CommentQuery) create() CommentCreate {
 	}
 }
 
-// set_slug sets `slug`.
-pub fn (b CommentCreate) set_slug(value string) CommentCreate {
+// set_created_at sets `Stamps.created_at`.
+pub fn (b CommentCreate) set_created_at(value time.Time) CommentCreate {
 	return CommentCreate{
 		...b
-		data: b.data.with_value('slug', orm.Primitive(value))
+		data: b.data.with_value('Stamps.created_at', orm.Primitive(value))
+	}
+}
+
+// set_updated_at sets `Stamps.updated_at`.
+pub fn (b CommentCreate) set_updated_at(value time.Time) CommentCreate {
+	return CommentCreate{
+		...b
+		data: b.data.with_value('Stamps.updated_at', orm.Primitive(value))
 	}
 }
 
 // set_user_id sets `user_id`.
-pub fn (b CommentCreate) set_user_id(value int) CommentCreate {
+pub fn (b CommentCreate) set_user_id(value i64) CommentCreate {
 	return CommentCreate{
 		...b
 		data: b.data.with_value('user_id', orm.Primitive(value))
@@ -400,7 +389,7 @@ pub fn (b CommentCreate) set_owner_type(value string) CommentCreate {
 }
 
 // set_owner_id sets `owner_id`.
-pub fn (b CommentCreate) set_owner_id(value int) CommentCreate {
+pub fn (b CommentCreate) set_owner_id(value i64) CommentCreate {
 	return CommentCreate{
 		...b
 		data: b.data.with_value('owner_id', orm.Primitive(value))
@@ -408,7 +397,7 @@ pub fn (b CommentCreate) set_owner_id(value int) CommentCreate {
 }
 
 // set_parent_id sets `parent_id`.
-pub fn (b CommentCreate) set_parent_id(value int) CommentCreate {
+pub fn (b CommentCreate) set_parent_id(value i64) CommentCreate {
 	return CommentCreate{
 		...b
 		data: b.data.with_value('parent_id', orm.Primitive(value))
@@ -416,7 +405,7 @@ pub fn (b CommentCreate) set_parent_id(value int) CommentCreate {
 }
 
 // set_nillable_parent_id sets `parent_id`, to null for `none`.
-pub fn (b CommentCreate) set_nillable_parent_id(value ?int) CommentCreate {
+pub fn (b CommentCreate) set_nillable_parent_id(value ?i64) CommentCreate {
 	return CommentCreate{
 		...b
 		data: b.data.with_value('parent_id', if v := value {
@@ -432,22 +421,6 @@ pub fn (b CommentCreate) set_body(value string) CommentCreate {
 	return CommentCreate{
 		...b
 		data: b.data.with_value('body', orm.Primitive(value))
-	}
-}
-
-// set_created_at sets `created_at`.
-pub fn (b CommentCreate) set_created_at(value time.Time) CommentCreate {
-	return CommentCreate{
-		...b
-		data: b.data.with_value('created_at', orm.Primitive(value))
-	}
-}
-
-// set_updated_at sets `updated_at`.
-pub fn (b CommentCreate) set_updated_at(value time.Time) CommentCreate {
-	return CommentCreate{
-		...b
-		data: b.data.with_value('updated_at', orm.Primitive(value))
 	}
 }
 
@@ -472,7 +445,7 @@ pub fn (b CommentCreate) set_nillable_deleted_at(value ?time.Time) CommentCreate
 }
 
 // set_author_id sets `author` to the `users` row with the key `id`.
-pub fn (b CommentCreate) set_author_id(id int) CommentCreate {
+pub fn (b CommentCreate) set_author_id(id i64) CommentCreate {
 	return CommentCreate{
 		...b
 		data: b.data.with_value('user_id', orm.Primitive(id))
@@ -496,7 +469,7 @@ pub fn (b CommentCreate) set_parent(node CommentNode) CommentCreate {
 }
 
 // set_article_id sets `article` to the `articles` row with the key `id`.
-pub fn (b CommentCreate) set_article_id(id int) CommentCreate {
+pub fn (b CommentCreate) set_article_id(id i64) CommentCreate {
 	return CommentCreate{
 		...b
 		data: b.data.with_value('owner_id', orm.Primitive(id)).with_value('owner_type', orm.Primitive('Article'))
@@ -512,7 +485,7 @@ pub fn (b CommentCreate) set_article(node ArticleNode) CommentCreate {
 }
 
 // set_post_id sets `post` to the `posts` row with the key `id`.
-pub fn (b CommentCreate) set_post_id(id int) CommentCreate {
+pub fn (b CommentCreate) set_post_id(id i64) CommentCreate {
 	return CommentCreate{
 		...b
 		data: b.data.with_value('owner_id', orm.Primitive(id)).with_value('owner_type', orm.Primitive('Post'))
@@ -528,7 +501,7 @@ pub fn (b CommentCreate) set_post(node PostNode) CommentCreate {
 }
 
 // add_replies_ids adds the `comments` rows with the keys `ids` to `replies`.
-pub fn (b CommentCreate) add_replies_ids(ids ...int) CommentCreate {
+pub fn (b CommentCreate) add_replies_ids(ids ...i64) CommentCreate {
 	return CommentCreate{
 		...b
 		data: b.data.with_added('replies', ids.map(it.str()))
@@ -682,7 +655,7 @@ pub fn (q CommentQuery) update_one(node CommentNode) CommentUpdateOne {
 }
 
 // update_one_id starts the update of the row with the key `id`.
-pub fn (q CommentQuery) update_one_id(id int) CommentUpdateOne {
+pub fn (q CommentQuery) update_one_id(id i64) CommentUpdateOne {
 	return CommentUpdateOne{
 		graph: q.graph
 		data:  vgraph.MutationData{
@@ -698,63 +671,11 @@ pub fn (n CommentNode) update() CommentUpdateOne {
 	return n.graph.comments().update_one(n)
 }
 
-// set_slug sets `slug`.
-pub fn (b CommentUpdateOne) set_slug(value string) CommentUpdateOne {
+// set_updated_at sets `Stamps.updated_at`.
+pub fn (b CommentUpdateOne) set_updated_at(value time.Time) CommentUpdateOne {
 	return CommentUpdateOne{
 		...b
-		data: b.data.with_value('slug', orm.Primitive(value))
-	}
-}
-
-// set_user_id sets `user_id`.
-pub fn (b CommentUpdateOne) set_user_id(value int) CommentUpdateOne {
-	return CommentUpdateOne{
-		...b
-		data: b.data.with_value('user_id', orm.Primitive(value))
-	}
-}
-
-// set_owner_type sets `owner_type`.
-pub fn (b CommentUpdateOne) set_owner_type(value string) CommentUpdateOne {
-	return CommentUpdateOne{
-		...b
-		data: b.data.with_value('owner_type', orm.Primitive(value))
-	}
-}
-
-// set_owner_id sets `owner_id`.
-pub fn (b CommentUpdateOne) set_owner_id(value int) CommentUpdateOne {
-	return CommentUpdateOne{
-		...b
-		data: b.data.with_value('owner_id', orm.Primitive(value))
-	}
-}
-
-// set_parent_id sets `parent_id`.
-pub fn (b CommentUpdateOne) set_parent_id(value int) CommentUpdateOne {
-	return CommentUpdateOne{
-		...b
-		data: b.data.with_value('parent_id', orm.Primitive(value))
-	}
-}
-
-// set_nillable_parent_id sets `parent_id`, to null for `none`.
-pub fn (b CommentUpdateOne) set_nillable_parent_id(value ?int) CommentUpdateOne {
-	return CommentUpdateOne{
-		...b
-		data: b.data.with_value('parent_id', if v := value {
-			orm.Primitive(v)
-		} else {
-			orm.Primitive(orm.Null{})
-		})
-	}
-}
-
-// clear_parent_id sets `parent_id` to null.
-pub fn (b CommentUpdateOne) clear_parent_id() CommentUpdateOne {
-	return CommentUpdateOne{
-		...b
-		data: b.data.with_value('parent_id', orm.Primitive(orm.Null{}))
+		data: b.data.with_value('Stamps.updated_at', orm.Primitive(value))
 	}
 }
 
@@ -763,22 +684,6 @@ pub fn (b CommentUpdateOne) set_body(value string) CommentUpdateOne {
 	return CommentUpdateOne{
 		...b
 		data: b.data.with_value('body', orm.Primitive(value))
-	}
-}
-
-// set_created_at sets `created_at`.
-pub fn (b CommentUpdateOne) set_created_at(value time.Time) CommentUpdateOne {
-	return CommentUpdateOne{
-		...b
-		data: b.data.with_value('created_at', orm.Primitive(value))
-	}
-}
-
-// set_updated_at sets `updated_at`.
-pub fn (b CommentUpdateOne) set_updated_at(value time.Time) CommentUpdateOne {
-	return CommentUpdateOne{
-		...b
-		data: b.data.with_value('updated_at', orm.Primitive(value))
 	}
 }
 
@@ -810,72 +715,8 @@ pub fn (b CommentUpdateOne) clear_deleted_at() CommentUpdateOne {
 	}
 }
 
-// set_author_id sets `author` to the `users` row with the key `id`.
-pub fn (b CommentUpdateOne) set_author_id(id int) CommentUpdateOne {
-	return CommentUpdateOne{
-		...b
-		data: b.data.with_value('user_id', orm.Primitive(id))
-	}
-}
-
-// set_author sets `author` to `node`.
-pub fn (b CommentUpdateOne) set_author(node UserNode) CommentUpdateOne {
-	return CommentUpdateOne{
-		...b
-		data: b.data.with_value('user_id', orm.Primitive(node.user.id))
-	}
-}
-
-// set_parent sets `parent` to `node`.
-pub fn (b CommentUpdateOne) set_parent(node CommentNode) CommentUpdateOne {
-	return CommentUpdateOne{
-		...b
-		data: b.data.with_value('parent_id', orm.Primitive(node.comment.id))
-	}
-}
-
-// clear_parent removes the `parent`.
-pub fn (b CommentUpdateOne) clear_parent() CommentUpdateOne {
-	return CommentUpdateOne{
-		...b
-		data: b.data.with_value('parent_id', orm.Primitive(orm.Null{}))
-	}
-}
-
-// set_article_id sets `article` to the `articles` row with the key `id`.
-pub fn (b CommentUpdateOne) set_article_id(id int) CommentUpdateOne {
-	return CommentUpdateOne{
-		...b
-		data: b.data.with_value('owner_id', orm.Primitive(id)).with_value('owner_type', orm.Primitive('Article'))
-	}
-}
-
-// set_article sets `article` to `node`.
-pub fn (b CommentUpdateOne) set_article(node ArticleNode) CommentUpdateOne {
-	return CommentUpdateOne{
-		...b
-		data: b.data.with_value('owner_id', orm.Primitive(node.article.id)).with_value('owner_type', orm.Primitive('Article'))
-	}
-}
-
-// set_post_id sets `post` to the `posts` row with the key `id`.
-pub fn (b CommentUpdateOne) set_post_id(id int) CommentUpdateOne {
-	return CommentUpdateOne{
-		...b
-		data: b.data.with_value('owner_id', orm.Primitive(id)).with_value('owner_type', orm.Primitive('Post'))
-	}
-}
-
-// set_post sets `post` to `node`.
-pub fn (b CommentUpdateOne) set_post(node PostNode) CommentUpdateOne {
-	return CommentUpdateOne{
-		...b
-		data: b.data.with_value('owner_id', orm.Primitive(node.post.id)).with_value('owner_type', orm.Primitive('Post'))
-	}
-}
-
 // add_replies_ids adds the `comments` rows with the keys `ids` to `replies`.
-pub fn (b CommentUpdateOne) add_replies_ids(ids ...int) CommentUpdateOne {
+pub fn (b CommentUpdateOne) add_replies_ids(ids ...i64) CommentUpdateOne {
 	return CommentUpdateOne{
 		...b
 		data: b.data.with_added('replies', ids.map(it.str()))
@@ -891,7 +732,7 @@ pub fn (b CommentUpdateOne) add_replies(nodes ...CommentNode) CommentUpdateOne {
 }
 
 // remove_replies_ids removes the `comments` rows with the keys `ids` from `replies`.
-pub fn (b CommentUpdateOne) remove_replies_ids(ids ...int) CommentUpdateOne {
+pub fn (b CommentUpdateOne) remove_replies_ids(ids ...i64) CommentUpdateOne {
 	return CommentUpdateOne{
 		...b
 		data: b.data.with_removed('replies', ids.map(it.str()))
@@ -960,133 +801,143 @@ pub fn (b CommentUpdate) where(conds ...load.Cond) CommentUpdate {
 	}
 }
 
+// where_created_at keeps the rows where `Stamps.created_at` is `value`.
+pub fn (q CommentUpdate) where_created_at(value time.Time) CommentUpdate {
+	return q.where(comment_created_at_eq(value))
+}
+
+// where_created_at_ne keeps the rows where `Stamps.created_at` is not `value`.
+pub fn (q CommentUpdate) where_created_at_ne(value time.Time) CommentUpdate {
+	return q.where(comment_created_at_ne(value))
+}
+
+// where_created_at_lt keeps the rows where `Stamps.created_at` comes before `value`.
+pub fn (q CommentUpdate) where_created_at_lt(value time.Time) CommentUpdate {
+	return q.where(comment_created_at_lt(value))
+}
+
+// where_created_at_le keeps the rows where `Stamps.created_at` comes at or before `value`.
+pub fn (q CommentUpdate) where_created_at_le(value time.Time) CommentUpdate {
+	return q.where(comment_created_at_le(value))
+}
+
+// where_created_at_gt keeps the rows where `Stamps.created_at` comes after `value`.
+pub fn (q CommentUpdate) where_created_at_gt(value time.Time) CommentUpdate {
+	return q.where(comment_created_at_gt(value))
+}
+
+// where_created_at_ge keeps the rows where `Stamps.created_at` comes at or after `value`.
+pub fn (q CommentUpdate) where_created_at_ge(value time.Time) CommentUpdate {
+	return q.where(comment_created_at_ge(value))
+}
+
+// where_updated_at keeps the rows where `Stamps.updated_at` is `value`.
+pub fn (q CommentUpdate) where_updated_at(value time.Time) CommentUpdate {
+	return q.where(comment_updated_at_eq(value))
+}
+
+// where_updated_at_ne keeps the rows where `Stamps.updated_at` is not `value`.
+pub fn (q CommentUpdate) where_updated_at_ne(value time.Time) CommentUpdate {
+	return q.where(comment_updated_at_ne(value))
+}
+
+// where_updated_at_lt keeps the rows where `Stamps.updated_at` comes before `value`.
+pub fn (q CommentUpdate) where_updated_at_lt(value time.Time) CommentUpdate {
+	return q.where(comment_updated_at_lt(value))
+}
+
+// where_updated_at_le keeps the rows where `Stamps.updated_at` comes at or before `value`.
+pub fn (q CommentUpdate) where_updated_at_le(value time.Time) CommentUpdate {
+	return q.where(comment_updated_at_le(value))
+}
+
+// where_updated_at_gt keeps the rows where `Stamps.updated_at` comes after `value`.
+pub fn (q CommentUpdate) where_updated_at_gt(value time.Time) CommentUpdate {
+	return q.where(comment_updated_at_gt(value))
+}
+
+// where_updated_at_ge keeps the rows where `Stamps.updated_at` comes at or after `value`.
+pub fn (q CommentUpdate) where_updated_at_ge(value time.Time) CommentUpdate {
+	return q.where(comment_updated_at_ge(value))
+}
+
 // where_id keeps the rows where `id` is `value`.
-pub fn (q CommentUpdate) where_id(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_id(value i64) CommentUpdate {
 	return q.where(comment_id_eq(value))
 }
 
 // where_id_ne keeps the rows where `id` is not `value`.
-pub fn (q CommentUpdate) where_id_ne(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_id_ne(value i64) CommentUpdate {
 	return q.where(comment_id_ne(value))
 }
 
 // where_id_lt keeps the rows where `id` comes before `value`.
-pub fn (q CommentUpdate) where_id_lt(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_id_lt(value i64) CommentUpdate {
 	return q.where(comment_id_lt(value))
 }
 
 // where_id_le keeps the rows where `id` comes at or before `value`.
-pub fn (q CommentUpdate) where_id_le(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_id_le(value i64) CommentUpdate {
 	return q.where(comment_id_le(value))
 }
 
 // where_id_gt keeps the rows where `id` comes after `value`.
-pub fn (q CommentUpdate) where_id_gt(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_id_gt(value i64) CommentUpdate {
 	return q.where(comment_id_gt(value))
 }
 
 // where_id_ge keeps the rows where `id` comes at or after `value`.
-pub fn (q CommentUpdate) where_id_ge(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_id_ge(value i64) CommentUpdate {
 	return q.where(comment_id_ge(value))
 }
 
 // where_id_in keeps the rows where `id` is one of `values`.
-pub fn (q CommentUpdate) where_id_in(values []int) CommentUpdate {
+pub fn (q CommentUpdate) where_id_in(values []i64) CommentUpdate {
 	return q.where(comment_id_in(values))
 }
 
 // where_id_not_in keeps the rows where `id` is none of `values`.
-pub fn (q CommentUpdate) where_id_not_in(values []int) CommentUpdate {
+pub fn (q CommentUpdate) where_id_not_in(values []i64) CommentUpdate {
 	return q.where(comment_id_not_in(values))
 }
 
-// where_slug keeps the rows where `slug` is `value`.
-pub fn (q CommentUpdate) where_slug(value string) CommentUpdate {
-	return q.where(comment_slug_eq(value))
-}
-
-// where_slug_ne keeps the rows where `slug` is not `value`.
-pub fn (q CommentUpdate) where_slug_ne(value string) CommentUpdate {
-	return q.where(comment_slug_ne(value))
-}
-
-// where_slug_in keeps the rows where `slug` is one of `values`.
-pub fn (q CommentUpdate) where_slug_in(values []string) CommentUpdate {
-	return q.where(comment_slug_in(values))
-}
-
-// where_slug_not_in keeps the rows where `slug` is none of `values`.
-pub fn (q CommentUpdate) where_slug_not_in(values []string) CommentUpdate {
-	return q.where(comment_slug_not_in(values))
-}
-
-// where_slug_like keeps the rows where `slug` matches the SQL LIKE `pattern`.
-pub fn (q CommentUpdate) where_slug_like(pattern string) CommentUpdate {
-	return q.where(comment_slug_like(pattern))
-}
-
-// where_slug_contains keeps the rows where `slug` contains `value`.
-pub fn (q CommentUpdate) where_slug_contains(value string) CommentUpdate {
-	return q.where(comment_slug_contains(value))
-}
-
-// where_slug_has_prefix keeps the rows where `slug` starts with `value`.
-pub fn (q CommentUpdate) where_slug_has_prefix(value string) CommentUpdate {
-	return q.where(comment_slug_has_prefix(value))
-}
-
-// where_slug_has_suffix keeps the rows where `slug` ends with `value`.
-pub fn (q CommentUpdate) where_slug_has_suffix(value string) CommentUpdate {
-	return q.where(comment_slug_has_suffix(value))
-}
-
-// where_slug_equal_fold keeps the rows where `slug` is `value`, ignoring case.
-pub fn (q CommentUpdate) where_slug_equal_fold(value string) CommentUpdate {
-	return q.where(comment_slug_equal_fold(value))
-}
-
-// where_slug_contains_fold keeps the rows where `slug` contains `value`, ignoring case.
-pub fn (q CommentUpdate) where_slug_contains_fold(value string) CommentUpdate {
-	return q.where(comment_slug_contains_fold(value))
-}
-
 // where_user_id keeps the rows where `user_id` is `value`.
-pub fn (q CommentUpdate) where_user_id(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_user_id(value i64) CommentUpdate {
 	return q.where(comment_user_id_eq(value))
 }
 
 // where_user_id_ne keeps the rows where `user_id` is not `value`.
-pub fn (q CommentUpdate) where_user_id_ne(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_user_id_ne(value i64) CommentUpdate {
 	return q.where(comment_user_id_ne(value))
 }
 
 // where_user_id_lt keeps the rows where `user_id` comes before `value`.
-pub fn (q CommentUpdate) where_user_id_lt(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_user_id_lt(value i64) CommentUpdate {
 	return q.where(comment_user_id_lt(value))
 }
 
 // where_user_id_le keeps the rows where `user_id` comes at or before `value`.
-pub fn (q CommentUpdate) where_user_id_le(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_user_id_le(value i64) CommentUpdate {
 	return q.where(comment_user_id_le(value))
 }
 
 // where_user_id_gt keeps the rows where `user_id` comes after `value`.
-pub fn (q CommentUpdate) where_user_id_gt(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_user_id_gt(value i64) CommentUpdate {
 	return q.where(comment_user_id_gt(value))
 }
 
 // where_user_id_ge keeps the rows where `user_id` comes at or after `value`.
-pub fn (q CommentUpdate) where_user_id_ge(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_user_id_ge(value i64) CommentUpdate {
 	return q.where(comment_user_id_ge(value))
 }
 
 // where_user_id_in keeps the rows where `user_id` is one of `values`.
-pub fn (q CommentUpdate) where_user_id_in(values []int) CommentUpdate {
+pub fn (q CommentUpdate) where_user_id_in(values []i64) CommentUpdate {
 	return q.where(comment_user_id_in(values))
 }
 
 // where_user_id_not_in keeps the rows where `user_id` is none of `values`.
-pub fn (q CommentUpdate) where_user_id_not_in(values []int) CommentUpdate {
+pub fn (q CommentUpdate) where_user_id_not_in(values []i64) CommentUpdate {
 	return q.where(comment_user_id_not_in(values))
 }
 
@@ -1141,82 +992,82 @@ pub fn (q CommentUpdate) where_owner_type_contains_fold(value string) CommentUpd
 }
 
 // where_owner_id keeps the rows where `owner_id` is `value`.
-pub fn (q CommentUpdate) where_owner_id(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_owner_id(value i64) CommentUpdate {
 	return q.where(comment_owner_id_eq(value))
 }
 
 // where_owner_id_ne keeps the rows where `owner_id` is not `value`.
-pub fn (q CommentUpdate) where_owner_id_ne(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_owner_id_ne(value i64) CommentUpdate {
 	return q.where(comment_owner_id_ne(value))
 }
 
 // where_owner_id_lt keeps the rows where `owner_id` comes before `value`.
-pub fn (q CommentUpdate) where_owner_id_lt(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_owner_id_lt(value i64) CommentUpdate {
 	return q.where(comment_owner_id_lt(value))
 }
 
 // where_owner_id_le keeps the rows where `owner_id` comes at or before `value`.
-pub fn (q CommentUpdate) where_owner_id_le(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_owner_id_le(value i64) CommentUpdate {
 	return q.where(comment_owner_id_le(value))
 }
 
 // where_owner_id_gt keeps the rows where `owner_id` comes after `value`.
-pub fn (q CommentUpdate) where_owner_id_gt(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_owner_id_gt(value i64) CommentUpdate {
 	return q.where(comment_owner_id_gt(value))
 }
 
 // where_owner_id_ge keeps the rows where `owner_id` comes at or after `value`.
-pub fn (q CommentUpdate) where_owner_id_ge(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_owner_id_ge(value i64) CommentUpdate {
 	return q.where(comment_owner_id_ge(value))
 }
 
 // where_owner_id_in keeps the rows where `owner_id` is one of `values`.
-pub fn (q CommentUpdate) where_owner_id_in(values []int) CommentUpdate {
+pub fn (q CommentUpdate) where_owner_id_in(values []i64) CommentUpdate {
 	return q.where(comment_owner_id_in(values))
 }
 
 // where_owner_id_not_in keeps the rows where `owner_id` is none of `values`.
-pub fn (q CommentUpdate) where_owner_id_not_in(values []int) CommentUpdate {
+pub fn (q CommentUpdate) where_owner_id_not_in(values []i64) CommentUpdate {
 	return q.where(comment_owner_id_not_in(values))
 }
 
 // where_parent_id keeps the rows where `parent_id` is `value`.
-pub fn (q CommentUpdate) where_parent_id(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_parent_id(value i64) CommentUpdate {
 	return q.where(comment_parent_id_eq(value))
 }
 
 // where_parent_id_ne keeps the rows where `parent_id` is not `value`.
-pub fn (q CommentUpdate) where_parent_id_ne(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_parent_id_ne(value i64) CommentUpdate {
 	return q.where(comment_parent_id_ne(value))
 }
 
 // where_parent_id_lt keeps the rows where `parent_id` comes before `value`.
-pub fn (q CommentUpdate) where_parent_id_lt(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_parent_id_lt(value i64) CommentUpdate {
 	return q.where(comment_parent_id_lt(value))
 }
 
 // where_parent_id_le keeps the rows where `parent_id` comes at or before `value`.
-pub fn (q CommentUpdate) where_parent_id_le(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_parent_id_le(value i64) CommentUpdate {
 	return q.where(comment_parent_id_le(value))
 }
 
 // where_parent_id_gt keeps the rows where `parent_id` comes after `value`.
-pub fn (q CommentUpdate) where_parent_id_gt(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_parent_id_gt(value i64) CommentUpdate {
 	return q.where(comment_parent_id_gt(value))
 }
 
 // where_parent_id_ge keeps the rows where `parent_id` comes at or after `value`.
-pub fn (q CommentUpdate) where_parent_id_ge(value int) CommentUpdate {
+pub fn (q CommentUpdate) where_parent_id_ge(value i64) CommentUpdate {
 	return q.where(comment_parent_id_ge(value))
 }
 
 // where_parent_id_in keeps the rows where `parent_id` is one of `values`.
-pub fn (q CommentUpdate) where_parent_id_in(values []int) CommentUpdate {
+pub fn (q CommentUpdate) where_parent_id_in(values []i64) CommentUpdate {
 	return q.where(comment_parent_id_in(values))
 }
 
 // where_parent_id_not_in keeps the rows where `parent_id` is none of `values`.
-pub fn (q CommentUpdate) where_parent_id_not_in(values []int) CommentUpdate {
+pub fn (q CommentUpdate) where_parent_id_not_in(values []i64) CommentUpdate {
 	return q.where(comment_parent_id_not_in(values))
 }
 
@@ -1278,66 +1129,6 @@ pub fn (q CommentUpdate) where_body_equal_fold(value string) CommentUpdate {
 // where_body_contains_fold keeps the rows where `body` contains `value`, ignoring case.
 pub fn (q CommentUpdate) where_body_contains_fold(value string) CommentUpdate {
 	return q.where(comment_body_contains_fold(value))
-}
-
-// where_created_at keeps the rows where `created_at` is `value`.
-pub fn (q CommentUpdate) where_created_at(value time.Time) CommentUpdate {
-	return q.where(comment_created_at_eq(value))
-}
-
-// where_created_at_ne keeps the rows where `created_at` is not `value`.
-pub fn (q CommentUpdate) where_created_at_ne(value time.Time) CommentUpdate {
-	return q.where(comment_created_at_ne(value))
-}
-
-// where_created_at_lt keeps the rows where `created_at` comes before `value`.
-pub fn (q CommentUpdate) where_created_at_lt(value time.Time) CommentUpdate {
-	return q.where(comment_created_at_lt(value))
-}
-
-// where_created_at_le keeps the rows where `created_at` comes at or before `value`.
-pub fn (q CommentUpdate) where_created_at_le(value time.Time) CommentUpdate {
-	return q.where(comment_created_at_le(value))
-}
-
-// where_created_at_gt keeps the rows where `created_at` comes after `value`.
-pub fn (q CommentUpdate) where_created_at_gt(value time.Time) CommentUpdate {
-	return q.where(comment_created_at_gt(value))
-}
-
-// where_created_at_ge keeps the rows where `created_at` comes at or after `value`.
-pub fn (q CommentUpdate) where_created_at_ge(value time.Time) CommentUpdate {
-	return q.where(comment_created_at_ge(value))
-}
-
-// where_updated_at keeps the rows where `updated_at` is `value`.
-pub fn (q CommentUpdate) where_updated_at(value time.Time) CommentUpdate {
-	return q.where(comment_updated_at_eq(value))
-}
-
-// where_updated_at_ne keeps the rows where `updated_at` is not `value`.
-pub fn (q CommentUpdate) where_updated_at_ne(value time.Time) CommentUpdate {
-	return q.where(comment_updated_at_ne(value))
-}
-
-// where_updated_at_lt keeps the rows where `updated_at` comes before `value`.
-pub fn (q CommentUpdate) where_updated_at_lt(value time.Time) CommentUpdate {
-	return q.where(comment_updated_at_lt(value))
-}
-
-// where_updated_at_le keeps the rows where `updated_at` comes at or before `value`.
-pub fn (q CommentUpdate) where_updated_at_le(value time.Time) CommentUpdate {
-	return q.where(comment_updated_at_le(value))
-}
-
-// where_updated_at_gt keeps the rows where `updated_at` comes after `value`.
-pub fn (q CommentUpdate) where_updated_at_gt(value time.Time) CommentUpdate {
-	return q.where(comment_updated_at_gt(value))
-}
-
-// where_updated_at_ge keeps the rows where `updated_at` comes at or after `value`.
-pub fn (q CommentUpdate) where_updated_at_ge(value time.Time) CommentUpdate {
-	return q.where(comment_updated_at_ge(value))
 }
 
 // where_deleted_at keeps the rows where `deleted_at` is `value`.
@@ -1430,63 +1221,11 @@ pub fn (q CommentUpdate) has_replies_with(configure fn (CommentQuery) CommentQue
 	return q.where(comment_has_replies_with(...configure(q.graph.comments()).query.conds))
 }
 
-// set_slug sets `slug`.
-pub fn (b CommentUpdate) set_slug(value string) CommentUpdate {
+// set_updated_at sets `Stamps.updated_at`.
+pub fn (b CommentUpdate) set_updated_at(value time.Time) CommentUpdate {
 	return CommentUpdate{
 		...b
-		data: b.data.with_value('slug', orm.Primitive(value))
-	}
-}
-
-// set_user_id sets `user_id`.
-pub fn (b CommentUpdate) set_user_id(value int) CommentUpdate {
-	return CommentUpdate{
-		...b
-		data: b.data.with_value('user_id', orm.Primitive(value))
-	}
-}
-
-// set_owner_type sets `owner_type`.
-pub fn (b CommentUpdate) set_owner_type(value string) CommentUpdate {
-	return CommentUpdate{
-		...b
-		data: b.data.with_value('owner_type', orm.Primitive(value))
-	}
-}
-
-// set_owner_id sets `owner_id`.
-pub fn (b CommentUpdate) set_owner_id(value int) CommentUpdate {
-	return CommentUpdate{
-		...b
-		data: b.data.with_value('owner_id', orm.Primitive(value))
-	}
-}
-
-// set_parent_id sets `parent_id`.
-pub fn (b CommentUpdate) set_parent_id(value int) CommentUpdate {
-	return CommentUpdate{
-		...b
-		data: b.data.with_value('parent_id', orm.Primitive(value))
-	}
-}
-
-// set_nillable_parent_id sets `parent_id`, to null for `none`.
-pub fn (b CommentUpdate) set_nillable_parent_id(value ?int) CommentUpdate {
-	return CommentUpdate{
-		...b
-		data: b.data.with_value('parent_id', if v := value {
-			orm.Primitive(v)
-		} else {
-			orm.Primitive(orm.Null{})
-		})
-	}
-}
-
-// clear_parent_id sets `parent_id` to null.
-pub fn (b CommentUpdate) clear_parent_id() CommentUpdate {
-	return CommentUpdate{
-		...b
-		data: b.data.with_value('parent_id', orm.Primitive(orm.Null{}))
+		data: b.data.with_value('Stamps.updated_at', orm.Primitive(value))
 	}
 }
 
@@ -1495,22 +1234,6 @@ pub fn (b CommentUpdate) set_body(value string) CommentUpdate {
 	return CommentUpdate{
 		...b
 		data: b.data.with_value('body', orm.Primitive(value))
-	}
-}
-
-// set_created_at sets `created_at`.
-pub fn (b CommentUpdate) set_created_at(value time.Time) CommentUpdate {
-	return CommentUpdate{
-		...b
-		data: b.data.with_value('created_at', orm.Primitive(value))
-	}
-}
-
-// set_updated_at sets `updated_at`.
-pub fn (b CommentUpdate) set_updated_at(value time.Time) CommentUpdate {
-	return CommentUpdate{
-		...b
-		data: b.data.with_value('updated_at', orm.Primitive(value))
 	}
 }
 
@@ -1542,72 +1265,8 @@ pub fn (b CommentUpdate) clear_deleted_at() CommentUpdate {
 	}
 }
 
-// set_author_id sets `author` to the `users` row with the key `id`.
-pub fn (b CommentUpdate) set_author_id(id int) CommentUpdate {
-	return CommentUpdate{
-		...b
-		data: b.data.with_value('user_id', orm.Primitive(id))
-	}
-}
-
-// set_author sets `author` to `node`.
-pub fn (b CommentUpdate) set_author(node UserNode) CommentUpdate {
-	return CommentUpdate{
-		...b
-		data: b.data.with_value('user_id', orm.Primitive(node.user.id))
-	}
-}
-
-// set_parent sets `parent` to `node`.
-pub fn (b CommentUpdate) set_parent(node CommentNode) CommentUpdate {
-	return CommentUpdate{
-		...b
-		data: b.data.with_value('parent_id', orm.Primitive(node.comment.id))
-	}
-}
-
-// clear_parent removes the `parent`.
-pub fn (b CommentUpdate) clear_parent() CommentUpdate {
-	return CommentUpdate{
-		...b
-		data: b.data.with_value('parent_id', orm.Primitive(orm.Null{}))
-	}
-}
-
-// set_article_id sets `article` to the `articles` row with the key `id`.
-pub fn (b CommentUpdate) set_article_id(id int) CommentUpdate {
-	return CommentUpdate{
-		...b
-		data: b.data.with_value('owner_id', orm.Primitive(id)).with_value('owner_type', orm.Primitive('Article'))
-	}
-}
-
-// set_article sets `article` to `node`.
-pub fn (b CommentUpdate) set_article(node ArticleNode) CommentUpdate {
-	return CommentUpdate{
-		...b
-		data: b.data.with_value('owner_id', orm.Primitive(node.article.id)).with_value('owner_type', orm.Primitive('Article'))
-	}
-}
-
-// set_post_id sets `post` to the `posts` row with the key `id`.
-pub fn (b CommentUpdate) set_post_id(id int) CommentUpdate {
-	return CommentUpdate{
-		...b
-		data: b.data.with_value('owner_id', orm.Primitive(id)).with_value('owner_type', orm.Primitive('Post'))
-	}
-}
-
-// set_post sets `post` to `node`.
-pub fn (b CommentUpdate) set_post(node PostNode) CommentUpdate {
-	return CommentUpdate{
-		...b
-		data: b.data.with_value('owner_id', orm.Primitive(node.post.id)).with_value('owner_type', orm.Primitive('Post'))
-	}
-}
-
 // add_replies_ids adds the `comments` rows with the keys `ids` to `replies`.
-pub fn (b CommentUpdate) add_replies_ids(ids ...int) CommentUpdate {
+pub fn (b CommentUpdate) add_replies_ids(ids ...i64) CommentUpdate {
 	return CommentUpdate{
 		...b
 		data: b.data.with_added('replies', ids.map(it.str()))
@@ -1623,7 +1282,7 @@ pub fn (b CommentUpdate) add_replies(nodes ...CommentNode) CommentUpdate {
 }
 
 // remove_replies_ids removes the `comments` rows with the keys `ids` from `replies`.
-pub fn (b CommentUpdate) remove_replies_ids(ids ...int) CommentUpdate {
+pub fn (b CommentUpdate) remove_replies_ids(ids ...i64) CommentUpdate {
 	return CommentUpdate{
 		...b
 		data: b.data.with_removed('replies', ids.map(it.str()))
@@ -1666,7 +1325,7 @@ pub fn (q CommentQuery) delete_one(node CommentNode) CommentDeleteOne {
 }
 
 // delete_one_id starts the delete of the row with the key `id`.
-pub fn (q CommentQuery) delete_one_id(id int) CommentDeleteOne {
+pub fn (q CommentQuery) delete_one_id(id i64) CommentDeleteOne {
 	return CommentDeleteOne{
 		graph: q.graph
 		data:  vgraph.MutationData{
@@ -1716,133 +1375,143 @@ pub fn (b CommentDelete) where(conds ...load.Cond) CommentDelete {
 	}
 }
 
+// where_created_at keeps the rows where `Stamps.created_at` is `value`.
+pub fn (q CommentDelete) where_created_at(value time.Time) CommentDelete {
+	return q.where(comment_created_at_eq(value))
+}
+
+// where_created_at_ne keeps the rows where `Stamps.created_at` is not `value`.
+pub fn (q CommentDelete) where_created_at_ne(value time.Time) CommentDelete {
+	return q.where(comment_created_at_ne(value))
+}
+
+// where_created_at_lt keeps the rows where `Stamps.created_at` comes before `value`.
+pub fn (q CommentDelete) where_created_at_lt(value time.Time) CommentDelete {
+	return q.where(comment_created_at_lt(value))
+}
+
+// where_created_at_le keeps the rows where `Stamps.created_at` comes at or before `value`.
+pub fn (q CommentDelete) where_created_at_le(value time.Time) CommentDelete {
+	return q.where(comment_created_at_le(value))
+}
+
+// where_created_at_gt keeps the rows where `Stamps.created_at` comes after `value`.
+pub fn (q CommentDelete) where_created_at_gt(value time.Time) CommentDelete {
+	return q.where(comment_created_at_gt(value))
+}
+
+// where_created_at_ge keeps the rows where `Stamps.created_at` comes at or after `value`.
+pub fn (q CommentDelete) where_created_at_ge(value time.Time) CommentDelete {
+	return q.where(comment_created_at_ge(value))
+}
+
+// where_updated_at keeps the rows where `Stamps.updated_at` is `value`.
+pub fn (q CommentDelete) where_updated_at(value time.Time) CommentDelete {
+	return q.where(comment_updated_at_eq(value))
+}
+
+// where_updated_at_ne keeps the rows where `Stamps.updated_at` is not `value`.
+pub fn (q CommentDelete) where_updated_at_ne(value time.Time) CommentDelete {
+	return q.where(comment_updated_at_ne(value))
+}
+
+// where_updated_at_lt keeps the rows where `Stamps.updated_at` comes before `value`.
+pub fn (q CommentDelete) where_updated_at_lt(value time.Time) CommentDelete {
+	return q.where(comment_updated_at_lt(value))
+}
+
+// where_updated_at_le keeps the rows where `Stamps.updated_at` comes at or before `value`.
+pub fn (q CommentDelete) where_updated_at_le(value time.Time) CommentDelete {
+	return q.where(comment_updated_at_le(value))
+}
+
+// where_updated_at_gt keeps the rows where `Stamps.updated_at` comes after `value`.
+pub fn (q CommentDelete) where_updated_at_gt(value time.Time) CommentDelete {
+	return q.where(comment_updated_at_gt(value))
+}
+
+// where_updated_at_ge keeps the rows where `Stamps.updated_at` comes at or after `value`.
+pub fn (q CommentDelete) where_updated_at_ge(value time.Time) CommentDelete {
+	return q.where(comment_updated_at_ge(value))
+}
+
 // where_id keeps the rows where `id` is `value`.
-pub fn (q CommentDelete) where_id(value int) CommentDelete {
+pub fn (q CommentDelete) where_id(value i64) CommentDelete {
 	return q.where(comment_id_eq(value))
 }
 
 // where_id_ne keeps the rows where `id` is not `value`.
-pub fn (q CommentDelete) where_id_ne(value int) CommentDelete {
+pub fn (q CommentDelete) where_id_ne(value i64) CommentDelete {
 	return q.where(comment_id_ne(value))
 }
 
 // where_id_lt keeps the rows where `id` comes before `value`.
-pub fn (q CommentDelete) where_id_lt(value int) CommentDelete {
+pub fn (q CommentDelete) where_id_lt(value i64) CommentDelete {
 	return q.where(comment_id_lt(value))
 }
 
 // where_id_le keeps the rows where `id` comes at or before `value`.
-pub fn (q CommentDelete) where_id_le(value int) CommentDelete {
+pub fn (q CommentDelete) where_id_le(value i64) CommentDelete {
 	return q.where(comment_id_le(value))
 }
 
 // where_id_gt keeps the rows where `id` comes after `value`.
-pub fn (q CommentDelete) where_id_gt(value int) CommentDelete {
+pub fn (q CommentDelete) where_id_gt(value i64) CommentDelete {
 	return q.where(comment_id_gt(value))
 }
 
 // where_id_ge keeps the rows where `id` comes at or after `value`.
-pub fn (q CommentDelete) where_id_ge(value int) CommentDelete {
+pub fn (q CommentDelete) where_id_ge(value i64) CommentDelete {
 	return q.where(comment_id_ge(value))
 }
 
 // where_id_in keeps the rows where `id` is one of `values`.
-pub fn (q CommentDelete) where_id_in(values []int) CommentDelete {
+pub fn (q CommentDelete) where_id_in(values []i64) CommentDelete {
 	return q.where(comment_id_in(values))
 }
 
 // where_id_not_in keeps the rows where `id` is none of `values`.
-pub fn (q CommentDelete) where_id_not_in(values []int) CommentDelete {
+pub fn (q CommentDelete) where_id_not_in(values []i64) CommentDelete {
 	return q.where(comment_id_not_in(values))
 }
 
-// where_slug keeps the rows where `slug` is `value`.
-pub fn (q CommentDelete) where_slug(value string) CommentDelete {
-	return q.where(comment_slug_eq(value))
-}
-
-// where_slug_ne keeps the rows where `slug` is not `value`.
-pub fn (q CommentDelete) where_slug_ne(value string) CommentDelete {
-	return q.where(comment_slug_ne(value))
-}
-
-// where_slug_in keeps the rows where `slug` is one of `values`.
-pub fn (q CommentDelete) where_slug_in(values []string) CommentDelete {
-	return q.where(comment_slug_in(values))
-}
-
-// where_slug_not_in keeps the rows where `slug` is none of `values`.
-pub fn (q CommentDelete) where_slug_not_in(values []string) CommentDelete {
-	return q.where(comment_slug_not_in(values))
-}
-
-// where_slug_like keeps the rows where `slug` matches the SQL LIKE `pattern`.
-pub fn (q CommentDelete) where_slug_like(pattern string) CommentDelete {
-	return q.where(comment_slug_like(pattern))
-}
-
-// where_slug_contains keeps the rows where `slug` contains `value`.
-pub fn (q CommentDelete) where_slug_contains(value string) CommentDelete {
-	return q.where(comment_slug_contains(value))
-}
-
-// where_slug_has_prefix keeps the rows where `slug` starts with `value`.
-pub fn (q CommentDelete) where_slug_has_prefix(value string) CommentDelete {
-	return q.where(comment_slug_has_prefix(value))
-}
-
-// where_slug_has_suffix keeps the rows where `slug` ends with `value`.
-pub fn (q CommentDelete) where_slug_has_suffix(value string) CommentDelete {
-	return q.where(comment_slug_has_suffix(value))
-}
-
-// where_slug_equal_fold keeps the rows where `slug` is `value`, ignoring case.
-pub fn (q CommentDelete) where_slug_equal_fold(value string) CommentDelete {
-	return q.where(comment_slug_equal_fold(value))
-}
-
-// where_slug_contains_fold keeps the rows where `slug` contains `value`, ignoring case.
-pub fn (q CommentDelete) where_slug_contains_fold(value string) CommentDelete {
-	return q.where(comment_slug_contains_fold(value))
-}
-
 // where_user_id keeps the rows where `user_id` is `value`.
-pub fn (q CommentDelete) where_user_id(value int) CommentDelete {
+pub fn (q CommentDelete) where_user_id(value i64) CommentDelete {
 	return q.where(comment_user_id_eq(value))
 }
 
 // where_user_id_ne keeps the rows where `user_id` is not `value`.
-pub fn (q CommentDelete) where_user_id_ne(value int) CommentDelete {
+pub fn (q CommentDelete) where_user_id_ne(value i64) CommentDelete {
 	return q.where(comment_user_id_ne(value))
 }
 
 // where_user_id_lt keeps the rows where `user_id` comes before `value`.
-pub fn (q CommentDelete) where_user_id_lt(value int) CommentDelete {
+pub fn (q CommentDelete) where_user_id_lt(value i64) CommentDelete {
 	return q.where(comment_user_id_lt(value))
 }
 
 // where_user_id_le keeps the rows where `user_id` comes at or before `value`.
-pub fn (q CommentDelete) where_user_id_le(value int) CommentDelete {
+pub fn (q CommentDelete) where_user_id_le(value i64) CommentDelete {
 	return q.where(comment_user_id_le(value))
 }
 
 // where_user_id_gt keeps the rows where `user_id` comes after `value`.
-pub fn (q CommentDelete) where_user_id_gt(value int) CommentDelete {
+pub fn (q CommentDelete) where_user_id_gt(value i64) CommentDelete {
 	return q.where(comment_user_id_gt(value))
 }
 
 // where_user_id_ge keeps the rows where `user_id` comes at or after `value`.
-pub fn (q CommentDelete) where_user_id_ge(value int) CommentDelete {
+pub fn (q CommentDelete) where_user_id_ge(value i64) CommentDelete {
 	return q.where(comment_user_id_ge(value))
 }
 
 // where_user_id_in keeps the rows where `user_id` is one of `values`.
-pub fn (q CommentDelete) where_user_id_in(values []int) CommentDelete {
+pub fn (q CommentDelete) where_user_id_in(values []i64) CommentDelete {
 	return q.where(comment_user_id_in(values))
 }
 
 // where_user_id_not_in keeps the rows where `user_id` is none of `values`.
-pub fn (q CommentDelete) where_user_id_not_in(values []int) CommentDelete {
+pub fn (q CommentDelete) where_user_id_not_in(values []i64) CommentDelete {
 	return q.where(comment_user_id_not_in(values))
 }
 
@@ -1897,82 +1566,82 @@ pub fn (q CommentDelete) where_owner_type_contains_fold(value string) CommentDel
 }
 
 // where_owner_id keeps the rows where `owner_id` is `value`.
-pub fn (q CommentDelete) where_owner_id(value int) CommentDelete {
+pub fn (q CommentDelete) where_owner_id(value i64) CommentDelete {
 	return q.where(comment_owner_id_eq(value))
 }
 
 // where_owner_id_ne keeps the rows where `owner_id` is not `value`.
-pub fn (q CommentDelete) where_owner_id_ne(value int) CommentDelete {
+pub fn (q CommentDelete) where_owner_id_ne(value i64) CommentDelete {
 	return q.where(comment_owner_id_ne(value))
 }
 
 // where_owner_id_lt keeps the rows where `owner_id` comes before `value`.
-pub fn (q CommentDelete) where_owner_id_lt(value int) CommentDelete {
+pub fn (q CommentDelete) where_owner_id_lt(value i64) CommentDelete {
 	return q.where(comment_owner_id_lt(value))
 }
 
 // where_owner_id_le keeps the rows where `owner_id` comes at or before `value`.
-pub fn (q CommentDelete) where_owner_id_le(value int) CommentDelete {
+pub fn (q CommentDelete) where_owner_id_le(value i64) CommentDelete {
 	return q.where(comment_owner_id_le(value))
 }
 
 // where_owner_id_gt keeps the rows where `owner_id` comes after `value`.
-pub fn (q CommentDelete) where_owner_id_gt(value int) CommentDelete {
+pub fn (q CommentDelete) where_owner_id_gt(value i64) CommentDelete {
 	return q.where(comment_owner_id_gt(value))
 }
 
 // where_owner_id_ge keeps the rows where `owner_id` comes at or after `value`.
-pub fn (q CommentDelete) where_owner_id_ge(value int) CommentDelete {
+pub fn (q CommentDelete) where_owner_id_ge(value i64) CommentDelete {
 	return q.where(comment_owner_id_ge(value))
 }
 
 // where_owner_id_in keeps the rows where `owner_id` is one of `values`.
-pub fn (q CommentDelete) where_owner_id_in(values []int) CommentDelete {
+pub fn (q CommentDelete) where_owner_id_in(values []i64) CommentDelete {
 	return q.where(comment_owner_id_in(values))
 }
 
 // where_owner_id_not_in keeps the rows where `owner_id` is none of `values`.
-pub fn (q CommentDelete) where_owner_id_not_in(values []int) CommentDelete {
+pub fn (q CommentDelete) where_owner_id_not_in(values []i64) CommentDelete {
 	return q.where(comment_owner_id_not_in(values))
 }
 
 // where_parent_id keeps the rows where `parent_id` is `value`.
-pub fn (q CommentDelete) where_parent_id(value int) CommentDelete {
+pub fn (q CommentDelete) where_parent_id(value i64) CommentDelete {
 	return q.where(comment_parent_id_eq(value))
 }
 
 // where_parent_id_ne keeps the rows where `parent_id` is not `value`.
-pub fn (q CommentDelete) where_parent_id_ne(value int) CommentDelete {
+pub fn (q CommentDelete) where_parent_id_ne(value i64) CommentDelete {
 	return q.where(comment_parent_id_ne(value))
 }
 
 // where_parent_id_lt keeps the rows where `parent_id` comes before `value`.
-pub fn (q CommentDelete) where_parent_id_lt(value int) CommentDelete {
+pub fn (q CommentDelete) where_parent_id_lt(value i64) CommentDelete {
 	return q.where(comment_parent_id_lt(value))
 }
 
 // where_parent_id_le keeps the rows where `parent_id` comes at or before `value`.
-pub fn (q CommentDelete) where_parent_id_le(value int) CommentDelete {
+pub fn (q CommentDelete) where_parent_id_le(value i64) CommentDelete {
 	return q.where(comment_parent_id_le(value))
 }
 
 // where_parent_id_gt keeps the rows where `parent_id` comes after `value`.
-pub fn (q CommentDelete) where_parent_id_gt(value int) CommentDelete {
+pub fn (q CommentDelete) where_parent_id_gt(value i64) CommentDelete {
 	return q.where(comment_parent_id_gt(value))
 }
 
 // where_parent_id_ge keeps the rows where `parent_id` comes at or after `value`.
-pub fn (q CommentDelete) where_parent_id_ge(value int) CommentDelete {
+pub fn (q CommentDelete) where_parent_id_ge(value i64) CommentDelete {
 	return q.where(comment_parent_id_ge(value))
 }
 
 // where_parent_id_in keeps the rows where `parent_id` is one of `values`.
-pub fn (q CommentDelete) where_parent_id_in(values []int) CommentDelete {
+pub fn (q CommentDelete) where_parent_id_in(values []i64) CommentDelete {
 	return q.where(comment_parent_id_in(values))
 }
 
 // where_parent_id_not_in keeps the rows where `parent_id` is none of `values`.
-pub fn (q CommentDelete) where_parent_id_not_in(values []int) CommentDelete {
+pub fn (q CommentDelete) where_parent_id_not_in(values []i64) CommentDelete {
 	return q.where(comment_parent_id_not_in(values))
 }
 
@@ -2034,66 +1703,6 @@ pub fn (q CommentDelete) where_body_equal_fold(value string) CommentDelete {
 // where_body_contains_fold keeps the rows where `body` contains `value`, ignoring case.
 pub fn (q CommentDelete) where_body_contains_fold(value string) CommentDelete {
 	return q.where(comment_body_contains_fold(value))
-}
-
-// where_created_at keeps the rows where `created_at` is `value`.
-pub fn (q CommentDelete) where_created_at(value time.Time) CommentDelete {
-	return q.where(comment_created_at_eq(value))
-}
-
-// where_created_at_ne keeps the rows where `created_at` is not `value`.
-pub fn (q CommentDelete) where_created_at_ne(value time.Time) CommentDelete {
-	return q.where(comment_created_at_ne(value))
-}
-
-// where_created_at_lt keeps the rows where `created_at` comes before `value`.
-pub fn (q CommentDelete) where_created_at_lt(value time.Time) CommentDelete {
-	return q.where(comment_created_at_lt(value))
-}
-
-// where_created_at_le keeps the rows where `created_at` comes at or before `value`.
-pub fn (q CommentDelete) where_created_at_le(value time.Time) CommentDelete {
-	return q.where(comment_created_at_le(value))
-}
-
-// where_created_at_gt keeps the rows where `created_at` comes after `value`.
-pub fn (q CommentDelete) where_created_at_gt(value time.Time) CommentDelete {
-	return q.where(comment_created_at_gt(value))
-}
-
-// where_created_at_ge keeps the rows where `created_at` comes at or after `value`.
-pub fn (q CommentDelete) where_created_at_ge(value time.Time) CommentDelete {
-	return q.where(comment_created_at_ge(value))
-}
-
-// where_updated_at keeps the rows where `updated_at` is `value`.
-pub fn (q CommentDelete) where_updated_at(value time.Time) CommentDelete {
-	return q.where(comment_updated_at_eq(value))
-}
-
-// where_updated_at_ne keeps the rows where `updated_at` is not `value`.
-pub fn (q CommentDelete) where_updated_at_ne(value time.Time) CommentDelete {
-	return q.where(comment_updated_at_ne(value))
-}
-
-// where_updated_at_lt keeps the rows where `updated_at` comes before `value`.
-pub fn (q CommentDelete) where_updated_at_lt(value time.Time) CommentDelete {
-	return q.where(comment_updated_at_lt(value))
-}
-
-// where_updated_at_le keeps the rows where `updated_at` comes at or before `value`.
-pub fn (q CommentDelete) where_updated_at_le(value time.Time) CommentDelete {
-	return q.where(comment_updated_at_le(value))
-}
-
-// where_updated_at_gt keeps the rows where `updated_at` comes after `value`.
-pub fn (q CommentDelete) where_updated_at_gt(value time.Time) CommentDelete {
-	return q.where(comment_updated_at_gt(value))
-}
-
-// where_updated_at_ge keeps the rows where `updated_at` comes at or after `value`.
-pub fn (q CommentDelete) where_updated_at_ge(value time.Time) CommentDelete {
-	return q.where(comment_updated_at_ge(value))
 }
 
 // where_deleted_at keeps the rows where `deleted_at` is `value`.
@@ -2197,7 +1806,7 @@ fn (g Graph) comments_by_keys(keys []string) ![]CommentNode {
 	// as stored: no privacy rule or interceptor hides a row just written
 	rows := Graph{
 		client: g.client.bypass()
-	}.comments().where(load.in_keys('id', keys, .int)).all()!
+	}.comments().where(load.in_keys('id', keys, .i64)).all()!
 	mut by_key := map[string]CommentNode{}
 	for row in rows {
 		by_key[row.comment.id.str()] = row
@@ -2218,24 +1827,16 @@ fn (g Graph) comments_by_keys(keys []string) ![]CommentNode {
 // they are.
 pub struct CreateCommentInput {
 pub mut:
-	slug       ?string
-	user_id    ?int
+	user_id    ?i64
 	owner_type ?string
-	owner_id   ?int
-	parent_id  ?int
+	owner_id   ?i64
+	parent_id  ?i64
 	body       ?string
-	created_at ?time.Time
-	updated_at ?time.Time
-	deleted_at ?time.Time
-	reply_ids  []int
 }
 
 // set_input sets what `input` gives: clears first, then values, then edges.
 pub fn (b CommentCreate) set_input(input CreateCommentInput) CommentCreate {
 	mut next := b
-	if v := input.slug {
-		next = next.set_slug(v)
-	}
 	if v := input.user_id {
 		next = next.set_user_id(v)
 	}
@@ -2250,18 +1851,6 @@ pub fn (b CommentCreate) set_input(input CreateCommentInput) CommentCreate {
 	}
 	if v := input.body {
 		next = next.set_body(v)
-	}
-	if v := input.created_at {
-		next = next.set_created_at(v)
-	}
-	if v := input.updated_at {
-		next = next.set_updated_at(v)
-	}
-	if v := input.deleted_at {
-		next = next.set_deleted_at(v)
-	}
-	if input.reply_ids.len > 0 {
-		next = next.add_replies_ids(...input.reply_ids)
 	}
 	return next
 }
@@ -2271,66 +1860,14 @@ pub fn (b CommentCreate) set_input(input CreateCommentInput) CommentCreate {
 // they are.
 pub struct UpdateCommentInput {
 pub mut:
-	slug             ?string
-	user_id          ?int
-	owner_type       ?string
-	owner_id         ?int
-	parent_id        ?int
-	clear_parent_id  bool
-	body             ?string
-	created_at       ?time.Time
-	updated_at       ?time.Time
-	deleted_at       ?time.Time
-	clear_deleted_at bool
-	add_reply_ids    []int
-	remove_reply_ids []int
-	clear_replies    bool
+	body ?string
 }
 
 // set_input sets what `input` gives: clears first, then values, then edges.
 pub fn (b CommentUpdateOne) set_input(input UpdateCommentInput) CommentUpdateOne {
 	mut next := b
-	if input.clear_parent_id {
-		next = next.clear_parent_id()
-	}
-	if input.clear_deleted_at {
-		next = next.clear_deleted_at()
-	}
-	if input.clear_replies {
-		next = next.clear_replies()
-	}
-	if v := input.slug {
-		next = next.set_slug(v)
-	}
-	if v := input.user_id {
-		next = next.set_user_id(v)
-	}
-	if v := input.owner_type {
-		next = next.set_owner_type(v)
-	}
-	if v := input.owner_id {
-		next = next.set_owner_id(v)
-	}
-	if v := input.parent_id {
-		next = next.set_parent_id(v)
-	}
 	if v := input.body {
 		next = next.set_body(v)
-	}
-	if v := input.created_at {
-		next = next.set_created_at(v)
-	}
-	if v := input.updated_at {
-		next = next.set_updated_at(v)
-	}
-	if v := input.deleted_at {
-		next = next.set_deleted_at(v)
-	}
-	if input.add_reply_ids.len > 0 {
-		next = next.add_replies_ids(...input.add_reply_ids)
-	}
-	if input.remove_reply_ids.len > 0 {
-		next = next.remove_replies_ids(...input.remove_reply_ids)
 	}
 	return next
 }

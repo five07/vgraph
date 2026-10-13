@@ -162,61 +162,88 @@ pub fn (mut m ArticleMutation) on_rollback(f fn ()) {
 	m.inner.on_rollback(f)
 }
 
+// created_at returns the value the write sets `Stamps.created_at` to, or `none` when it
+// doesn't set it, or sets it to null.
+pub fn (m ArticleMutation) created_at() ?time.Time {
+	value := m.inner.field_value('Stamps.created_at') or { return none }
+	return if value is time.Time { value } else { none }
+}
+
+// set_created_at makes the write set `Stamps.created_at` to `value`.
+pub fn (mut m ArticleMutation) set_created_at(value time.Time) {
+	m.inner.set_field_value('Stamps.created_at', value)
+}
+
+// old_created_at returns the stored `Stamps.created_at` of the row an update_one or
+// delete_one is to.
+pub fn (mut m ArticleMutation) old_created_at() !time.Time {
+	value := m.inner.old_field('Stamps.created_at')!
+	return if value is time.Time {
+		value
+	} else {
+		error('`articles.Stamps.created_at` is not a time.Time')
+	}
+}
+
+// updated_at returns the value the write sets `Stamps.updated_at` to, or `none` when it
+// doesn't set it, or sets it to null.
+pub fn (m ArticleMutation) updated_at() ?time.Time {
+	value := m.inner.field_value('Stamps.updated_at') or { return none }
+	return if value is time.Time { value } else { none }
+}
+
+// set_updated_at makes the write set `Stamps.updated_at` to `value`.
+pub fn (mut m ArticleMutation) set_updated_at(value time.Time) {
+	m.inner.set_field_value('Stamps.updated_at', value)
+}
+
+// old_updated_at returns the stored `Stamps.updated_at` of the row an update_one or
+// delete_one is to.
+pub fn (mut m ArticleMutation) old_updated_at() !time.Time {
+	value := m.inner.old_field('Stamps.updated_at')!
+	return if value is time.Time {
+		value
+	} else {
+		error('`articles.Stamps.updated_at` is not a time.Time')
+	}
+}
+
 // id returns the value the write sets `id` to, or `none` when it
 // doesn't set it, or sets it to null.
-pub fn (m ArticleMutation) id() ?int {
+pub fn (m ArticleMutation) id() ?i64 {
 	value := m.inner.field_value('id') or { return none }
-	return if value is int { value } else { none }
+	return if value is i64 { value } else { none }
 }
 
 // set_id makes the write set `id` to `value`.
-pub fn (mut m ArticleMutation) set_id(value int) {
+pub fn (mut m ArticleMutation) set_id(value i64) {
 	m.inner.set_field_value('id', value)
 }
 
 // old_id returns the stored `id` of the row an update_one or
 // delete_one is to.
-pub fn (mut m ArticleMutation) old_id() !int {
+pub fn (mut m ArticleMutation) old_id() !i64 {
 	value := m.inner.old_field('id')!
-	return if value is int { value } else { error('`articles.id` is not a int') }
-}
-
-// slug returns the value the write sets `slug` to, or `none` when it
-// doesn't set it, or sets it to null.
-pub fn (m ArticleMutation) slug() ?string {
-	value := m.inner.field_value('slug') or { return none }
-	return if value is string { value } else { none }
-}
-
-// set_slug makes the write set `slug` to `value`.
-pub fn (mut m ArticleMutation) set_slug(value string) {
-	m.inner.set_field_value('slug', value)
-}
-
-// old_slug returns the stored `slug` of the row an update_one or
-// delete_one is to.
-pub fn (mut m ArticleMutation) old_slug() !string {
-	value := m.inner.old_field('slug')!
-	return if value is string { value } else { error('`articles.slug` is not a string') }
+	return if value is i64 { value } else { error('`articles.id` is not a i64') }
 }
 
 // user_id returns the value the write sets `user_id` to, or `none` when it
 // doesn't set it, or sets it to null.
-pub fn (m ArticleMutation) user_id() ?int {
+pub fn (m ArticleMutation) user_id() ?i64 {
 	value := m.inner.field_value('user_id') or { return none }
-	return if value is int { value } else { none }
+	return if value is i64 { value } else { none }
 }
 
 // set_user_id makes the write set `user_id` to `value`.
-pub fn (mut m ArticleMutation) set_user_id(value int) {
+pub fn (mut m ArticleMutation) set_user_id(value i64) {
 	m.inner.set_field_value('user_id', value)
 }
 
 // old_user_id returns the stored `user_id` of the row an update_one or
 // delete_one is to.
-pub fn (mut m ArticleMutation) old_user_id() !int {
+pub fn (mut m ArticleMutation) old_user_id() !i64 {
 	value := m.inner.old_field('user_id')!
-	return if value is int { value } else { error('`articles.user_id` is not a int') }
+	return if value is i64 { value } else { error('`articles.user_id` is not a i64') }
 }
 
 // title returns the value the write sets `title` to, or `none` when it
@@ -293,52 +320,6 @@ pub fn (mut m ArticleMutation) clear_published_at() {
 	m.inner.clear_field_value('published_at')
 }
 
-// created_at returns the value the write sets `created_at` to, or `none` when it
-// doesn't set it, or sets it to null.
-pub fn (m ArticleMutation) created_at() ?time.Time {
-	value := m.inner.field_value('created_at') or { return none }
-	return if value is time.Time { value } else { none }
-}
-
-// set_created_at makes the write set `created_at` to `value`.
-pub fn (mut m ArticleMutation) set_created_at(value time.Time) {
-	m.inner.set_field_value('created_at', value)
-}
-
-// old_created_at returns the stored `created_at` of the row an update_one or
-// delete_one is to.
-pub fn (mut m ArticleMutation) old_created_at() !time.Time {
-	value := m.inner.old_field('created_at')!
-	return if value is time.Time {
-		value
-	} else {
-		error('`articles.created_at` is not a time.Time')
-	}
-}
-
-// updated_at returns the value the write sets `updated_at` to, or `none` when it
-// doesn't set it, or sets it to null.
-pub fn (m ArticleMutation) updated_at() ?time.Time {
-	value := m.inner.field_value('updated_at') or { return none }
-	return if value is time.Time { value } else { none }
-}
-
-// set_updated_at makes the write set `updated_at` to `value`.
-pub fn (mut m ArticleMutation) set_updated_at(value time.Time) {
-	m.inner.set_field_value('updated_at', value)
-}
-
-// old_updated_at returns the stored `updated_at` of the row an update_one or
-// delete_one is to.
-pub fn (mut m ArticleMutation) old_updated_at() !time.Time {
-	value := m.inner.old_field('updated_at')!
-	return if value is time.Time {
-		value
-	} else {
-		error('`articles.updated_at` is not a time.Time')
-	}
-}
-
 // deleted_at returns the value the write sets `deleted_at` to, or `none` when it
 // doesn't set it, or sets it to null.
 pub fn (m ArticleMutation) deleted_at() ?time.Time {
@@ -375,16 +356,24 @@ pub fn (q ArticleQuery) create() ArticleCreate {
 	}
 }
 
-// set_slug sets `slug`.
-pub fn (b ArticleCreate) set_slug(value string) ArticleCreate {
+// set_created_at sets `Stamps.created_at`.
+pub fn (b ArticleCreate) set_created_at(value time.Time) ArticleCreate {
 	return ArticleCreate{
 		...b
-		data: b.data.with_value('slug', orm.Primitive(value))
+		data: b.data.with_value('Stamps.created_at', orm.Primitive(value))
+	}
+}
+
+// set_updated_at sets `Stamps.updated_at`.
+pub fn (b ArticleCreate) set_updated_at(value time.Time) ArticleCreate {
+	return ArticleCreate{
+		...b
+		data: b.data.with_value('Stamps.updated_at', orm.Primitive(value))
 	}
 }
 
 // set_user_id sets `user_id`.
-pub fn (b ArticleCreate) set_user_id(value int) ArticleCreate {
+pub fn (b ArticleCreate) set_user_id(value i64) ArticleCreate {
 	return ArticleCreate{
 		...b
 		data: b.data.with_value('user_id', orm.Primitive(value))
@@ -435,22 +424,6 @@ pub fn (b ArticleCreate) set_nillable_published_at(value ?time.Time) ArticleCrea
 	}
 }
 
-// set_created_at sets `created_at`.
-pub fn (b ArticleCreate) set_created_at(value time.Time) ArticleCreate {
-	return ArticleCreate{
-		...b
-		data: b.data.with_value('created_at', orm.Primitive(value))
-	}
-}
-
-// set_updated_at sets `updated_at`.
-pub fn (b ArticleCreate) set_updated_at(value time.Time) ArticleCreate {
-	return ArticleCreate{
-		...b
-		data: b.data.with_value('updated_at', orm.Primitive(value))
-	}
-}
-
 // set_deleted_at sets `deleted_at`.
 pub fn (b ArticleCreate) set_deleted_at(value time.Time) ArticleCreate {
 	return ArticleCreate{
@@ -472,7 +445,7 @@ pub fn (b ArticleCreate) set_nillable_deleted_at(value ?time.Time) ArticleCreate
 }
 
 // set_author_id sets `author` to the `users` row with the key `id`.
-pub fn (b ArticleCreate) set_author_id(id int) ArticleCreate {
+pub fn (b ArticleCreate) set_author_id(id i64) ArticleCreate {
 	return ArticleCreate{
 		...b
 		data: b.data.with_value('user_id', orm.Primitive(id))
@@ -488,7 +461,7 @@ pub fn (b ArticleCreate) set_author(node UserNode) ArticleCreate {
 }
 
 // add_comments_ids adds the `comments` rows with the keys `ids` to `comments`.
-pub fn (b ArticleCreate) add_comments_ids(ids ...int) ArticleCreate {
+pub fn (b ArticleCreate) add_comments_ids(ids ...i64) ArticleCreate {
 	return ArticleCreate{
 		...b
 		data: b.data.with_added('comments', ids.map(it.str()))
@@ -642,7 +615,7 @@ pub fn (q ArticleQuery) update_one(node ArticleNode) ArticleUpdateOne {
 }
 
 // update_one_id starts the update of the row with the key `id`.
-pub fn (q ArticleQuery) update_one_id(id int) ArticleUpdateOne {
+pub fn (q ArticleQuery) update_one_id(id i64) ArticleUpdateOne {
 	return ArticleUpdateOne{
 		graph: q.graph
 		data:  vgraph.MutationData{
@@ -658,19 +631,11 @@ pub fn (n ArticleNode) update() ArticleUpdateOne {
 	return n.graph.articles().update_one(n)
 }
 
-// set_slug sets `slug`.
-pub fn (b ArticleUpdateOne) set_slug(value string) ArticleUpdateOne {
+// set_updated_at sets `Stamps.updated_at`.
+pub fn (b ArticleUpdateOne) set_updated_at(value time.Time) ArticleUpdateOne {
 	return ArticleUpdateOne{
 		...b
-		data: b.data.with_value('slug', orm.Primitive(value))
-	}
-}
-
-// set_user_id sets `user_id`.
-pub fn (b ArticleUpdateOne) set_user_id(value int) ArticleUpdateOne {
-	return ArticleUpdateOne{
-		...b
-		data: b.data.with_value('user_id', orm.Primitive(value))
+		data: b.data.with_value('Stamps.updated_at', orm.Primitive(value))
 	}
 }
 
@@ -726,22 +691,6 @@ pub fn (b ArticleUpdateOne) clear_published_at() ArticleUpdateOne {
 	}
 }
 
-// set_created_at sets `created_at`.
-pub fn (b ArticleUpdateOne) set_created_at(value time.Time) ArticleUpdateOne {
-	return ArticleUpdateOne{
-		...b
-		data: b.data.with_value('created_at', orm.Primitive(value))
-	}
-}
-
-// set_updated_at sets `updated_at`.
-pub fn (b ArticleUpdateOne) set_updated_at(value time.Time) ArticleUpdateOne {
-	return ArticleUpdateOne{
-		...b
-		data: b.data.with_value('updated_at', orm.Primitive(value))
-	}
-}
-
 // set_deleted_at sets `deleted_at`.
 pub fn (b ArticleUpdateOne) set_deleted_at(value time.Time) ArticleUpdateOne {
 	return ArticleUpdateOne{
@@ -770,24 +719,8 @@ pub fn (b ArticleUpdateOne) clear_deleted_at() ArticleUpdateOne {
 	}
 }
 
-// set_author_id sets `author` to the `users` row with the key `id`.
-pub fn (b ArticleUpdateOne) set_author_id(id int) ArticleUpdateOne {
-	return ArticleUpdateOne{
-		...b
-		data: b.data.with_value('user_id', orm.Primitive(id))
-	}
-}
-
-// set_author sets `author` to `node`.
-pub fn (b ArticleUpdateOne) set_author(node UserNode) ArticleUpdateOne {
-	return ArticleUpdateOne{
-		...b
-		data: b.data.with_value('user_id', orm.Primitive(node.user.id))
-	}
-}
-
 // add_comments_ids adds the `comments` rows with the keys `ids` to `comments`.
-pub fn (b ArticleUpdateOne) add_comments_ids(ids ...int) ArticleUpdateOne {
+pub fn (b ArticleUpdateOne) add_comments_ids(ids ...i64) ArticleUpdateOne {
 	return ArticleUpdateOne{
 		...b
 		data: b.data.with_added('comments', ids.map(it.str()))
@@ -803,7 +736,7 @@ pub fn (b ArticleUpdateOne) add_comments(nodes ...CommentNode) ArticleUpdateOne 
 }
 
 // remove_comments_ids removes the `comments` rows with the keys `ids` from `comments`.
-pub fn (b ArticleUpdateOne) remove_comments_ids(ids ...int) ArticleUpdateOne {
+pub fn (b ArticleUpdateOne) remove_comments_ids(ids ...i64) ArticleUpdateOne {
 	return ArticleUpdateOne{
 		...b
 		data: b.data.with_removed('comments', ids.map(it.str()))
@@ -872,133 +805,143 @@ pub fn (b ArticleUpdate) where(conds ...load.Cond) ArticleUpdate {
 	}
 }
 
+// where_created_at keeps the rows where `Stamps.created_at` is `value`.
+pub fn (q ArticleUpdate) where_created_at(value time.Time) ArticleUpdate {
+	return q.where(article_created_at_eq(value))
+}
+
+// where_created_at_ne keeps the rows where `Stamps.created_at` is not `value`.
+pub fn (q ArticleUpdate) where_created_at_ne(value time.Time) ArticleUpdate {
+	return q.where(article_created_at_ne(value))
+}
+
+// where_created_at_lt keeps the rows where `Stamps.created_at` comes before `value`.
+pub fn (q ArticleUpdate) where_created_at_lt(value time.Time) ArticleUpdate {
+	return q.where(article_created_at_lt(value))
+}
+
+// where_created_at_le keeps the rows where `Stamps.created_at` comes at or before `value`.
+pub fn (q ArticleUpdate) where_created_at_le(value time.Time) ArticleUpdate {
+	return q.where(article_created_at_le(value))
+}
+
+// where_created_at_gt keeps the rows where `Stamps.created_at` comes after `value`.
+pub fn (q ArticleUpdate) where_created_at_gt(value time.Time) ArticleUpdate {
+	return q.where(article_created_at_gt(value))
+}
+
+// where_created_at_ge keeps the rows where `Stamps.created_at` comes at or after `value`.
+pub fn (q ArticleUpdate) where_created_at_ge(value time.Time) ArticleUpdate {
+	return q.where(article_created_at_ge(value))
+}
+
+// where_updated_at keeps the rows where `Stamps.updated_at` is `value`.
+pub fn (q ArticleUpdate) where_updated_at(value time.Time) ArticleUpdate {
+	return q.where(article_updated_at_eq(value))
+}
+
+// where_updated_at_ne keeps the rows where `Stamps.updated_at` is not `value`.
+pub fn (q ArticleUpdate) where_updated_at_ne(value time.Time) ArticleUpdate {
+	return q.where(article_updated_at_ne(value))
+}
+
+// where_updated_at_lt keeps the rows where `Stamps.updated_at` comes before `value`.
+pub fn (q ArticleUpdate) where_updated_at_lt(value time.Time) ArticleUpdate {
+	return q.where(article_updated_at_lt(value))
+}
+
+// where_updated_at_le keeps the rows where `Stamps.updated_at` comes at or before `value`.
+pub fn (q ArticleUpdate) where_updated_at_le(value time.Time) ArticleUpdate {
+	return q.where(article_updated_at_le(value))
+}
+
+// where_updated_at_gt keeps the rows where `Stamps.updated_at` comes after `value`.
+pub fn (q ArticleUpdate) where_updated_at_gt(value time.Time) ArticleUpdate {
+	return q.where(article_updated_at_gt(value))
+}
+
+// where_updated_at_ge keeps the rows where `Stamps.updated_at` comes at or after `value`.
+pub fn (q ArticleUpdate) where_updated_at_ge(value time.Time) ArticleUpdate {
+	return q.where(article_updated_at_ge(value))
+}
+
 // where_id keeps the rows where `id` is `value`.
-pub fn (q ArticleUpdate) where_id(value int) ArticleUpdate {
+pub fn (q ArticleUpdate) where_id(value i64) ArticleUpdate {
 	return q.where(article_id_eq(value))
 }
 
 // where_id_ne keeps the rows where `id` is not `value`.
-pub fn (q ArticleUpdate) where_id_ne(value int) ArticleUpdate {
+pub fn (q ArticleUpdate) where_id_ne(value i64) ArticleUpdate {
 	return q.where(article_id_ne(value))
 }
 
 // where_id_lt keeps the rows where `id` comes before `value`.
-pub fn (q ArticleUpdate) where_id_lt(value int) ArticleUpdate {
+pub fn (q ArticleUpdate) where_id_lt(value i64) ArticleUpdate {
 	return q.where(article_id_lt(value))
 }
 
 // where_id_le keeps the rows where `id` comes at or before `value`.
-pub fn (q ArticleUpdate) where_id_le(value int) ArticleUpdate {
+pub fn (q ArticleUpdate) where_id_le(value i64) ArticleUpdate {
 	return q.where(article_id_le(value))
 }
 
 // where_id_gt keeps the rows where `id` comes after `value`.
-pub fn (q ArticleUpdate) where_id_gt(value int) ArticleUpdate {
+pub fn (q ArticleUpdate) where_id_gt(value i64) ArticleUpdate {
 	return q.where(article_id_gt(value))
 }
 
 // where_id_ge keeps the rows where `id` comes at or after `value`.
-pub fn (q ArticleUpdate) where_id_ge(value int) ArticleUpdate {
+pub fn (q ArticleUpdate) where_id_ge(value i64) ArticleUpdate {
 	return q.where(article_id_ge(value))
 }
 
 // where_id_in keeps the rows where `id` is one of `values`.
-pub fn (q ArticleUpdate) where_id_in(values []int) ArticleUpdate {
+pub fn (q ArticleUpdate) where_id_in(values []i64) ArticleUpdate {
 	return q.where(article_id_in(values))
 }
 
 // where_id_not_in keeps the rows where `id` is none of `values`.
-pub fn (q ArticleUpdate) where_id_not_in(values []int) ArticleUpdate {
+pub fn (q ArticleUpdate) where_id_not_in(values []i64) ArticleUpdate {
 	return q.where(article_id_not_in(values))
 }
 
-// where_slug keeps the rows where `slug` is `value`.
-pub fn (q ArticleUpdate) where_slug(value string) ArticleUpdate {
-	return q.where(article_slug_eq(value))
-}
-
-// where_slug_ne keeps the rows where `slug` is not `value`.
-pub fn (q ArticleUpdate) where_slug_ne(value string) ArticleUpdate {
-	return q.where(article_slug_ne(value))
-}
-
-// where_slug_in keeps the rows where `slug` is one of `values`.
-pub fn (q ArticleUpdate) where_slug_in(values []string) ArticleUpdate {
-	return q.where(article_slug_in(values))
-}
-
-// where_slug_not_in keeps the rows where `slug` is none of `values`.
-pub fn (q ArticleUpdate) where_slug_not_in(values []string) ArticleUpdate {
-	return q.where(article_slug_not_in(values))
-}
-
-// where_slug_like keeps the rows where `slug` matches the SQL LIKE `pattern`.
-pub fn (q ArticleUpdate) where_slug_like(pattern string) ArticleUpdate {
-	return q.where(article_slug_like(pattern))
-}
-
-// where_slug_contains keeps the rows where `slug` contains `value`.
-pub fn (q ArticleUpdate) where_slug_contains(value string) ArticleUpdate {
-	return q.where(article_slug_contains(value))
-}
-
-// where_slug_has_prefix keeps the rows where `slug` starts with `value`.
-pub fn (q ArticleUpdate) where_slug_has_prefix(value string) ArticleUpdate {
-	return q.where(article_slug_has_prefix(value))
-}
-
-// where_slug_has_suffix keeps the rows where `slug` ends with `value`.
-pub fn (q ArticleUpdate) where_slug_has_suffix(value string) ArticleUpdate {
-	return q.where(article_slug_has_suffix(value))
-}
-
-// where_slug_equal_fold keeps the rows where `slug` is `value`, ignoring case.
-pub fn (q ArticleUpdate) where_slug_equal_fold(value string) ArticleUpdate {
-	return q.where(article_slug_equal_fold(value))
-}
-
-// where_slug_contains_fold keeps the rows where `slug` contains `value`, ignoring case.
-pub fn (q ArticleUpdate) where_slug_contains_fold(value string) ArticleUpdate {
-	return q.where(article_slug_contains_fold(value))
-}
-
 // where_user_id keeps the rows where `user_id` is `value`.
-pub fn (q ArticleUpdate) where_user_id(value int) ArticleUpdate {
+pub fn (q ArticleUpdate) where_user_id(value i64) ArticleUpdate {
 	return q.where(article_user_id_eq(value))
 }
 
 // where_user_id_ne keeps the rows where `user_id` is not `value`.
-pub fn (q ArticleUpdate) where_user_id_ne(value int) ArticleUpdate {
+pub fn (q ArticleUpdate) where_user_id_ne(value i64) ArticleUpdate {
 	return q.where(article_user_id_ne(value))
 }
 
 // where_user_id_lt keeps the rows where `user_id` comes before `value`.
-pub fn (q ArticleUpdate) where_user_id_lt(value int) ArticleUpdate {
+pub fn (q ArticleUpdate) where_user_id_lt(value i64) ArticleUpdate {
 	return q.where(article_user_id_lt(value))
 }
 
 // where_user_id_le keeps the rows where `user_id` comes at or before `value`.
-pub fn (q ArticleUpdate) where_user_id_le(value int) ArticleUpdate {
+pub fn (q ArticleUpdate) where_user_id_le(value i64) ArticleUpdate {
 	return q.where(article_user_id_le(value))
 }
 
 // where_user_id_gt keeps the rows where `user_id` comes after `value`.
-pub fn (q ArticleUpdate) where_user_id_gt(value int) ArticleUpdate {
+pub fn (q ArticleUpdate) where_user_id_gt(value i64) ArticleUpdate {
 	return q.where(article_user_id_gt(value))
 }
 
 // where_user_id_ge keeps the rows where `user_id` comes at or after `value`.
-pub fn (q ArticleUpdate) where_user_id_ge(value int) ArticleUpdate {
+pub fn (q ArticleUpdate) where_user_id_ge(value i64) ArticleUpdate {
 	return q.where(article_user_id_ge(value))
 }
 
 // where_user_id_in keeps the rows where `user_id` is one of `values`.
-pub fn (q ArticleUpdate) where_user_id_in(values []int) ArticleUpdate {
+pub fn (q ArticleUpdate) where_user_id_in(values []i64) ArticleUpdate {
 	return q.where(article_user_id_in(values))
 }
 
 // where_user_id_not_in keeps the rows where `user_id` is none of `values`.
-pub fn (q ArticleUpdate) where_user_id_not_in(values []int) ArticleUpdate {
+pub fn (q ArticleUpdate) where_user_id_not_in(values []i64) ArticleUpdate {
 	return q.where(article_user_id_not_in(values))
 }
 
@@ -1192,66 +1135,6 @@ pub fn (q ArticleUpdate) where_published_at_is_not_null() ArticleUpdate {
 	return q.where(article_published_at_is_not_null())
 }
 
-// where_created_at keeps the rows where `created_at` is `value`.
-pub fn (q ArticleUpdate) where_created_at(value time.Time) ArticleUpdate {
-	return q.where(article_created_at_eq(value))
-}
-
-// where_created_at_ne keeps the rows where `created_at` is not `value`.
-pub fn (q ArticleUpdate) where_created_at_ne(value time.Time) ArticleUpdate {
-	return q.where(article_created_at_ne(value))
-}
-
-// where_created_at_lt keeps the rows where `created_at` comes before `value`.
-pub fn (q ArticleUpdate) where_created_at_lt(value time.Time) ArticleUpdate {
-	return q.where(article_created_at_lt(value))
-}
-
-// where_created_at_le keeps the rows where `created_at` comes at or before `value`.
-pub fn (q ArticleUpdate) where_created_at_le(value time.Time) ArticleUpdate {
-	return q.where(article_created_at_le(value))
-}
-
-// where_created_at_gt keeps the rows where `created_at` comes after `value`.
-pub fn (q ArticleUpdate) where_created_at_gt(value time.Time) ArticleUpdate {
-	return q.where(article_created_at_gt(value))
-}
-
-// where_created_at_ge keeps the rows where `created_at` comes at or after `value`.
-pub fn (q ArticleUpdate) where_created_at_ge(value time.Time) ArticleUpdate {
-	return q.where(article_created_at_ge(value))
-}
-
-// where_updated_at keeps the rows where `updated_at` is `value`.
-pub fn (q ArticleUpdate) where_updated_at(value time.Time) ArticleUpdate {
-	return q.where(article_updated_at_eq(value))
-}
-
-// where_updated_at_ne keeps the rows where `updated_at` is not `value`.
-pub fn (q ArticleUpdate) where_updated_at_ne(value time.Time) ArticleUpdate {
-	return q.where(article_updated_at_ne(value))
-}
-
-// where_updated_at_lt keeps the rows where `updated_at` comes before `value`.
-pub fn (q ArticleUpdate) where_updated_at_lt(value time.Time) ArticleUpdate {
-	return q.where(article_updated_at_lt(value))
-}
-
-// where_updated_at_le keeps the rows where `updated_at` comes at or before `value`.
-pub fn (q ArticleUpdate) where_updated_at_le(value time.Time) ArticleUpdate {
-	return q.where(article_updated_at_le(value))
-}
-
-// where_updated_at_gt keeps the rows where `updated_at` comes after `value`.
-pub fn (q ArticleUpdate) where_updated_at_gt(value time.Time) ArticleUpdate {
-	return q.where(article_updated_at_gt(value))
-}
-
-// where_updated_at_ge keeps the rows where `updated_at` comes at or after `value`.
-pub fn (q ArticleUpdate) where_updated_at_ge(value time.Time) ArticleUpdate {
-	return q.where(article_updated_at_ge(value))
-}
-
 // where_deleted_at keeps the rows where `deleted_at` is `value`.
 pub fn (q ArticleUpdate) where_deleted_at(value time.Time) ArticleUpdate {
 	return q.where(article_deleted_at_eq(value))
@@ -1312,19 +1195,11 @@ pub fn (q ArticleUpdate) has_comments_with(configure fn (CommentQuery) CommentQu
 	return q.where(article_has_comments_with(...configure(q.graph.comments()).query.conds))
 }
 
-// set_slug sets `slug`.
-pub fn (b ArticleUpdate) set_slug(value string) ArticleUpdate {
+// set_updated_at sets `Stamps.updated_at`.
+pub fn (b ArticleUpdate) set_updated_at(value time.Time) ArticleUpdate {
 	return ArticleUpdate{
 		...b
-		data: b.data.with_value('slug', orm.Primitive(value))
-	}
-}
-
-// set_user_id sets `user_id`.
-pub fn (b ArticleUpdate) set_user_id(value int) ArticleUpdate {
-	return ArticleUpdate{
-		...b
-		data: b.data.with_value('user_id', orm.Primitive(value))
+		data: b.data.with_value('Stamps.updated_at', orm.Primitive(value))
 	}
 }
 
@@ -1380,22 +1255,6 @@ pub fn (b ArticleUpdate) clear_published_at() ArticleUpdate {
 	}
 }
 
-// set_created_at sets `created_at`.
-pub fn (b ArticleUpdate) set_created_at(value time.Time) ArticleUpdate {
-	return ArticleUpdate{
-		...b
-		data: b.data.with_value('created_at', orm.Primitive(value))
-	}
-}
-
-// set_updated_at sets `updated_at`.
-pub fn (b ArticleUpdate) set_updated_at(value time.Time) ArticleUpdate {
-	return ArticleUpdate{
-		...b
-		data: b.data.with_value('updated_at', orm.Primitive(value))
-	}
-}
-
 // set_deleted_at sets `deleted_at`.
 pub fn (b ArticleUpdate) set_deleted_at(value time.Time) ArticleUpdate {
 	return ArticleUpdate{
@@ -1424,24 +1283,8 @@ pub fn (b ArticleUpdate) clear_deleted_at() ArticleUpdate {
 	}
 }
 
-// set_author_id sets `author` to the `users` row with the key `id`.
-pub fn (b ArticleUpdate) set_author_id(id int) ArticleUpdate {
-	return ArticleUpdate{
-		...b
-		data: b.data.with_value('user_id', orm.Primitive(id))
-	}
-}
-
-// set_author sets `author` to `node`.
-pub fn (b ArticleUpdate) set_author(node UserNode) ArticleUpdate {
-	return ArticleUpdate{
-		...b
-		data: b.data.with_value('user_id', orm.Primitive(node.user.id))
-	}
-}
-
 // add_comments_ids adds the `comments` rows with the keys `ids` to `comments`.
-pub fn (b ArticleUpdate) add_comments_ids(ids ...int) ArticleUpdate {
+pub fn (b ArticleUpdate) add_comments_ids(ids ...i64) ArticleUpdate {
 	return ArticleUpdate{
 		...b
 		data: b.data.with_added('comments', ids.map(it.str()))
@@ -1457,7 +1300,7 @@ pub fn (b ArticleUpdate) add_comments(nodes ...CommentNode) ArticleUpdate {
 }
 
 // remove_comments_ids removes the `comments` rows with the keys `ids` from `comments`.
-pub fn (b ArticleUpdate) remove_comments_ids(ids ...int) ArticleUpdate {
+pub fn (b ArticleUpdate) remove_comments_ids(ids ...i64) ArticleUpdate {
 	return ArticleUpdate{
 		...b
 		data: b.data.with_removed('comments', ids.map(it.str()))
@@ -1500,7 +1343,7 @@ pub fn (q ArticleQuery) delete_one(node ArticleNode) ArticleDeleteOne {
 }
 
 // delete_one_id starts the delete of the row with the key `id`.
-pub fn (q ArticleQuery) delete_one_id(id int) ArticleDeleteOne {
+pub fn (q ArticleQuery) delete_one_id(id i64) ArticleDeleteOne {
 	return ArticleDeleteOne{
 		graph: q.graph
 		data:  vgraph.MutationData{
@@ -1550,133 +1393,143 @@ pub fn (b ArticleDelete) where(conds ...load.Cond) ArticleDelete {
 	}
 }
 
+// where_created_at keeps the rows where `Stamps.created_at` is `value`.
+pub fn (q ArticleDelete) where_created_at(value time.Time) ArticleDelete {
+	return q.where(article_created_at_eq(value))
+}
+
+// where_created_at_ne keeps the rows where `Stamps.created_at` is not `value`.
+pub fn (q ArticleDelete) where_created_at_ne(value time.Time) ArticleDelete {
+	return q.where(article_created_at_ne(value))
+}
+
+// where_created_at_lt keeps the rows where `Stamps.created_at` comes before `value`.
+pub fn (q ArticleDelete) where_created_at_lt(value time.Time) ArticleDelete {
+	return q.where(article_created_at_lt(value))
+}
+
+// where_created_at_le keeps the rows where `Stamps.created_at` comes at or before `value`.
+pub fn (q ArticleDelete) where_created_at_le(value time.Time) ArticleDelete {
+	return q.where(article_created_at_le(value))
+}
+
+// where_created_at_gt keeps the rows where `Stamps.created_at` comes after `value`.
+pub fn (q ArticleDelete) where_created_at_gt(value time.Time) ArticleDelete {
+	return q.where(article_created_at_gt(value))
+}
+
+// where_created_at_ge keeps the rows where `Stamps.created_at` comes at or after `value`.
+pub fn (q ArticleDelete) where_created_at_ge(value time.Time) ArticleDelete {
+	return q.where(article_created_at_ge(value))
+}
+
+// where_updated_at keeps the rows where `Stamps.updated_at` is `value`.
+pub fn (q ArticleDelete) where_updated_at(value time.Time) ArticleDelete {
+	return q.where(article_updated_at_eq(value))
+}
+
+// where_updated_at_ne keeps the rows where `Stamps.updated_at` is not `value`.
+pub fn (q ArticleDelete) where_updated_at_ne(value time.Time) ArticleDelete {
+	return q.where(article_updated_at_ne(value))
+}
+
+// where_updated_at_lt keeps the rows where `Stamps.updated_at` comes before `value`.
+pub fn (q ArticleDelete) where_updated_at_lt(value time.Time) ArticleDelete {
+	return q.where(article_updated_at_lt(value))
+}
+
+// where_updated_at_le keeps the rows where `Stamps.updated_at` comes at or before `value`.
+pub fn (q ArticleDelete) where_updated_at_le(value time.Time) ArticleDelete {
+	return q.where(article_updated_at_le(value))
+}
+
+// where_updated_at_gt keeps the rows where `Stamps.updated_at` comes after `value`.
+pub fn (q ArticleDelete) where_updated_at_gt(value time.Time) ArticleDelete {
+	return q.where(article_updated_at_gt(value))
+}
+
+// where_updated_at_ge keeps the rows where `Stamps.updated_at` comes at or after `value`.
+pub fn (q ArticleDelete) where_updated_at_ge(value time.Time) ArticleDelete {
+	return q.where(article_updated_at_ge(value))
+}
+
 // where_id keeps the rows where `id` is `value`.
-pub fn (q ArticleDelete) where_id(value int) ArticleDelete {
+pub fn (q ArticleDelete) where_id(value i64) ArticleDelete {
 	return q.where(article_id_eq(value))
 }
 
 // where_id_ne keeps the rows where `id` is not `value`.
-pub fn (q ArticleDelete) where_id_ne(value int) ArticleDelete {
+pub fn (q ArticleDelete) where_id_ne(value i64) ArticleDelete {
 	return q.where(article_id_ne(value))
 }
 
 // where_id_lt keeps the rows where `id` comes before `value`.
-pub fn (q ArticleDelete) where_id_lt(value int) ArticleDelete {
+pub fn (q ArticleDelete) where_id_lt(value i64) ArticleDelete {
 	return q.where(article_id_lt(value))
 }
 
 // where_id_le keeps the rows where `id` comes at or before `value`.
-pub fn (q ArticleDelete) where_id_le(value int) ArticleDelete {
+pub fn (q ArticleDelete) where_id_le(value i64) ArticleDelete {
 	return q.where(article_id_le(value))
 }
 
 // where_id_gt keeps the rows where `id` comes after `value`.
-pub fn (q ArticleDelete) where_id_gt(value int) ArticleDelete {
+pub fn (q ArticleDelete) where_id_gt(value i64) ArticleDelete {
 	return q.where(article_id_gt(value))
 }
 
 // where_id_ge keeps the rows where `id` comes at or after `value`.
-pub fn (q ArticleDelete) where_id_ge(value int) ArticleDelete {
+pub fn (q ArticleDelete) where_id_ge(value i64) ArticleDelete {
 	return q.where(article_id_ge(value))
 }
 
 // where_id_in keeps the rows where `id` is one of `values`.
-pub fn (q ArticleDelete) where_id_in(values []int) ArticleDelete {
+pub fn (q ArticleDelete) where_id_in(values []i64) ArticleDelete {
 	return q.where(article_id_in(values))
 }
 
 // where_id_not_in keeps the rows where `id` is none of `values`.
-pub fn (q ArticleDelete) where_id_not_in(values []int) ArticleDelete {
+pub fn (q ArticleDelete) where_id_not_in(values []i64) ArticleDelete {
 	return q.where(article_id_not_in(values))
 }
 
-// where_slug keeps the rows where `slug` is `value`.
-pub fn (q ArticleDelete) where_slug(value string) ArticleDelete {
-	return q.where(article_slug_eq(value))
-}
-
-// where_slug_ne keeps the rows where `slug` is not `value`.
-pub fn (q ArticleDelete) where_slug_ne(value string) ArticleDelete {
-	return q.where(article_slug_ne(value))
-}
-
-// where_slug_in keeps the rows where `slug` is one of `values`.
-pub fn (q ArticleDelete) where_slug_in(values []string) ArticleDelete {
-	return q.where(article_slug_in(values))
-}
-
-// where_slug_not_in keeps the rows where `slug` is none of `values`.
-pub fn (q ArticleDelete) where_slug_not_in(values []string) ArticleDelete {
-	return q.where(article_slug_not_in(values))
-}
-
-// where_slug_like keeps the rows where `slug` matches the SQL LIKE `pattern`.
-pub fn (q ArticleDelete) where_slug_like(pattern string) ArticleDelete {
-	return q.where(article_slug_like(pattern))
-}
-
-// where_slug_contains keeps the rows where `slug` contains `value`.
-pub fn (q ArticleDelete) where_slug_contains(value string) ArticleDelete {
-	return q.where(article_slug_contains(value))
-}
-
-// where_slug_has_prefix keeps the rows where `slug` starts with `value`.
-pub fn (q ArticleDelete) where_slug_has_prefix(value string) ArticleDelete {
-	return q.where(article_slug_has_prefix(value))
-}
-
-// where_slug_has_suffix keeps the rows where `slug` ends with `value`.
-pub fn (q ArticleDelete) where_slug_has_suffix(value string) ArticleDelete {
-	return q.where(article_slug_has_suffix(value))
-}
-
-// where_slug_equal_fold keeps the rows where `slug` is `value`, ignoring case.
-pub fn (q ArticleDelete) where_slug_equal_fold(value string) ArticleDelete {
-	return q.where(article_slug_equal_fold(value))
-}
-
-// where_slug_contains_fold keeps the rows where `slug` contains `value`, ignoring case.
-pub fn (q ArticleDelete) where_slug_contains_fold(value string) ArticleDelete {
-	return q.where(article_slug_contains_fold(value))
-}
-
 // where_user_id keeps the rows where `user_id` is `value`.
-pub fn (q ArticleDelete) where_user_id(value int) ArticleDelete {
+pub fn (q ArticleDelete) where_user_id(value i64) ArticleDelete {
 	return q.where(article_user_id_eq(value))
 }
 
 // where_user_id_ne keeps the rows where `user_id` is not `value`.
-pub fn (q ArticleDelete) where_user_id_ne(value int) ArticleDelete {
+pub fn (q ArticleDelete) where_user_id_ne(value i64) ArticleDelete {
 	return q.where(article_user_id_ne(value))
 }
 
 // where_user_id_lt keeps the rows where `user_id` comes before `value`.
-pub fn (q ArticleDelete) where_user_id_lt(value int) ArticleDelete {
+pub fn (q ArticleDelete) where_user_id_lt(value i64) ArticleDelete {
 	return q.where(article_user_id_lt(value))
 }
 
 // where_user_id_le keeps the rows where `user_id` comes at or before `value`.
-pub fn (q ArticleDelete) where_user_id_le(value int) ArticleDelete {
+pub fn (q ArticleDelete) where_user_id_le(value i64) ArticleDelete {
 	return q.where(article_user_id_le(value))
 }
 
 // where_user_id_gt keeps the rows where `user_id` comes after `value`.
-pub fn (q ArticleDelete) where_user_id_gt(value int) ArticleDelete {
+pub fn (q ArticleDelete) where_user_id_gt(value i64) ArticleDelete {
 	return q.where(article_user_id_gt(value))
 }
 
 // where_user_id_ge keeps the rows where `user_id` comes at or after `value`.
-pub fn (q ArticleDelete) where_user_id_ge(value int) ArticleDelete {
+pub fn (q ArticleDelete) where_user_id_ge(value i64) ArticleDelete {
 	return q.where(article_user_id_ge(value))
 }
 
 // where_user_id_in keeps the rows where `user_id` is one of `values`.
-pub fn (q ArticleDelete) where_user_id_in(values []int) ArticleDelete {
+pub fn (q ArticleDelete) where_user_id_in(values []i64) ArticleDelete {
 	return q.where(article_user_id_in(values))
 }
 
 // where_user_id_not_in keeps the rows where `user_id` is none of `values`.
-pub fn (q ArticleDelete) where_user_id_not_in(values []int) ArticleDelete {
+pub fn (q ArticleDelete) where_user_id_not_in(values []i64) ArticleDelete {
 	return q.where(article_user_id_not_in(values))
 }
 
@@ -1870,66 +1723,6 @@ pub fn (q ArticleDelete) where_published_at_is_not_null() ArticleDelete {
 	return q.where(article_published_at_is_not_null())
 }
 
-// where_created_at keeps the rows where `created_at` is `value`.
-pub fn (q ArticleDelete) where_created_at(value time.Time) ArticleDelete {
-	return q.where(article_created_at_eq(value))
-}
-
-// where_created_at_ne keeps the rows where `created_at` is not `value`.
-pub fn (q ArticleDelete) where_created_at_ne(value time.Time) ArticleDelete {
-	return q.where(article_created_at_ne(value))
-}
-
-// where_created_at_lt keeps the rows where `created_at` comes before `value`.
-pub fn (q ArticleDelete) where_created_at_lt(value time.Time) ArticleDelete {
-	return q.where(article_created_at_lt(value))
-}
-
-// where_created_at_le keeps the rows where `created_at` comes at or before `value`.
-pub fn (q ArticleDelete) where_created_at_le(value time.Time) ArticleDelete {
-	return q.where(article_created_at_le(value))
-}
-
-// where_created_at_gt keeps the rows where `created_at` comes after `value`.
-pub fn (q ArticleDelete) where_created_at_gt(value time.Time) ArticleDelete {
-	return q.where(article_created_at_gt(value))
-}
-
-// where_created_at_ge keeps the rows where `created_at` comes at or after `value`.
-pub fn (q ArticleDelete) where_created_at_ge(value time.Time) ArticleDelete {
-	return q.where(article_created_at_ge(value))
-}
-
-// where_updated_at keeps the rows where `updated_at` is `value`.
-pub fn (q ArticleDelete) where_updated_at(value time.Time) ArticleDelete {
-	return q.where(article_updated_at_eq(value))
-}
-
-// where_updated_at_ne keeps the rows where `updated_at` is not `value`.
-pub fn (q ArticleDelete) where_updated_at_ne(value time.Time) ArticleDelete {
-	return q.where(article_updated_at_ne(value))
-}
-
-// where_updated_at_lt keeps the rows where `updated_at` comes before `value`.
-pub fn (q ArticleDelete) where_updated_at_lt(value time.Time) ArticleDelete {
-	return q.where(article_updated_at_lt(value))
-}
-
-// where_updated_at_le keeps the rows where `updated_at` comes at or before `value`.
-pub fn (q ArticleDelete) where_updated_at_le(value time.Time) ArticleDelete {
-	return q.where(article_updated_at_le(value))
-}
-
-// where_updated_at_gt keeps the rows where `updated_at` comes after `value`.
-pub fn (q ArticleDelete) where_updated_at_gt(value time.Time) ArticleDelete {
-	return q.where(article_updated_at_gt(value))
-}
-
-// where_updated_at_ge keeps the rows where `updated_at` comes at or after `value`.
-pub fn (q ArticleDelete) where_updated_at_ge(value time.Time) ArticleDelete {
-	return q.where(article_updated_at_ge(value))
-}
-
 // where_deleted_at keeps the rows where `deleted_at` is `value`.
 pub fn (q ArticleDelete) where_deleted_at(value time.Time) ArticleDelete {
 	return q.where(article_deleted_at_eq(value))
@@ -2001,7 +1794,7 @@ fn (g Graph) articles_by_keys(keys []string) ![]ArticleNode {
 	// as stored: no privacy rule or interceptor hides a row just written
 	rows := Graph{
 		client: g.client.bypass()
-	}.articles().where(load.in_keys('id', keys, .int)).all()!
+	}.articles().where(load.in_keys('id', keys, .i64)).all()!
 	mut by_key := map[string]ArticleNode{}
 	for row in rows {
 		by_key[row.article.id.str()] = row
@@ -2022,24 +1815,16 @@ fn (g Graph) articles_by_keys(keys []string) ![]ArticleNode {
 // they are.
 pub struct CreateArticleInput {
 pub mut:
-	slug         ?string
-	user_id      ?int
+	user_id      ?i64
 	title        ?string
 	summary      ?string
 	body         ?string
 	published_at ?time.Time
-	created_at   ?time.Time
-	updated_at   ?time.Time
-	deleted_at   ?time.Time
-	comment_ids  []int
 }
 
 // set_input sets what `input` gives: clears first, then values, then edges.
 pub fn (b ArticleCreate) set_input(input CreateArticleInput) ArticleCreate {
 	mut next := b
-	if v := input.slug {
-		next = next.set_slug(v)
-	}
 	if v := input.user_id {
 		next = next.set_user_id(v)
 	}
@@ -2054,18 +1839,6 @@ pub fn (b ArticleCreate) set_input(input CreateArticleInput) ArticleCreate {
 	}
 	if v := input.published_at {
 		next = next.set_published_at(v)
-	}
-	if v := input.created_at {
-		next = next.set_created_at(v)
-	}
-	if v := input.updated_at {
-		next = next.set_updated_at(v)
-	}
-	if v := input.deleted_at {
-		next = next.set_deleted_at(v)
-	}
-	if input.comment_ids.len > 0 {
-		next = next.add_comments_ids(...input.comment_ids)
 	}
 	return next
 }
@@ -2075,20 +1848,11 @@ pub fn (b ArticleCreate) set_input(input CreateArticleInput) ArticleCreate {
 // they are.
 pub struct UpdateArticleInput {
 pub mut:
-	slug               ?string
-	user_id            ?int
 	title              ?string
 	summary            ?string
 	body               ?string
 	published_at       ?time.Time
 	clear_published_at bool
-	created_at         ?time.Time
-	updated_at         ?time.Time
-	deleted_at         ?time.Time
-	clear_deleted_at   bool
-	add_comment_ids    []int
-	remove_comment_ids []int
-	clear_comments     bool
 }
 
 // set_input sets what `input` gives: clears first, then values, then edges.
@@ -2096,18 +1860,6 @@ pub fn (b ArticleUpdateOne) set_input(input UpdateArticleInput) ArticleUpdateOne
 	mut next := b
 	if input.clear_published_at {
 		next = next.clear_published_at()
-	}
-	if input.clear_deleted_at {
-		next = next.clear_deleted_at()
-	}
-	if input.clear_comments {
-		next = next.clear_comments()
-	}
-	if v := input.slug {
-		next = next.set_slug(v)
-	}
-	if v := input.user_id {
-		next = next.set_user_id(v)
 	}
 	if v := input.title {
 		next = next.set_title(v)
@@ -2120,21 +1872,6 @@ pub fn (b ArticleUpdateOne) set_input(input UpdateArticleInput) ArticleUpdateOne
 	}
 	if v := input.published_at {
 		next = next.set_published_at(v)
-	}
-	if v := input.created_at {
-		next = next.set_created_at(v)
-	}
-	if v := input.updated_at {
-		next = next.set_updated_at(v)
-	}
-	if v := input.deleted_at {
-		next = next.set_deleted_at(v)
-	}
-	if input.add_comment_ids.len > 0 {
-		next = next.add_comments_ids(...input.add_comment_ids)
-	}
-	if input.remove_comment_ids.len > 0 {
-		next = next.remove_comments_ids(...input.remove_comment_ids)
 	}
 	return next
 }

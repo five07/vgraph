@@ -1078,7 +1078,7 @@ fn (q LikeQuery) load_user(rows []models.Like, fns []fn (UserQuery) UserQuery) !
 		keys << row.user_id.str()
 	}
 	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id', load.unique(keys),
-		query: q.graph.client.prepare_query('users', sub.query)!
+		query: q.graph.client.prepare_edge_query('users', sub.query)!
 	)!)!
 	mut by_key := map[string]UserNode{}
 	for target in targets {
@@ -1120,7 +1120,7 @@ fn (q LikeQuery) load_gadget(rows []models.Like, fns []fn (GadgetQuery) GadgetQu
 		keys << row.gadget_id.str()
 	}
 	targets := sub.nodes(load.select_in[models.Gadget](q.graph.client.conn, 'id', load.unique(keys),
-		query: q.graph.client.prepare_query('gadgets', sub.query)!
+		query: q.graph.client.prepare_edge_query('gadgets', sub.query)!
 	)!)!
 	mut by_key := map[string]GadgetNode{}
 	for target in targets {

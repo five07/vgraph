@@ -430,6 +430,9 @@ fn input_fields(info Info, infos map[string]Info, create bool) []InputField {
 			continue
 		}
 		target := infos[e.to] or { continue }
+		if held_immutably(e, target) {
+			continue
+		}
 		kt := key_v_type(target)
 		match e.kind {
 			'one_to_one' {
@@ -500,6 +503,18 @@ fn input_fields(info Info, infos map[string]Info, create bool) []InputField {
 		}
 	}
 	return out
+}
+
+// held_immutably reports whether the targets of the one_to_many or one_to_one
+// edge `e` hold its key in a column their own immutable many_to_one edge
+// follows: setting the edge from this side would change it.
+fn held_immutably(e Edge, target Info) bool {
+	if e.kind !in ['one_to_many', 'one_to_one'] {
+		return false
+	}
+	return target.table.edges.any(it.kind == 'many_to_one' && it.immutable && it.column == e.column
+		&& it.type_col == e.type_col && it.type_val == e.type_val)
+		|| (target.table.column(e.column) or { Column{} }).immutable
 }
 
 // check_inputs rejects two input fields of one name.

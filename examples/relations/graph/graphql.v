@@ -1354,7 +1354,6 @@ input CreateUserInput {
   followerIDs: [ID!]
   friendIDs: [ID!]
   deviceIDs: [ID!]
-  gadgetIDs: [ID!]
   likedGadgetIDs: [ID!]
 }
 
@@ -1383,9 +1382,6 @@ input UpdateUserInput {
   addDeviceIDs: [ID!]
   removeDeviceIDs: [ID!]
   clearDevices: Boolean
-  addGadgetIDs: [ID!]
-  removeGadgetIDs: [ID!]
-  clearGadgets: Boolean
   addLikedGadgetIDs: [ID!]
   removeLikedGadgetIDs: [ID!]
   clearLikedGadgets: Boolean
@@ -4971,7 +4967,7 @@ fn user_where(w map[string]graphql.Value) ![]load.Cond {
 // user_count_gadgets counts the `gadgets` of each of `rows` that `sub` keeps, by the
 // row's key.
 fn user_count_gadgets(g Graph, rows []models.User, sub GadgetQuery) !map[string]int {
-	conds := g.client.prepare_query('gadgets', sub.query)!.conds
+	conds := g.client.prepare_edge_query('gadgets', sub.query)!.conds
 	return load.count_each(g.client.conn, 'gadgets', 'owner_id', rows.map(it.id.str()),
 		.int, load.Query{
 			conds: conds
@@ -4981,7 +4977,7 @@ fn user_count_gadgets(g Graph, rows []models.User, sub GadgetQuery) !map[string]
 // user_count_liked_gadgets counts the `liked_gadgets` of each of `rows` that `sub` keeps, by the
 // row's key.
 fn user_count_liked_gadgets(g Graph, rows []models.User, sub GadgetQuery) !map[string]int {
-	conds := g.client.prepare_query('gadgets', sub.query)!.conds
+	conds := g.client.prepare_edge_query('gadgets', sub.query)!.conds
 	return load.count_through(g.client.conn, 'likes', 'user_id', 'gadget_id',
 		rows.map(it.id.str()), .int, .i64, 'gadgets', 'id', load.Query{
 			conds: conds
@@ -5022,9 +5018,6 @@ fn user_create_input(value graphql.Value) !CreateUserInput {
 			}
 			'deviceIDs' {
 				input.device_ids = gql_strings(v)
-			}
-			'gadgetIDs' {
-				input.gadget_ids = gql_i64s(v)!
 			}
 			'likedGadgetIDs' {
 				input.liked_gadget_ids = gql_i64s(v)!
@@ -5111,15 +5104,6 @@ fn user_update_input(value graphql.Value) !UpdateUserInput {
 			}
 			'clearDevices' {
 				input.clear_devices = v.as_bool()
-			}
-			'addGadgetIDs' {
-				input.add_gadget_ids = gql_i64s(v)!
-			}
-			'removeGadgetIDs' {
-				input.remove_gadget_ids = gql_i64s(v)!
-			}
-			'clearGadgets' {
-				input.clear_gadgets = v.as_bool()
 			}
 			'addLikedGadgetIDs' {
 				input.add_liked_gadget_ids = gql_i64s(v)!

@@ -843,7 +843,7 @@ fn (q CategoryQuery) load_parent(rows []models.Category, fns []fn (CategoryQuery
 	}
 	targets := sub.nodes(load.select_in[models.Category](q.graph.client.conn, 'id',
 		load.unique(keys),
-		query: q.graph.client.prepare_query('categories', sub.query)!
+		query: q.graph.client.prepare_edge_query('categories', sub.query)!
 	)!)!
 	mut by_key := map[string]CategoryNode{}
 	for target in targets {
@@ -883,7 +883,7 @@ fn (q CategoryQuery) load_children(rows []models.Category, fns []fn (CategoryQue
 	}
 	children := sub.nodes(load.select_each[models.Category](q.graph.client.conn, 'parent_id',
 		rows.map(it.id.str()),
-		query: q.graph.client.prepare_query('categories', sub.query)!
+		query: q.graph.client.prepare_edge_query('categories', sub.query)!
 	)!)!
 	mut by_parent := map[string][]CategoryNode{}
 	for child in children {

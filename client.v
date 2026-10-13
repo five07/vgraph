@@ -224,7 +224,7 @@ pub fn (c Client) load_one[C, P](children []C, edge string) !map[string]P {
 		type_col: e.type_col
 		type_val: e.type_val
 		soft_del: e.soft_del
-		query:    c.prepare_query(e.to, load.Query{})!
+		query:    c.prepare_edge_query(e.to, load.Query{})!
 	)
 }
 
@@ -238,7 +238,7 @@ pub fn (c Client) load_many[P, C](parents []P, edge string) !map[string][]C {
 		type_col: e.type_col
 		type_val: e.type_val
 		soft_del: e.soft_del
-		query:    c.prepare_query(e.to, load.Query{})!
+		query:    c.prepare_edge_query(e.to, load.Query{})!
 	}
 	return match e.kind {
 		.one_to_many, .one_to_one { load.load_many[P, C](c.conn, parents, e.column, opts)! }

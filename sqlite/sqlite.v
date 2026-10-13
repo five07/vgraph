@@ -6,21 +6,29 @@ module sqlite
 
 import db.sqlite as sq
 import orm
+import sync
 
 // Driver is a SQLite connection that vgraph can run its own SQL on. It
 // implements `vgraph.Driver`, `vgraph.TxConnection` and
 // `orm.TransactionalConnection`.
+//
+// SQLite has one transaction per connection, so threads that share a driver
+// take turns: a transaction begun while another is open waits for it to end.
+// Statements outside a transaction don't wait, and see what an open one has
+// written.
 @[heap]
 pub struct Driver {
 mut:
-	db    sq.DB
-	in_tx bool
+	db      sq.DB
+	in_tx   bool
+	tx_lock &sync.Mutex = sync.new_mutex()
 }
 
 // new returns a driver that runs on `db`.
 pub fn new(db sq.DB) &Driver {
 	return &Driver{
-		db: db
+		db:      db
+		tx_lock: sync.new_mutex()
 	}
 }
 
@@ -37,17 +45,22 @@ pub fn (d &Driver) dialect() orm.SQLDialect {
 // exec_params runs `query`, binding `params` as text to its `?` placeholders.
 // SQLite converts them to each column's type. A null cell is returned as ''.
 pub fn (mut d Driver) exec_params(query string, params []string) ![][]?string {
-	rows := d.db.exec_param_many(query, params)!
+	rows := d.db.exec_param_many(query, params) or { return without_sql(err) }
 	return rows.map(it.vals.map(?string(it)))
 }
 
 // begin_tx starts a transaction on the same connection, and returns a driver
 // that commits or rolls it back. SQLite has one transaction per connection.
 pub fn (mut d Driver) begin_tx() !orm.Connection {
-	d.db.begin()!
+	d.tx_lock.lock()
+	d.db.begin() or {
+		d.tx_lock.unlock()
+		return err
+	}
 	return &Driver{
-		db:    d.db
-		in_tx: true
+		db:      d.db
+		in_tx:   true
+		tx_lock: d.tx_lock
 	}
 }
 
@@ -56,8 +69,15 @@ pub fn (mut d Driver) commit_tx() ! {
 	if !d.in_tx {
 		return error('vgraph sqlite: no transaction to commit')
 	}
-	d.db.commit()!
 	d.in_tx = false
+	defer {
+		d.tx_lock.unlock()
+	}
+	d.db.commit() or {
+		// a commit that fails leaves nothing open
+		d.db.rollback() or {}
+		return err
+	}
 }
 
 // rollback_tx rolls back the transaction that `begin_tx` started.
@@ -65,30 +85,46 @@ pub fn (mut d Driver) rollback_tx() ! {
 	if !d.in_tx {
 		return error('vgraph sqlite: no transaction to roll back')
 	}
-	d.db.rollback()!
 	d.in_tx = false
+	defer {
+		d.tx_lock.unlock()
+	}
+	d.db.rollback()!
+}
+
+// without_sql returns `err` without the statement that `db.sqlite` adds to
+// its messages, which can hold values: SQLite's own message, and its code,
+// reach the caller, and through GraphQL, the client.
+fn without_sql(err IError) IError {
+	code := err.code()
+	marker := ' (${code}) ('
+	msg := err.msg()
+	if code != 0 && msg.contains(marker) {
+		return error_with_code(msg.all_before(marker), code)
+	}
+	return err
 }
 
 // The ORM's calls, passed to `db`.
 
 // select runs the ORM's select on the wrapped connection.
 pub fn (mut d Driver) select(config orm.SelectConfig, data orm.QueryData, where orm.QueryData) ![][]orm.Primitive {
-	return d.db.select(config, data, where)
+	return d.db.select(config, data, where) or { return without_sql(err) }
 }
 
 // insert runs the ORM's insert on the wrapped connection.
 pub fn (mut d Driver) insert(table orm.Table, data orm.QueryData) ! {
-	d.db.insert(table, data)!
+	d.db.insert(table, data) or { return without_sql(err) }
 }
 
 // update runs the ORM's update on the wrapped connection.
 pub fn (mut d Driver) update(table orm.Table, data orm.QueryData, where orm.QueryData) ! {
-	d.db.update(table, data, where)!
+	d.db.update(table, data, where) or { return without_sql(err) }
 }
 
 // delete runs the ORM's delete on the wrapped connection.
 pub fn (mut d Driver) delete(table orm.Table, where orm.QueryData) ! {
-	d.db.delete(table, where)!
+	d.db.delete(table, where) or { return without_sql(err) }
 }
 
 // create runs the ORM's create table on the wrapped connection.
@@ -112,17 +148,26 @@ pub fn (mut d Driver) execute(query string) ![]orm.Row {
 }
 
 // orm_begin starts the ORM's transaction on the wrapped connection.
+// Like `begin_tx`, it waits for another thread's transaction to end.
 pub fn (mut d Driver) orm_begin() ! {
-	d.db.orm_begin()!
+	d.tx_lock.lock()
+	d.db.orm_begin() or {
+		d.tx_lock.unlock()
+		return err
+	}
 }
 
 // orm_commit commits the ORM's transaction on the wrapped connection.
 pub fn (mut d Driver) orm_commit() ! {
 	d.db.orm_commit()!
+	d.tx_lock.unlock()
 }
 
 // orm_rollback rolls back the ORM's transaction on the wrapped connection.
 pub fn (mut d Driver) orm_rollback() ! {
+	defer {
+		d.tx_lock.unlock()
+	}
 	d.db.orm_rollback()!
 }
 

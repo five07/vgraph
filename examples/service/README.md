@@ -1,12 +1,13 @@
 # service
 
-A small JSON REST API in [V](https://vlang.io), backed by SQLite through V's ORM, that
-also serves the same data over GraphQL. It has users, articles, posts, and comments
-that can be on either an article or a post, with threaded replies. There is no
-authentication.
+A small GraphQL API in [V](https://vlang.io), backed by SQLite, that runs on vgraph
+alone: its schema, queries, writes and checks all come from the models. It has
+users, articles, posts, and comments that can be on either an article or a post,
+with threaded replies. There is no authentication.
 
-It started as a copy of `rest-api` (commit `9d802d6`) and is the test bed and,
-later, the published example for vgraph. See `../../PLAN.md` for the plan.
+It started as a copy of the `rest-api` REST service (commit `9d802d6`), and has been
+vgraph's test bed since. Phase 7 of `../../PLAN.md` replaced its REST API, handlers
+and stores with what vgraph generates.
 
 Built and tested with V master, like vgraph (see the root README). It imports vgraph
 as `five07.vgraph`, so link the checkout first: `ln -s <vgraph> ~/.vmodules/five07/vgraph`.
@@ -15,7 +16,7 @@ as `five07.vgraph`, so link the checkout first: `ln -s <vgraph> ~/.vmodules/five
 
 ```sh
 v run .                          # build and start on http://localhost:8080
-v test .                         # store tests and HTTP-level tests
+v test .                         # the API's tests, over HTTP
 v run ../../cmd/vgraph gen .     # regenerate graph/ after changing a model's edges()
 ```
 
@@ -31,80 +32,79 @@ environment variables override it. Copy `.env.example` to start one.
 
 Startup runs the pending migrations of `migrations/` through V's `v.migrations`,
 which records them in `schema_migrations`. The first, `1 initial`, creates the
-tables from the models and the indexes their edges need
-(`vgraph.add_edge_indexes`). A schema change is a new migration. A database file
-from before migrations has the tables but no `schema_migrations`: delete it.
+tables from the schema (`vgraph.create_table`), the indexes their edges need
+(`vgraph.add_edge_indexes`) and each table's range of global ids
+(`vgraph.global_ids`). A schema change is a new migration. A database file from
+before Phase 7, with slugs and integer ids, doesn't fit: delete it.
 
 ## Layout
 
-One module per model, as in `../web`. Each has a handler and a `models` submodule
-that holds the struct, its validation and its store:
-
 ```
 main.v, app.v, seed.v      startup, wiring, example data
+hooks.v                    the hook that checks a new comment's owner and parent:
+                           it reads other tables through `graph`, which `models`
+                           can't import
+models/                    one file per model: the struct, its edges, field
+                           options, hooks and GraphQL options; `stamps.v` has the
+                           Stamps mixin and what the models share
 migrations/                the database migrations, run at startup
-app/                       Context, config, database, errors, JSON in and out, slugs
-graph/                     the typed vgraph client and GraphQL server, generated from the
-                           models' edges() and api.graphql; resolvers.v is written by hand
-api.graphql                the GraphQL mutations, one per REST endpoint that writes
-users/  articles/  posts/  comments/
-    <name>.v               the routes
-    models/<name>.v        the struct, its edges, request and response shapes, validation
-    models/store.v         reads and writes through orm.Connection
-comments/service.v         comment operations shared with the articles and posts routes
-comments/owners.v          the kinds of records comments can be on
+app/                       config, database, request context, JSON for /health
+graph/                     the typed vgraph client and GraphQL server, generated
+                           from the models; resolvers.v is the project's (empty)
 ```
 
 ## API
 
-Every request and response body is JSON.
+`POST /graphql`, or `GET /graphql?query=…` for queries, serves the schema in
+`graph/schema.graphql`, which `vgraph gen` writes from the models with entgql's
+conventions. `GET /health` answers `{"status":"ok"}`.
 
-| Method | Path | Success |
-|--------|------|---------|
-| `GET` | `/health` | `200 {"status":"ok"}` |
-| `GET` | `/{users,articles,posts,comments}` | `200` list, oldest first |
-| `GET` | `/{resource}/:slug` | `200` the record |
-| `POST` | `/{resource}` | `201` the new record |
-| `PUT` | `/{resource}/:slug` | `200`: replaces every writable field |
-| `PATCH` | `/{resource}/:slug` | `200`: changes only the fields sent |
-| `DELETE` | `/{resource}/:slug` | `204`: soft delete |
-| `GET` | `/users/:slug/{articles,posts,comments}` | `200` what the user wrote |
-| `GET` | `/{articles,posts}/:slug/comments` | `200` the comments on it |
-| `POST` | `/{articles,posts}/:slug/comments` | `201` a new comment on it |
-| `GET` | `/comments?owner_type=Article&owner_slug=…` | `200` the comments on that record |
+- **Ids.** Every record has a global id (`ID`), unique across the four tables, so
+  `node(id:)` finds any of them and `nodes(ids:)` several. Records refer to each
+  other by id (`userID`, `ownerID`, `parentID`), with foreign keys in the database;
+  a comment's owner can be in either table, so a hook checks it instead.
+- **Lists** are Relay connections: `users`, `articles`, `posts` and `comments` at
+  the root, and the edges between them (`articles` of a user, `comments` and
+  `replies`), with `first` / `after`, `last` / `before`, `where`, `orderBy` and
+  `totalCount`.
+- **Writes** are the generated mutations: `create<Type>(input:)`,
+  `update<Type>(id:, input:)` and `delete<Type>(id:)`, which returns the id. A
+  request's mutations run in one transaction: if one fails, none is stored.
+- **Introspection** answers as graphql-js does (`testdata/introspection.json`), so
+  GraphiQL, Apollo Sandbox and code generators can read the schema.
 
 ### Records
 
-| Record | Writable fields | Fixed at create |
-|--------|-----------------|-----------------|
-| user | `name`, `email` | — |
-| article | `title`, `summary`, `body`, `published` | `user_slug` |
-| post | `body` | `user_slug` |
-| comment | `body` | `user_slug`, `owner_type` (`Article` \| `Post`), `owner_slug`, `parent_slug` |
+| Type | Fields a create sets | An update can change | Fixed at create |
+|------|----------------------|----------------------|-----------------|
+| `User` | `name`, `email` | `name`, `email` | — |
+| `Article` | `title`, `summary`, `body`, `publishedAt` | the same, `clearPublishedAt` | `userID` |
+| `Post` | `body` | `body` | `userID` |
+| `Comment` | `body` | `body` | `userID`, `ownerType` (`Article` \| `Post`), `ownerID`, `parentID` |
 
-Responses also carry `slug`, `created_at` and `updated_at`. An article carries
-`published_at` while it is published, and a reply carries `parent_slug`.
+Every record also has `id`, `createdAt` and `updatedAt`, which only the server
+sets. An article is published while it has a `publishedAt`.
 
-### Conventions
+### Rules
 
-- **Slugs, not ids.** Each record has a UUID v7 `slug`, which is the only identifier
-  the API shows. Records refer to each other by slug (`user_slug`, `owner_slug`,
-  `parent_slug`). In the database they refer to each other by integer id, with
-  foreign keys. The exception is a comment's owner, which can be in either table, so
-  the app checks it instead.
-- **Strict bodies.** A key that isn't a field of the request gets
-  `400 The following attribute(s) are not supported: [...]`. `slug`, `created_at` and
-  `updated_at` are ignored, so a response can be sent back as is.
-- **Fixed fields can't change.** `PUT` and `PATCH` reject any of the "fixed at create"
-  fields above.
-- **Soft delete.** `DELETE` marks a record deleted, and it then gives `404`
-  everywhere. Nothing cascades: an article's comments stay in `GET /comments`, but
-  can't be reached or added through the deleted article. A deleted user's email
+Each is in the models, so every write follows it, whoever makes it:
+
+- Names, titles and summaries are trimmed; emails are trimmed and lowercased, and
+  unique. A name is at most 100 bytes, an email 254 and has an `@`, a title 200, a
+  summary 500; bodies can't be blank, and are at most 20,000 bytes (articles),
+  2,000 (posts) or 5,000 (comments). Field options check them (`fields()`), after
+  the hooks that normalize (`hooks()`).
+- A comment's owner exists and isn't deleted, and is of the type `ownerType`
+  names; a reply is on its parent's owner (`hooks.v`).
+- **Soft delete.** A delete sets `deletedAt`, and the record is then left out of
+  every query: lists, counts, `node`. Lists on edges (a user's articles, an
+  article's comments, a comment's replies) leave it out too. A record that refers
+  to it still shows it: an article by a deleted user keeps its `author`, a comment
+  on a deleted article its `article`. Nothing cascades, and a deleted user's email
   stays taken.
-- **Errors** are `{"error": "<message>"}`: `400` for a bad body or reference, `404`
-  for a missing record in the path, `409` for a duplicate email, `500` (with no
-  detail) for anything else.
-- Emails are trimmed and lowercased; names and titles are trimmed.
+- **Errors** are GraphQL errors, at the field that failed, with vgraph's message,
+  such as `` `articles.title`: is empty ``, or the database's, without its SQL,
+  such as `UNIQUE constraint failed: users.email`.
 
 ## Walkthrough
 
@@ -112,50 +112,42 @@ Every command below runs against a server started with `v run .`. They need `cur
 and `jq`.
 
 ```sh
-API=http://localhost:8080
-json=(-H 'Content-Type: application/json')
+API=http://localhost:8080/graphql
+gql() { jq -n --arg q "$1" '{query: $q}' | curl -s -H 'Content-Type: application/json' -d @- "$API"; }
 
-# Users
-LIN=$(curl -s "${json[@]}" -d '{"name":"Linus","email":"linus@example.com"}' "$API/users" | jq -r .slug)
-curl -s "$API/users" | jq -r '.[].name'          # Ada Lovelace, Grace Hopper (seeded), Linus
-curl -s "$API/users/$LIN" | jq -c .
-curl -s -X PATCH "${json[@]}" -d '{"name":"Linus T."}' "$API/users/$LIN" | jq -c '{name, email}'
-curl -s -X PUT "${json[@]}" -d '{"name":"Linus","email":"lt@example.com"}' "$API/users/$LIN" | jq -c '{name, email}'
+# Users: the seeded ones, and a new one
+gql '{ users { edges { node { id name } } } }' | jq -r '.data.users.edges[].node.name'
+LIN=$(gql 'mutation { createUser(input: {name: "Linus", email: " Linus@Example.com"}) { id } }' | jq -r .data.createUser.id)
+gql "{ node(id: \"$LIN\") { ... on User { name email createdAt } } }" | jq -c .data.node
+gql "mutation { updateUser(id: \"$LIN\", input: {name: \"Linus T.\"}) { name email } }" | jq -c .data
 
-# Articles
-ART=$(curl -s "${json[@]}" -d "{\"user_slug\":\"$LIN\",\"title\":\"Hello\",\"body\":\"V is great.\"}" "$API/articles" | jq -r .slug)
-curl -s -X PATCH "${json[@]}" -d '{"published":true}' "$API/articles/$ART" | jq -c '{title, published_at}'
-curl -s "$API/articles" | jq -r '.[].title'
+# Articles, published by setting publishedAt
+ART=$(gql "mutation { createArticle(input: {userID: \"$LIN\", title: \"Hello\", body: \"V is great.\"}) { id } }" | jq -r .data.createArticle.id)
+gql "mutation { updateArticle(id: \"$ART\", input: {publishedAt: \"2026-10-13T12:00:00Z\"}) { title publishedAt } }" | jq -c .data
+gql '{ articles(orderBy: {field: TITLE}) { totalCount edges { node { title author { name } } } } }' | jq -c '.data.articles'
 
 # Posts
-POST=$(curl -s "${json[@]}" -d "{\"user_slug\":\"$LIN\",\"body\":\"Shipping today.\"}" "$API/posts" | jq -r .slug)
-curl -s -X PUT "${json[@]}" -d '{"body":"Shipped."}' "$API/posts/$POST" | jq -c '{body}'
+POST=$(gql "mutation { createPost(input: {userID: \"$LIN\", body: \"Shipping today.\"}) { id } }" | jq -r .data.createPost.id)
 
-# Comments: through the flat route, or nested under what they're on
-C1=$(curl -s "${json[@]}" -d "{\"user_slug\":\"$LIN\",\"owner_type\":\"Article\",\"owner_slug\":\"$ART\",\"body\":\"First!\"}" "$API/comments" | jq -r .slug)
-curl -s "${json[@]}" -d "{\"user_slug\":\"$LIN\",\"parent_slug\":\"$C1\",\"body\":\"A reply.\"}" "$API/articles/$ART/comments" | jq -c '{body, parent_slug}'
-curl -s "${json[@]}" -d "{\"user_slug\":\"$LIN\",\"body\":\"Nice.\"}" "$API/posts/$POST/comments" | jq -c '{body, owner_type}'
-curl -s "$API/articles/$ART/comments" | jq -r '.[].body'                     # First!, A reply.
-curl -s "$API/comments?owner_type=Post&owner_slug=$POST" | jq -r '.[].body'  # Nice.
-curl -s -X PATCH "${json[@]}" -d '{"body":"First, edited."}' "$API/comments/$C1" | jq -c '{body}'
+# Comments, and a reply
+C1=$(gql "mutation { createComment(input: {userID: \"$LIN\", ownerType: \"Article\", ownerID: \"$ART\", body: \"First!\"}) { id } }" | jq -r .data.createComment.id)
+gql "mutation { createComment(input: {userID: \"$LIN\", ownerType: \"Article\", ownerID: \"$ART\", parentID: \"$C1\", body: \"A reply.\"}) { parent { body } } }" | jq -c .data
+gql "mutation { createComment(input: {userID: \"$LIN\", ownerType: \"Post\", ownerID: \"$POST\", body: \"Nice.\"}) { post { body } } }" | jq -c .data
+gql "{ node(id: \"$ART\") { ... on Article { comments { edges { node { body replies { totalCount } } } } } } }" | jq -c .data.node
 
-# What a user wrote
-curl -s "$API/users/$LIN/articles" | jq -r '.[].title'
-curl -s "$API/users/$LIN/posts" | jq -r '.[].body'
-curl -s "$API/users/$LIN/comments" | jq -r '.[] | "\(.owner_type): \(.body)"'
+# What a user wrote, two at a time
+gql "{ node(id: \"$LIN\") { ... on User { articles { totalCount } posts { totalCount } comments(first: 2) { edges { node { body } } pageInfo { hasNextPage endCursor } } } } }" | jq -c .data.node
 
 # Errors
-curl -s "${json[@]}" -d '{"name":"x","email":"x@example.com","role":"admin"}' "$API/users" | jq -c .
-# {"error":"The following attribute(s) are not supported: [role]"}
-curl -s "${json[@]}" -d '{"name":"Again","email":"LT@example.com"}' -w ' %{http_code}\n' "$API/users"
-# {"error":"the email `lt@example.com` is already taken"} 409
-curl -s -w ' %{http_code}\n' "$API/articles/$(uuidgen | tr A-Z a-z)"
-# {"error":"article not found"} 404
+gql "mutation { createUser(input: {name: \"Again\", email: \"LINUS@example.com\"}) { id } }" | jq -r '.errors[0].message'
+# UNIQUE constraint failed: users.email
+gql "mutation { createArticle(input: {userID: \"$LIN\", title: \" \", body: \"x\"}) { id } }" | jq -r '.errors[0].message'
+# `articles.title`: is empty
 
 # Soft delete
-curl -s -X DELETE -o /dev/null -w '%{http_code}\n' "$API/articles/$ART"   # 204
-curl -s -w ' %{http_code}\n' "$API/articles/$ART/comments"                # article not found 404
-curl -s "$API/comments" | jq length                                       # still 6
+gql "mutation { deleteArticle(id: \"$ART\") }" | jq -c .data
+gql '{ articles { totalCount } }' | jq -c .data                   # one fewer
+gql "{ node(id: \"$C1\") { ... on Comment { article { title } } } }" | jq -c .data.node   # still shows it
 ```
 
 ## V notes
@@ -163,43 +155,7 @@ curl -s "$API/comments" | jq length                                       # stil
 Things in V 0.5.2 this project works around; section 5 of `../../PLAN.md` lists them.
 
 - macOS's libsqlite3 is in multi-thread mode, and veb serves requests on several
-  threads, so the shared connection is opened with `fullmutex`. New rows are read
-  back by slug, because the ORM's `last_insert_rowid()` can race.
-- `sqlite.DB.exec` ignores errors raised while a statement runs; use the ORM or
-  `exec_param_many` for writes.
-- A variable named `update` inside `sql { }` makes V skip the statement silently.
-- The struct attribute `@[index: '...']` creates no index on SQLite; the
-  migrations create the indexes instead.
-- The ORM leaves `@[references]` columns nullable; `sql_type: 'INTEGER NOT NULL'`
-  adds the `NOT NULL`.
-
-## GraphQL
-
-`POST /graphql` (or `GET /graphql?query=…` for queries) serves the schema in
-`graph/schema.graphql`, which `vgraph gen` writes from the models and `api.graphql`.
-
-- **Reads** come from the generated root fields, one per table, with `where`,
-  `orderBy`, `limit` and `offset`, and the edges as fields. Every REST read has a
-  GraphQL query that runs the same selects (`test_graphql_runs_the_same_selects_as_rest`):
-
-  ```graphql
-  {
-    articles(where: {deletedAtIsNil: true}, orderBy: {field: CREATED_AT, direction: DESC}, limit: 10) {
-      slug title author { slug name }
-      comments(orderBy: {field: ID}) { body author { name } parent { slug } }
-    }
-    articlesCount(where: {deletedAtIsNil: true})
-  }
-  ```
-
-- **Writes** are the mutations of `api.graphql`, one per REST endpoint that writes
-  (`createArticle`, `updateArticle`, `deleteArticle`, `createArticleComment`, …).
-  `graph/resolvers.v` resolves them through the same stores and comment service as
-  the routes, so they check and fail the same way. A request's mutations run in one
-  transaction, rolled back if one fails.
-- **Introspection** answers as graphql-js does (`testdata/introspection.json`), so
-  GraphiQL, Apollo Sandbox and code generators can read the schema.
-
-After changing `api.graphql`, run `vgraph gen` again: it adds a stub to
-`graph/resolvers.v` for each new field, and leaves the rest of that file alone.
-
+  threads, so the shared connection is opened with `fullmutex`. vgraph's SQLite
+  driver lets one thread's transaction finish before another's starts.
+- `sqlite.DB.exec` ignores errors raised while a statement runs; vgraph's driver
+  uses `exec_param_many`, which reports them.

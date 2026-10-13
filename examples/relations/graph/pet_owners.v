@@ -838,7 +838,7 @@ fn (q OwnedPetQuery) load_owner(rows []models.OwnedPet, fns []fn (UserQuery) Use
 		keys << row.owner_id.str()
 	}
 	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id', load.unique(keys),
-		query: q.graph.client.prepare_query('users', sub.query)!
+		query: q.graph.client.prepare_edge_query('users', sub.query)!
 	)!)!
 	mut by_key := map[string]UserNode{}
 	for target in targets {

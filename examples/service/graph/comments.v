@@ -3,10 +3,7 @@ module graph
 
 import five07.vgraph.load
 import time
-import comments.models as comments_models
-import users.models as users_models
-import articles.models as articles_models
-import posts.models as posts_models
+import models
 
 // CommentQuery selects `comments` rows, and the edges to load with them. Start one with
 // `Graph.comments()`.
@@ -31,7 +28,7 @@ mut:
 pub struct CommentNode {
 	graph Graph
 pub mut:
-	comment       comments_models.Comment
+	comment       models.Comment
 	author        ?&UserNode               // set by `with_author()`
 	parent        ?&CommentNode            // set by `with_parent()`
 	article       ?&ArticleNode            // set by `with_article()`
@@ -87,137 +84,147 @@ pub fn (q CommentQuery) offset(count int) CommentQuery {
 // count returns how many rows match, in one query; order, limit and offset
 // do not apply.
 pub fn (q CommentQuery) count() !int {
-	return load.count_where[comments_models.Comment](q.graph.client.conn, q.graph.client.prepare_query('comments', q.query)!)
+	return load.count_where[models.Comment](q.graph.client.conn, q.graph.client.prepare_query('comments', q.query)!)
+}
+
+// comment_created_at_eq returns the condition that `Stamps.created_at` is `value`.
+pub fn comment_created_at_eq(value time.Time) load.Cond {
+	return load.eq('Stamps.created_at', value)
+}
+
+// comment_created_at_ne returns the condition that `Stamps.created_at` is not `value`.
+pub fn comment_created_at_ne(value time.Time) load.Cond {
+	return load.ne('Stamps.created_at', value)
+}
+
+// comment_created_at_lt returns the condition that `Stamps.created_at` comes before `value`.
+pub fn comment_created_at_lt(value time.Time) load.Cond {
+	return load.lt('Stamps.created_at', value)
+}
+
+// comment_created_at_le returns the condition that `Stamps.created_at` comes at or before `value`.
+pub fn comment_created_at_le(value time.Time) load.Cond {
+	return load.le('Stamps.created_at', value)
+}
+
+// comment_created_at_gt returns the condition that `Stamps.created_at` comes after `value`.
+pub fn comment_created_at_gt(value time.Time) load.Cond {
+	return load.gt('Stamps.created_at', value)
+}
+
+// comment_created_at_ge returns the condition that `Stamps.created_at` comes at or after `value`.
+pub fn comment_created_at_ge(value time.Time) load.Cond {
+	return load.ge('Stamps.created_at', value)
+}
+
+// comment_updated_at_eq returns the condition that `Stamps.updated_at` is `value`.
+pub fn comment_updated_at_eq(value time.Time) load.Cond {
+	return load.eq('Stamps.updated_at', value)
+}
+
+// comment_updated_at_ne returns the condition that `Stamps.updated_at` is not `value`.
+pub fn comment_updated_at_ne(value time.Time) load.Cond {
+	return load.ne('Stamps.updated_at', value)
+}
+
+// comment_updated_at_lt returns the condition that `Stamps.updated_at` comes before `value`.
+pub fn comment_updated_at_lt(value time.Time) load.Cond {
+	return load.lt('Stamps.updated_at', value)
+}
+
+// comment_updated_at_le returns the condition that `Stamps.updated_at` comes at or before `value`.
+pub fn comment_updated_at_le(value time.Time) load.Cond {
+	return load.le('Stamps.updated_at', value)
+}
+
+// comment_updated_at_gt returns the condition that `Stamps.updated_at` comes after `value`.
+pub fn comment_updated_at_gt(value time.Time) load.Cond {
+	return load.gt('Stamps.updated_at', value)
+}
+
+// comment_updated_at_ge returns the condition that `Stamps.updated_at` comes at or after `value`.
+pub fn comment_updated_at_ge(value time.Time) load.Cond {
+	return load.ge('Stamps.updated_at', value)
 }
 
 // comment_id_eq returns the condition that `id` is `value`.
-pub fn comment_id_eq(value int) load.Cond {
+pub fn comment_id_eq(value i64) load.Cond {
 	return load.eq('id', value)
 }
 
 // comment_id_ne returns the condition that `id` is not `value`.
-pub fn comment_id_ne(value int) load.Cond {
+pub fn comment_id_ne(value i64) load.Cond {
 	return load.ne('id', value)
 }
 
 // comment_id_lt returns the condition that `id` comes before `value`.
-pub fn comment_id_lt(value int) load.Cond {
+pub fn comment_id_lt(value i64) load.Cond {
 	return load.lt('id', value)
 }
 
 // comment_id_le returns the condition that `id` comes at or before `value`.
-pub fn comment_id_le(value int) load.Cond {
+pub fn comment_id_le(value i64) load.Cond {
 	return load.le('id', value)
 }
 
 // comment_id_gt returns the condition that `id` comes after `value`.
-pub fn comment_id_gt(value int) load.Cond {
+pub fn comment_id_gt(value i64) load.Cond {
 	return load.gt('id', value)
 }
 
 // comment_id_ge returns the condition that `id` comes at or after `value`.
-pub fn comment_id_ge(value int) load.Cond {
+pub fn comment_id_ge(value i64) load.Cond {
 	return load.ge('id', value)
 }
 
 // comment_id_in returns the condition that `id` is one of `values`.
-pub fn comment_id_in(values []int) load.Cond {
-	return load.in_ints('id', values)
+pub fn comment_id_in(values []i64) load.Cond {
+	return load.in_i64s('id', values)
 }
 
 // comment_id_not_in returns the condition that `id` is none of `values`.
-pub fn comment_id_not_in(values []int) load.Cond {
-	return load.not_in_ints('id', values)
-}
-
-// comment_slug_eq returns the condition that `slug` is `value`.
-pub fn comment_slug_eq(value string) load.Cond {
-	return load.eq('slug', value)
-}
-
-// comment_slug_ne returns the condition that `slug` is not `value`.
-pub fn comment_slug_ne(value string) load.Cond {
-	return load.ne('slug', value)
-}
-
-// comment_slug_in returns the condition that `slug` is one of `values`.
-pub fn comment_slug_in(values []string) load.Cond {
-	return load.in_strings('slug', values)
-}
-
-// comment_slug_not_in returns the condition that `slug` is none of `values`.
-pub fn comment_slug_not_in(values []string) load.Cond {
-	return load.not_in_strings('slug', values)
-}
-
-// comment_slug_like returns the condition that `slug` matches the SQL LIKE `pattern`.
-pub fn comment_slug_like(pattern string) load.Cond {
-	return load.like('slug', pattern)
-}
-
-// comment_slug_contains returns the condition that `slug` contains `value`.
-pub fn comment_slug_contains(value string) load.Cond {
-	return load.contains('slug', value)
-}
-
-// comment_slug_has_prefix returns the condition that `slug` starts with `value`.
-pub fn comment_slug_has_prefix(value string) load.Cond {
-	return load.has_prefix('slug', value)
-}
-
-// comment_slug_has_suffix returns the condition that `slug` ends with `value`.
-pub fn comment_slug_has_suffix(value string) load.Cond {
-	return load.has_suffix('slug', value)
-}
-
-// comment_slug_equal_fold returns the condition that `slug` is `value`, ignoring case.
-pub fn comment_slug_equal_fold(value string) load.Cond {
-	return load.equal_fold('slug', value)
-}
-
-// comment_slug_contains_fold returns the condition that `slug` contains `value`, ignoring case.
-pub fn comment_slug_contains_fold(value string) load.Cond {
-	return load.contains_fold('slug', value)
+pub fn comment_id_not_in(values []i64) load.Cond {
+	return load.not_in_i64s('id', values)
 }
 
 // comment_user_id_eq returns the condition that `user_id` is `value`.
-pub fn comment_user_id_eq(value int) load.Cond {
+pub fn comment_user_id_eq(value i64) load.Cond {
 	return load.eq('user_id', value)
 }
 
 // comment_user_id_ne returns the condition that `user_id` is not `value`.
-pub fn comment_user_id_ne(value int) load.Cond {
+pub fn comment_user_id_ne(value i64) load.Cond {
 	return load.ne('user_id', value)
 }
 
 // comment_user_id_lt returns the condition that `user_id` comes before `value`.
-pub fn comment_user_id_lt(value int) load.Cond {
+pub fn comment_user_id_lt(value i64) load.Cond {
 	return load.lt('user_id', value)
 }
 
 // comment_user_id_le returns the condition that `user_id` comes at or before `value`.
-pub fn comment_user_id_le(value int) load.Cond {
+pub fn comment_user_id_le(value i64) load.Cond {
 	return load.le('user_id', value)
 }
 
 // comment_user_id_gt returns the condition that `user_id` comes after `value`.
-pub fn comment_user_id_gt(value int) load.Cond {
+pub fn comment_user_id_gt(value i64) load.Cond {
 	return load.gt('user_id', value)
 }
 
 // comment_user_id_ge returns the condition that `user_id` comes at or after `value`.
-pub fn comment_user_id_ge(value int) load.Cond {
+pub fn comment_user_id_ge(value i64) load.Cond {
 	return load.ge('user_id', value)
 }
 
 // comment_user_id_in returns the condition that `user_id` is one of `values`.
-pub fn comment_user_id_in(values []int) load.Cond {
-	return load.in_ints('user_id', values)
+pub fn comment_user_id_in(values []i64) load.Cond {
+	return load.in_i64s('user_id', values)
 }
 
 // comment_user_id_not_in returns the condition that `user_id` is none of `values`.
-pub fn comment_user_id_not_in(values []int) load.Cond {
-	return load.not_in_ints('user_id', values)
+pub fn comment_user_id_not_in(values []i64) load.Cond {
+	return load.not_in_i64s('user_id', values)
 }
 
 // comment_owner_type_eq returns the condition that `owner_type` is `value`.
@@ -271,83 +278,83 @@ pub fn comment_owner_type_contains_fold(value string) load.Cond {
 }
 
 // comment_owner_id_eq returns the condition that `owner_id` is `value`.
-pub fn comment_owner_id_eq(value int) load.Cond {
+pub fn comment_owner_id_eq(value i64) load.Cond {
 	return load.eq('owner_id', value)
 }
 
 // comment_owner_id_ne returns the condition that `owner_id` is not `value`.
-pub fn comment_owner_id_ne(value int) load.Cond {
+pub fn comment_owner_id_ne(value i64) load.Cond {
 	return load.ne('owner_id', value)
 }
 
 // comment_owner_id_lt returns the condition that `owner_id` comes before `value`.
-pub fn comment_owner_id_lt(value int) load.Cond {
+pub fn comment_owner_id_lt(value i64) load.Cond {
 	return load.lt('owner_id', value)
 }
 
 // comment_owner_id_le returns the condition that `owner_id` comes at or before `value`.
-pub fn comment_owner_id_le(value int) load.Cond {
+pub fn comment_owner_id_le(value i64) load.Cond {
 	return load.le('owner_id', value)
 }
 
 // comment_owner_id_gt returns the condition that `owner_id` comes after `value`.
-pub fn comment_owner_id_gt(value int) load.Cond {
+pub fn comment_owner_id_gt(value i64) load.Cond {
 	return load.gt('owner_id', value)
 }
 
 // comment_owner_id_ge returns the condition that `owner_id` comes at or after `value`.
-pub fn comment_owner_id_ge(value int) load.Cond {
+pub fn comment_owner_id_ge(value i64) load.Cond {
 	return load.ge('owner_id', value)
 }
 
 // comment_owner_id_in returns the condition that `owner_id` is one of `values`.
-pub fn comment_owner_id_in(values []int) load.Cond {
-	return load.in_ints('owner_id', values)
+pub fn comment_owner_id_in(values []i64) load.Cond {
+	return load.in_i64s('owner_id', values)
 }
 
 // comment_owner_id_not_in returns the condition that `owner_id` is none of `values`.
-pub fn comment_owner_id_not_in(values []int) load.Cond {
-	return load.not_in_ints('owner_id', values)
+pub fn comment_owner_id_not_in(values []i64) load.Cond {
+	return load.not_in_i64s('owner_id', values)
 }
 
 // comment_parent_id_eq returns the condition that `parent_id` is `value`.
-pub fn comment_parent_id_eq(value int) load.Cond {
+pub fn comment_parent_id_eq(value i64) load.Cond {
 	return load.eq('parent_id', value)
 }
 
 // comment_parent_id_ne returns the condition that `parent_id` is not `value`.
-pub fn comment_parent_id_ne(value int) load.Cond {
+pub fn comment_parent_id_ne(value i64) load.Cond {
 	return load.ne('parent_id', value)
 }
 
 // comment_parent_id_lt returns the condition that `parent_id` comes before `value`.
-pub fn comment_parent_id_lt(value int) load.Cond {
+pub fn comment_parent_id_lt(value i64) load.Cond {
 	return load.lt('parent_id', value)
 }
 
 // comment_parent_id_le returns the condition that `parent_id` comes at or before `value`.
-pub fn comment_parent_id_le(value int) load.Cond {
+pub fn comment_parent_id_le(value i64) load.Cond {
 	return load.le('parent_id', value)
 }
 
 // comment_parent_id_gt returns the condition that `parent_id` comes after `value`.
-pub fn comment_parent_id_gt(value int) load.Cond {
+pub fn comment_parent_id_gt(value i64) load.Cond {
 	return load.gt('parent_id', value)
 }
 
 // comment_parent_id_ge returns the condition that `parent_id` comes at or after `value`.
-pub fn comment_parent_id_ge(value int) load.Cond {
+pub fn comment_parent_id_ge(value i64) load.Cond {
 	return load.ge('parent_id', value)
 }
 
 // comment_parent_id_in returns the condition that `parent_id` is one of `values`.
-pub fn comment_parent_id_in(values []int) load.Cond {
-	return load.in_ints('parent_id', values)
+pub fn comment_parent_id_in(values []i64) load.Cond {
+	return load.in_i64s('parent_id', values)
 }
 
 // comment_parent_id_not_in returns the condition that `parent_id` is none of `values`.
-pub fn comment_parent_id_not_in(values []int) load.Cond {
-	return load.not_in_ints('parent_id', values)
+pub fn comment_parent_id_not_in(values []i64) load.Cond {
+	return load.not_in_i64s('parent_id', values)
 }
 
 // comment_parent_id_is_null returns the condition that `parent_id` is null.
@@ -410,66 +417,6 @@ pub fn comment_body_contains_fold(value string) load.Cond {
 	return load.contains_fold('body', value)
 }
 
-// comment_created_at_eq returns the condition that `created_at` is `value`.
-pub fn comment_created_at_eq(value time.Time) load.Cond {
-	return load.eq('created_at', value)
-}
-
-// comment_created_at_ne returns the condition that `created_at` is not `value`.
-pub fn comment_created_at_ne(value time.Time) load.Cond {
-	return load.ne('created_at', value)
-}
-
-// comment_created_at_lt returns the condition that `created_at` comes before `value`.
-pub fn comment_created_at_lt(value time.Time) load.Cond {
-	return load.lt('created_at', value)
-}
-
-// comment_created_at_le returns the condition that `created_at` comes at or before `value`.
-pub fn comment_created_at_le(value time.Time) load.Cond {
-	return load.le('created_at', value)
-}
-
-// comment_created_at_gt returns the condition that `created_at` comes after `value`.
-pub fn comment_created_at_gt(value time.Time) load.Cond {
-	return load.gt('created_at', value)
-}
-
-// comment_created_at_ge returns the condition that `created_at` comes at or after `value`.
-pub fn comment_created_at_ge(value time.Time) load.Cond {
-	return load.ge('created_at', value)
-}
-
-// comment_updated_at_eq returns the condition that `updated_at` is `value`.
-pub fn comment_updated_at_eq(value time.Time) load.Cond {
-	return load.eq('updated_at', value)
-}
-
-// comment_updated_at_ne returns the condition that `updated_at` is not `value`.
-pub fn comment_updated_at_ne(value time.Time) load.Cond {
-	return load.ne('updated_at', value)
-}
-
-// comment_updated_at_lt returns the condition that `updated_at` comes before `value`.
-pub fn comment_updated_at_lt(value time.Time) load.Cond {
-	return load.lt('updated_at', value)
-}
-
-// comment_updated_at_le returns the condition that `updated_at` comes at or before `value`.
-pub fn comment_updated_at_le(value time.Time) load.Cond {
-	return load.le('updated_at', value)
-}
-
-// comment_updated_at_gt returns the condition that `updated_at` comes after `value`.
-pub fn comment_updated_at_gt(value time.Time) load.Cond {
-	return load.gt('updated_at', value)
-}
-
-// comment_updated_at_ge returns the condition that `updated_at` comes at or after `value`.
-pub fn comment_updated_at_ge(value time.Time) load.Cond {
-	return load.ge('updated_at', value)
-}
-
 // comment_deleted_at_eq returns the condition that `deleted_at` is `value`.
 pub fn comment_deleted_at_eq(value time.Time) load.Cond {
 	return load.eq('deleted_at', value)
@@ -512,52 +459,76 @@ pub fn comment_deleted_at_is_not_null() load.Cond {
 
 // comment_has_author returns the condition that it has a `author`.
 pub fn comment_has_author() load.Cond {
-	return load.and(load.is_not_null('user_id'), load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: []load.Cond{} }))
+	return load.and(load.is_not_null('user_id'), load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .i64, conds: []load.Cond{} }))
 }
 
 // comment_has_author_with returns the condition that it has a `author` that matches `conds`.
 pub fn comment_has_author_with(conds ...load.Cond) load.Cond {
-	return load.and(load.is_not_null('user_id'), load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: conds }))
+	return load.and(load.is_not_null('user_id'), load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .i64, conds: conds }))
 }
 
 // comment_has_parent returns the condition that it has a `parent`.
 pub fn comment_has_parent() load.Cond {
-	return load.and(load.is_not_null('parent_id'), load.in_sub('parent_id', load.Sub{ table: 'comments', column: 'id', kind: .int, conds: []load.Cond{} }))
+	return load.and(load.is_not_null('parent_id'), load.in_sub('parent_id', load.Sub{ table: 'comments', column: 'id', kind: .i64, conds: []load.Cond{} }))
 }
 
 // comment_has_parent_with returns the condition that it has a `parent` that matches `conds`.
 pub fn comment_has_parent_with(conds ...load.Cond) load.Cond {
-	return load.and(load.is_not_null('parent_id'), load.in_sub('parent_id', load.Sub{ table: 'comments', column: 'id', kind: .int, conds: conds }))
+	return load.and(load.is_not_null('parent_id'), load.in_sub('parent_id', load.Sub{ table: 'comments', column: 'id', kind: .i64, conds: conds }))
 }
 
 // comment_has_article returns the condition that it has a `article`.
 pub fn comment_has_article() load.Cond {
-	return load.and(load.eq('owner_type', 'Article'), load.is_not_null('owner_id'), load.in_sub('owner_id', load.Sub{ table: 'articles', column: 'id', kind: .int, conds: []load.Cond{} }))
+	return load.and(load.eq('owner_type', 'Article'), load.is_not_null('owner_id'), load.in_sub('owner_id', load.Sub{ table: 'articles', column: 'id', kind: .i64, conds: []load.Cond{} }))
 }
 
 // comment_has_article_with returns the condition that it has a `article` that matches `conds`.
 pub fn comment_has_article_with(conds ...load.Cond) load.Cond {
-	return load.and(load.eq('owner_type', 'Article'), load.is_not_null('owner_id'), load.in_sub('owner_id', load.Sub{ table: 'articles', column: 'id', kind: .int, conds: conds }))
+	return load.and(load.eq('owner_type', 'Article'), load.is_not_null('owner_id'), load.in_sub('owner_id', load.Sub{ table: 'articles', column: 'id', kind: .i64, conds: conds }))
 }
 
 // comment_has_post returns the condition that it has a `post`.
 pub fn comment_has_post() load.Cond {
-	return load.and(load.eq('owner_type', 'Post'), load.is_not_null('owner_id'), load.in_sub('owner_id', load.Sub{ table: 'posts', column: 'id', kind: .int, conds: []load.Cond{} }))
+	return load.and(load.eq('owner_type', 'Post'), load.is_not_null('owner_id'), load.in_sub('owner_id', load.Sub{ table: 'posts', column: 'id', kind: .i64, conds: []load.Cond{} }))
 }
 
 // comment_has_post_with returns the condition that it has a `post` that matches `conds`.
 pub fn comment_has_post_with(conds ...load.Cond) load.Cond {
-	return load.and(load.eq('owner_type', 'Post'), load.is_not_null('owner_id'), load.in_sub('owner_id', load.Sub{ table: 'posts', column: 'id', kind: .int, conds: conds }))
+	return load.and(load.eq('owner_type', 'Post'), load.is_not_null('owner_id'), load.in_sub('owner_id', load.Sub{ table: 'posts', column: 'id', kind: .i64, conds: conds }))
 }
 
 // comment_has_replies returns the condition that it has a `replies`.
 pub fn comment_has_replies() load.Cond {
-	return load.in_sub('id', load.Sub{ table: 'comments', column: 'parent_id', kind: .int, conds: with_conds([]load.Cond{}, load.is_null('deleted_at')) })
+	return load.in_sub('id', load.Sub{ table: 'comments', column: 'parent_id', kind: .i64, conds: with_conds([]load.Cond{}, load.is_null('deleted_at')) })
 }
 
 // comment_has_replies_with returns the condition that it has a `replies` that matches `conds`.
 pub fn comment_has_replies_with(conds ...load.Cond) load.Cond {
-	return load.in_sub('id', load.Sub{ table: 'comments', column: 'parent_id', kind: .int, conds: with_conds(conds, load.is_null('deleted_at')) })
+	return load.in_sub('id', load.Sub{ table: 'comments', column: 'parent_id', kind: .i64, conds: with_conds(conds, load.is_null('deleted_at')) })
+}
+
+// order_by_created_at orders the rows by `Stamps.created_at`, ascending, after the orders
+// given before.
+pub fn (q CommentQuery) order_by_created_at() CommentQuery {
+	return q.order_by(load.asc('Stamps.created_at'))
+}
+
+// order_by_created_at_desc orders the rows by `Stamps.created_at`, descending, after the
+// orders given before.
+pub fn (q CommentQuery) order_by_created_at_desc() CommentQuery {
+	return q.order_by(load.desc('Stamps.created_at'))
+}
+
+// order_by_updated_at orders the rows by `Stamps.updated_at`, ascending, after the orders
+// given before.
+pub fn (q CommentQuery) order_by_updated_at() CommentQuery {
+	return q.order_by(load.asc('Stamps.updated_at'))
+}
+
+// order_by_updated_at_desc orders the rows by `Stamps.updated_at`, descending, after the
+// orders given before.
+pub fn (q CommentQuery) order_by_updated_at_desc() CommentQuery {
+	return q.order_by(load.desc('Stamps.updated_at'))
 }
 
 // order_by_id orders the rows by `id`, ascending, after the orders
@@ -570,18 +541,6 @@ pub fn (q CommentQuery) order_by_id() CommentQuery {
 // orders given before.
 pub fn (q CommentQuery) order_by_id_desc() CommentQuery {
 	return q.order_by(load.desc('id'))
-}
-
-// order_by_slug orders the rows by `slug`, ascending, after the orders
-// given before.
-pub fn (q CommentQuery) order_by_slug() CommentQuery {
-	return q.order_by(load.asc('slug'))
-}
-
-// order_by_slug_desc orders the rows by `slug`, descending, after the
-// orders given before.
-pub fn (q CommentQuery) order_by_slug_desc() CommentQuery {
-	return q.order_by(load.desc('slug'))
 }
 
 // order_by_user_id orders the rows by `user_id`, ascending, after the orders
@@ -644,30 +603,6 @@ pub fn (q CommentQuery) order_by_body_desc() CommentQuery {
 	return q.order_by(load.desc('body'))
 }
 
-// order_by_created_at orders the rows by `created_at`, ascending, after the orders
-// given before.
-pub fn (q CommentQuery) order_by_created_at() CommentQuery {
-	return q.order_by(load.asc('created_at'))
-}
-
-// order_by_created_at_desc orders the rows by `created_at`, descending, after the
-// orders given before.
-pub fn (q CommentQuery) order_by_created_at_desc() CommentQuery {
-	return q.order_by(load.desc('created_at'))
-}
-
-// order_by_updated_at orders the rows by `updated_at`, ascending, after the orders
-// given before.
-pub fn (q CommentQuery) order_by_updated_at() CommentQuery {
-	return q.order_by(load.asc('updated_at'))
-}
-
-// order_by_updated_at_desc orders the rows by `updated_at`, descending, after the
-// orders given before.
-pub fn (q CommentQuery) order_by_updated_at_desc() CommentQuery {
-	return q.order_by(load.desc('updated_at'))
-}
-
 // order_by_deleted_at orders the rows by `deleted_at`, ascending, after the orders
 // given before.
 pub fn (q CommentQuery) order_by_deleted_at() CommentQuery {
@@ -680,133 +615,143 @@ pub fn (q CommentQuery) order_by_deleted_at_desc() CommentQuery {
 	return q.order_by(load.desc('deleted_at'))
 }
 
+// where_created_at keeps the rows where `Stamps.created_at` is `value`.
+pub fn (q CommentQuery) where_created_at(value time.Time) CommentQuery {
+	return q.where(comment_created_at_eq(value))
+}
+
+// where_created_at_ne keeps the rows where `Stamps.created_at` is not `value`.
+pub fn (q CommentQuery) where_created_at_ne(value time.Time) CommentQuery {
+	return q.where(comment_created_at_ne(value))
+}
+
+// where_created_at_lt keeps the rows where `Stamps.created_at` comes before `value`.
+pub fn (q CommentQuery) where_created_at_lt(value time.Time) CommentQuery {
+	return q.where(comment_created_at_lt(value))
+}
+
+// where_created_at_le keeps the rows where `Stamps.created_at` comes at or before `value`.
+pub fn (q CommentQuery) where_created_at_le(value time.Time) CommentQuery {
+	return q.where(comment_created_at_le(value))
+}
+
+// where_created_at_gt keeps the rows where `Stamps.created_at` comes after `value`.
+pub fn (q CommentQuery) where_created_at_gt(value time.Time) CommentQuery {
+	return q.where(comment_created_at_gt(value))
+}
+
+// where_created_at_ge keeps the rows where `Stamps.created_at` comes at or after `value`.
+pub fn (q CommentQuery) where_created_at_ge(value time.Time) CommentQuery {
+	return q.where(comment_created_at_ge(value))
+}
+
+// where_updated_at keeps the rows where `Stamps.updated_at` is `value`.
+pub fn (q CommentQuery) where_updated_at(value time.Time) CommentQuery {
+	return q.where(comment_updated_at_eq(value))
+}
+
+// where_updated_at_ne keeps the rows where `Stamps.updated_at` is not `value`.
+pub fn (q CommentQuery) where_updated_at_ne(value time.Time) CommentQuery {
+	return q.where(comment_updated_at_ne(value))
+}
+
+// where_updated_at_lt keeps the rows where `Stamps.updated_at` comes before `value`.
+pub fn (q CommentQuery) where_updated_at_lt(value time.Time) CommentQuery {
+	return q.where(comment_updated_at_lt(value))
+}
+
+// where_updated_at_le keeps the rows where `Stamps.updated_at` comes at or before `value`.
+pub fn (q CommentQuery) where_updated_at_le(value time.Time) CommentQuery {
+	return q.where(comment_updated_at_le(value))
+}
+
+// where_updated_at_gt keeps the rows where `Stamps.updated_at` comes after `value`.
+pub fn (q CommentQuery) where_updated_at_gt(value time.Time) CommentQuery {
+	return q.where(comment_updated_at_gt(value))
+}
+
+// where_updated_at_ge keeps the rows where `Stamps.updated_at` comes at or after `value`.
+pub fn (q CommentQuery) where_updated_at_ge(value time.Time) CommentQuery {
+	return q.where(comment_updated_at_ge(value))
+}
+
 // where_id keeps the rows where `id` is `value`.
-pub fn (q CommentQuery) where_id(value int) CommentQuery {
+pub fn (q CommentQuery) where_id(value i64) CommentQuery {
 	return q.where(comment_id_eq(value))
 }
 
 // where_id_ne keeps the rows where `id` is not `value`.
-pub fn (q CommentQuery) where_id_ne(value int) CommentQuery {
+pub fn (q CommentQuery) where_id_ne(value i64) CommentQuery {
 	return q.where(comment_id_ne(value))
 }
 
 // where_id_lt keeps the rows where `id` comes before `value`.
-pub fn (q CommentQuery) where_id_lt(value int) CommentQuery {
+pub fn (q CommentQuery) where_id_lt(value i64) CommentQuery {
 	return q.where(comment_id_lt(value))
 }
 
 // where_id_le keeps the rows where `id` comes at or before `value`.
-pub fn (q CommentQuery) where_id_le(value int) CommentQuery {
+pub fn (q CommentQuery) where_id_le(value i64) CommentQuery {
 	return q.where(comment_id_le(value))
 }
 
 // where_id_gt keeps the rows where `id` comes after `value`.
-pub fn (q CommentQuery) where_id_gt(value int) CommentQuery {
+pub fn (q CommentQuery) where_id_gt(value i64) CommentQuery {
 	return q.where(comment_id_gt(value))
 }
 
 // where_id_ge keeps the rows where `id` comes at or after `value`.
-pub fn (q CommentQuery) where_id_ge(value int) CommentQuery {
+pub fn (q CommentQuery) where_id_ge(value i64) CommentQuery {
 	return q.where(comment_id_ge(value))
 }
 
 // where_id_in keeps the rows where `id` is one of `values`.
-pub fn (q CommentQuery) where_id_in(values []int) CommentQuery {
+pub fn (q CommentQuery) where_id_in(values []i64) CommentQuery {
 	return q.where(comment_id_in(values))
 }
 
 // where_id_not_in keeps the rows where `id` is none of `values`.
-pub fn (q CommentQuery) where_id_not_in(values []int) CommentQuery {
+pub fn (q CommentQuery) where_id_not_in(values []i64) CommentQuery {
 	return q.where(comment_id_not_in(values))
 }
 
-// where_slug keeps the rows where `slug` is `value`.
-pub fn (q CommentQuery) where_slug(value string) CommentQuery {
-	return q.where(comment_slug_eq(value))
-}
-
-// where_slug_ne keeps the rows where `slug` is not `value`.
-pub fn (q CommentQuery) where_slug_ne(value string) CommentQuery {
-	return q.where(comment_slug_ne(value))
-}
-
-// where_slug_in keeps the rows where `slug` is one of `values`.
-pub fn (q CommentQuery) where_slug_in(values []string) CommentQuery {
-	return q.where(comment_slug_in(values))
-}
-
-// where_slug_not_in keeps the rows where `slug` is none of `values`.
-pub fn (q CommentQuery) where_slug_not_in(values []string) CommentQuery {
-	return q.where(comment_slug_not_in(values))
-}
-
-// where_slug_like keeps the rows where `slug` matches the SQL LIKE `pattern`.
-pub fn (q CommentQuery) where_slug_like(pattern string) CommentQuery {
-	return q.where(comment_slug_like(pattern))
-}
-
-// where_slug_contains keeps the rows where `slug` contains `value`.
-pub fn (q CommentQuery) where_slug_contains(value string) CommentQuery {
-	return q.where(comment_slug_contains(value))
-}
-
-// where_slug_has_prefix keeps the rows where `slug` starts with `value`.
-pub fn (q CommentQuery) where_slug_has_prefix(value string) CommentQuery {
-	return q.where(comment_slug_has_prefix(value))
-}
-
-// where_slug_has_suffix keeps the rows where `slug` ends with `value`.
-pub fn (q CommentQuery) where_slug_has_suffix(value string) CommentQuery {
-	return q.where(comment_slug_has_suffix(value))
-}
-
-// where_slug_equal_fold keeps the rows where `slug` is `value`, ignoring case.
-pub fn (q CommentQuery) where_slug_equal_fold(value string) CommentQuery {
-	return q.where(comment_slug_equal_fold(value))
-}
-
-// where_slug_contains_fold keeps the rows where `slug` contains `value`, ignoring case.
-pub fn (q CommentQuery) where_slug_contains_fold(value string) CommentQuery {
-	return q.where(comment_slug_contains_fold(value))
-}
-
 // where_user_id keeps the rows where `user_id` is `value`.
-pub fn (q CommentQuery) where_user_id(value int) CommentQuery {
+pub fn (q CommentQuery) where_user_id(value i64) CommentQuery {
 	return q.where(comment_user_id_eq(value))
 }
 
 // where_user_id_ne keeps the rows where `user_id` is not `value`.
-pub fn (q CommentQuery) where_user_id_ne(value int) CommentQuery {
+pub fn (q CommentQuery) where_user_id_ne(value i64) CommentQuery {
 	return q.where(comment_user_id_ne(value))
 }
 
 // where_user_id_lt keeps the rows where `user_id` comes before `value`.
-pub fn (q CommentQuery) where_user_id_lt(value int) CommentQuery {
+pub fn (q CommentQuery) where_user_id_lt(value i64) CommentQuery {
 	return q.where(comment_user_id_lt(value))
 }
 
 // where_user_id_le keeps the rows where `user_id` comes at or before `value`.
-pub fn (q CommentQuery) where_user_id_le(value int) CommentQuery {
+pub fn (q CommentQuery) where_user_id_le(value i64) CommentQuery {
 	return q.where(comment_user_id_le(value))
 }
 
 // where_user_id_gt keeps the rows where `user_id` comes after `value`.
-pub fn (q CommentQuery) where_user_id_gt(value int) CommentQuery {
+pub fn (q CommentQuery) where_user_id_gt(value i64) CommentQuery {
 	return q.where(comment_user_id_gt(value))
 }
 
 // where_user_id_ge keeps the rows where `user_id` comes at or after `value`.
-pub fn (q CommentQuery) where_user_id_ge(value int) CommentQuery {
+pub fn (q CommentQuery) where_user_id_ge(value i64) CommentQuery {
 	return q.where(comment_user_id_ge(value))
 }
 
 // where_user_id_in keeps the rows where `user_id` is one of `values`.
-pub fn (q CommentQuery) where_user_id_in(values []int) CommentQuery {
+pub fn (q CommentQuery) where_user_id_in(values []i64) CommentQuery {
 	return q.where(comment_user_id_in(values))
 }
 
 // where_user_id_not_in keeps the rows where `user_id` is none of `values`.
-pub fn (q CommentQuery) where_user_id_not_in(values []int) CommentQuery {
+pub fn (q CommentQuery) where_user_id_not_in(values []i64) CommentQuery {
 	return q.where(comment_user_id_not_in(values))
 }
 
@@ -861,82 +806,82 @@ pub fn (q CommentQuery) where_owner_type_contains_fold(value string) CommentQuer
 }
 
 // where_owner_id keeps the rows where `owner_id` is `value`.
-pub fn (q CommentQuery) where_owner_id(value int) CommentQuery {
+pub fn (q CommentQuery) where_owner_id(value i64) CommentQuery {
 	return q.where(comment_owner_id_eq(value))
 }
 
 // where_owner_id_ne keeps the rows where `owner_id` is not `value`.
-pub fn (q CommentQuery) where_owner_id_ne(value int) CommentQuery {
+pub fn (q CommentQuery) where_owner_id_ne(value i64) CommentQuery {
 	return q.where(comment_owner_id_ne(value))
 }
 
 // where_owner_id_lt keeps the rows where `owner_id` comes before `value`.
-pub fn (q CommentQuery) where_owner_id_lt(value int) CommentQuery {
+pub fn (q CommentQuery) where_owner_id_lt(value i64) CommentQuery {
 	return q.where(comment_owner_id_lt(value))
 }
 
 // where_owner_id_le keeps the rows where `owner_id` comes at or before `value`.
-pub fn (q CommentQuery) where_owner_id_le(value int) CommentQuery {
+pub fn (q CommentQuery) where_owner_id_le(value i64) CommentQuery {
 	return q.where(comment_owner_id_le(value))
 }
 
 // where_owner_id_gt keeps the rows where `owner_id` comes after `value`.
-pub fn (q CommentQuery) where_owner_id_gt(value int) CommentQuery {
+pub fn (q CommentQuery) where_owner_id_gt(value i64) CommentQuery {
 	return q.where(comment_owner_id_gt(value))
 }
 
 // where_owner_id_ge keeps the rows where `owner_id` comes at or after `value`.
-pub fn (q CommentQuery) where_owner_id_ge(value int) CommentQuery {
+pub fn (q CommentQuery) where_owner_id_ge(value i64) CommentQuery {
 	return q.where(comment_owner_id_ge(value))
 }
 
 // where_owner_id_in keeps the rows where `owner_id` is one of `values`.
-pub fn (q CommentQuery) where_owner_id_in(values []int) CommentQuery {
+pub fn (q CommentQuery) where_owner_id_in(values []i64) CommentQuery {
 	return q.where(comment_owner_id_in(values))
 }
 
 // where_owner_id_not_in keeps the rows where `owner_id` is none of `values`.
-pub fn (q CommentQuery) where_owner_id_not_in(values []int) CommentQuery {
+pub fn (q CommentQuery) where_owner_id_not_in(values []i64) CommentQuery {
 	return q.where(comment_owner_id_not_in(values))
 }
 
 // where_parent_id keeps the rows where `parent_id` is `value`.
-pub fn (q CommentQuery) where_parent_id(value int) CommentQuery {
+pub fn (q CommentQuery) where_parent_id(value i64) CommentQuery {
 	return q.where(comment_parent_id_eq(value))
 }
 
 // where_parent_id_ne keeps the rows where `parent_id` is not `value`.
-pub fn (q CommentQuery) where_parent_id_ne(value int) CommentQuery {
+pub fn (q CommentQuery) where_parent_id_ne(value i64) CommentQuery {
 	return q.where(comment_parent_id_ne(value))
 }
 
 // where_parent_id_lt keeps the rows where `parent_id` comes before `value`.
-pub fn (q CommentQuery) where_parent_id_lt(value int) CommentQuery {
+pub fn (q CommentQuery) where_parent_id_lt(value i64) CommentQuery {
 	return q.where(comment_parent_id_lt(value))
 }
 
 // where_parent_id_le keeps the rows where `parent_id` comes at or before `value`.
-pub fn (q CommentQuery) where_parent_id_le(value int) CommentQuery {
+pub fn (q CommentQuery) where_parent_id_le(value i64) CommentQuery {
 	return q.where(comment_parent_id_le(value))
 }
 
 // where_parent_id_gt keeps the rows where `parent_id` comes after `value`.
-pub fn (q CommentQuery) where_parent_id_gt(value int) CommentQuery {
+pub fn (q CommentQuery) where_parent_id_gt(value i64) CommentQuery {
 	return q.where(comment_parent_id_gt(value))
 }
 
 // where_parent_id_ge keeps the rows where `parent_id` comes at or after `value`.
-pub fn (q CommentQuery) where_parent_id_ge(value int) CommentQuery {
+pub fn (q CommentQuery) where_parent_id_ge(value i64) CommentQuery {
 	return q.where(comment_parent_id_ge(value))
 }
 
 // where_parent_id_in keeps the rows where `parent_id` is one of `values`.
-pub fn (q CommentQuery) where_parent_id_in(values []int) CommentQuery {
+pub fn (q CommentQuery) where_parent_id_in(values []i64) CommentQuery {
 	return q.where(comment_parent_id_in(values))
 }
 
 // where_parent_id_not_in keeps the rows where `parent_id` is none of `values`.
-pub fn (q CommentQuery) where_parent_id_not_in(values []int) CommentQuery {
+pub fn (q CommentQuery) where_parent_id_not_in(values []i64) CommentQuery {
 	return q.where(comment_parent_id_not_in(values))
 }
 
@@ -998,66 +943,6 @@ pub fn (q CommentQuery) where_body_equal_fold(value string) CommentQuery {
 // where_body_contains_fold keeps the rows where `body` contains `value`, ignoring case.
 pub fn (q CommentQuery) where_body_contains_fold(value string) CommentQuery {
 	return q.where(comment_body_contains_fold(value))
-}
-
-// where_created_at keeps the rows where `created_at` is `value`.
-pub fn (q CommentQuery) where_created_at(value time.Time) CommentQuery {
-	return q.where(comment_created_at_eq(value))
-}
-
-// where_created_at_ne keeps the rows where `created_at` is not `value`.
-pub fn (q CommentQuery) where_created_at_ne(value time.Time) CommentQuery {
-	return q.where(comment_created_at_ne(value))
-}
-
-// where_created_at_lt keeps the rows where `created_at` comes before `value`.
-pub fn (q CommentQuery) where_created_at_lt(value time.Time) CommentQuery {
-	return q.where(comment_created_at_lt(value))
-}
-
-// where_created_at_le keeps the rows where `created_at` comes at or before `value`.
-pub fn (q CommentQuery) where_created_at_le(value time.Time) CommentQuery {
-	return q.where(comment_created_at_le(value))
-}
-
-// where_created_at_gt keeps the rows where `created_at` comes after `value`.
-pub fn (q CommentQuery) where_created_at_gt(value time.Time) CommentQuery {
-	return q.where(comment_created_at_gt(value))
-}
-
-// where_created_at_ge keeps the rows where `created_at` comes at or after `value`.
-pub fn (q CommentQuery) where_created_at_ge(value time.Time) CommentQuery {
-	return q.where(comment_created_at_ge(value))
-}
-
-// where_updated_at keeps the rows where `updated_at` is `value`.
-pub fn (q CommentQuery) where_updated_at(value time.Time) CommentQuery {
-	return q.where(comment_updated_at_eq(value))
-}
-
-// where_updated_at_ne keeps the rows where `updated_at` is not `value`.
-pub fn (q CommentQuery) where_updated_at_ne(value time.Time) CommentQuery {
-	return q.where(comment_updated_at_ne(value))
-}
-
-// where_updated_at_lt keeps the rows where `updated_at` comes before `value`.
-pub fn (q CommentQuery) where_updated_at_lt(value time.Time) CommentQuery {
-	return q.where(comment_updated_at_lt(value))
-}
-
-// where_updated_at_le keeps the rows where `updated_at` comes at or before `value`.
-pub fn (q CommentQuery) where_updated_at_le(value time.Time) CommentQuery {
-	return q.where(comment_updated_at_le(value))
-}
-
-// where_updated_at_gt keeps the rows where `updated_at` comes after `value`.
-pub fn (q CommentQuery) where_updated_at_gt(value time.Time) CommentQuery {
-	return q.where(comment_updated_at_gt(value))
-}
-
-// where_updated_at_ge keeps the rows where `updated_at` comes at or after `value`.
-pub fn (q CommentQuery) where_updated_at_ge(value time.Time) CommentQuery {
-	return q.where(comment_updated_at_ge(value))
 }
 
 // where_deleted_at keeps the rows where `deleted_at` is `value`.
@@ -1153,31 +1038,31 @@ pub fn (q CommentQuery) has_replies_with(configure fn (CommentQuery) CommentQuer
 // query_author starts a query of the `author` of the rows that match this
 // query's conditions; its order, limit and offset don't apply.
 pub fn (q CommentQuery) query_author() UserQuery {
-	return q.graph.users().where(load.in_sub('id', load.Sub{ table: 'comments', column: 'user_id', kind: .int, conds: q.query.conds }))
+	return q.graph.users().where(load.in_sub('id', load.Sub{ table: 'comments', column: 'user_id', kind: .i64, conds: q.query.conds }))
 }
 
 // query_parent starts a query of the `parent` of the rows that match this
 // query's conditions; its order, limit and offset don't apply.
 pub fn (q CommentQuery) query_parent() CommentQuery {
-	return q.graph.comments().where(load.in_sub('id', load.Sub{ table: 'comments', column: 'parent_id', kind: .int, conds: q.query.conds }))
+	return q.graph.comments().where(load.in_sub('id', load.Sub{ table: 'comments', column: 'parent_id', kind: .i64, conds: q.query.conds }))
 }
 
 // query_article starts a query of the `article` of the rows that match this
 // query's conditions; its order, limit and offset don't apply.
 pub fn (q CommentQuery) query_article() ArticleQuery {
-	return q.graph.articles().where(load.in_sub('id', load.Sub{ table: 'comments', column: 'owner_id', kind: .int, conds: with_conds(q.query.conds, load.eq('owner_type', 'Article')) }))
+	return q.graph.articles().where(load.in_sub('id', load.Sub{ table: 'comments', column: 'owner_id', kind: .i64, conds: with_conds(q.query.conds, load.eq('owner_type', 'Article')) }))
 }
 
 // query_post starts a query of the `post` of the rows that match this
 // query's conditions; its order, limit and offset don't apply.
 pub fn (q CommentQuery) query_post() PostQuery {
-	return q.graph.posts().where(load.in_sub('id', load.Sub{ table: 'comments', column: 'owner_id', kind: .int, conds: with_conds(q.query.conds, load.eq('owner_type', 'Post')) }))
+	return q.graph.posts().where(load.in_sub('id', load.Sub{ table: 'comments', column: 'owner_id', kind: .i64, conds: with_conds(q.query.conds, load.eq('owner_type', 'Post')) }))
 }
 
 // query_replies starts a query of the `replies` of the rows that match this
 // query's conditions; its order, limit and offset don't apply.
 pub fn (q CommentQuery) query_replies() CommentQuery {
-	return q.graph.comments().where(load.in_sub('parent_id', load.Sub{ table: 'comments', column: 'id', kind: .int, conds: q.query.conds }), load.is_null('deleted_at'))
+	return q.graph.comments().where(load.in_sub('parent_id', load.Sub{ table: 'comments', column: 'id', kind: .i64, conds: q.query.conds }), load.is_null('deleted_at'))
 }
 
 // only returns the one matching row, with the requested edges: a
@@ -1198,13 +1083,13 @@ pub fn (q CommentQuery) only() !CommentNode {
 }
 
 // ids returns the keys of the matching rows, in order, and no edges.
-pub fn (q CommentQuery) ids() ![]int {
-	keys := load.select_keys_where(q.graph.client.conn, 'comments', 'id', .int, q.graph.client.prepare_query('comments', q.query)!, true)!
-	return keys.map(it.int())
+pub fn (q CommentQuery) ids() ![]i64 {
+	keys := load.select_keys_where(q.graph.client.conn, 'comments', 'id', .i64, q.graph.client.prepare_query('comments', q.query)!, true)!
+	return keys.map(it.i64())
 }
 
 // first_id returns the key of the first matching row, or a `NotFoundError`.
-pub fn (q CommentQuery) first_id() !int {
+pub fn (q CommentQuery) first_id() !i64 {
 	ids := q.limit(1).ids()!
 	if ids.len == 0 {
 		return NotFoundError{
@@ -1216,7 +1101,7 @@ pub fn (q CommentQuery) first_id() !int {
 
 // only_id returns the key of the one matching row: a `NotFoundError` when
 // there is none, a `NotSingularError` when there are more.
-pub fn (q CommentQuery) only_id() !int {
+pub fn (q CommentQuery) only_id() !i64 {
 	ids := q.limit(2).ids()!
 	if ids.len == 0 {
 		return NotFoundError{
@@ -1264,7 +1149,7 @@ pub fn (q CommentQuery) unique() CommentQuery {
 // scan reads the matching rows into `T`, the app's struct for some of the
 // columns, by column name.
 pub fn (q CommentQuery) scan[T]() ![]T {
-	return load.select_into[T](q.graph.client.conn, 'comments', 'id', .int, q.graph.client.prepare_query('comments', q.query)!)
+	return load.select_into[T](q.graph.client.conn, 'comments', 'id', .i64, q.graph.client.prepare_query('comments', q.query)!)
 }
 
 // order_by orders the rows by `orders` too, after the orders given before,
@@ -1475,32 +1360,47 @@ pub fn (g CommentGroupBy) scan[T]() ![]T {
 // comment_column_type returns the V type of a column of `comments`.
 fn comment_column_type(column string) string {
 	return match column {
-		'id' { 'int' }
-		'slug' { 'string' }
-		'user_id' { 'int' }
+		'Stamps.created_at' { 'time.Time' }
+		'Stamps.updated_at' { 'time.Time' }
+		'id' { 'i64' }
+		'user_id' { 'i64' }
 		'owner_type' { 'string' }
-		'owner_id' { 'int' }
-		'parent_id' { '?int' }
+		'owner_id' { 'i64' }
+		'parent_id' { '?i64' }
 		'body' { 'string' }
-		'created_at' { 'time.Time' }
-		'updated_at' { 'time.Time' }
 		'deleted_at' { '?time.Time' }
 		else { '' }
 	}
 }
 
-// order_by_author_slug orders the rows by the `slug` of their `author`.
-pub fn (q CommentQuery) order_by_author_slug() CommentQuery {
+// order_by_author_created_at orders the rows by the `Stamps.created_at` of their `author`.
+pub fn (q CommentQuery) order_by_author_created_at() CommentQuery {
 	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."slug" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
+		expr: '(SELECT "t1"."Stamps.created_at" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
 	})
 }
 
-// order_by_author_slug_desc orders the rows by the `slug` of their
+// order_by_author_created_at_desc orders the rows by the `Stamps.created_at` of their
 // `author`, descending.
-pub fn (q CommentQuery) order_by_author_slug_desc() CommentQuery {
+pub fn (q CommentQuery) order_by_author_created_at_desc() CommentQuery {
 	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."slug" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
+		expr: '(SELECT "t1"."Stamps.created_at" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
+		desc: true
+	})
+}
+
+// order_by_author_updated_at orders the rows by the `Stamps.updated_at` of their `author`.
+pub fn (q CommentQuery) order_by_author_updated_at() CommentQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."Stamps.updated_at" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
+	})
+}
+
+// order_by_author_updated_at_desc orders the rows by the `Stamps.updated_at` of their
+// `author`, descending.
+pub fn (q CommentQuery) order_by_author_updated_at_desc() CommentQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."Stamps.updated_at" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
 		desc: true
 	})
 }
@@ -1537,38 +1437,6 @@ pub fn (q CommentQuery) order_by_author_email_desc() CommentQuery {
 	})
 }
 
-// order_by_author_created_at orders the rows by the `created_at` of their `author`.
-pub fn (q CommentQuery) order_by_author_created_at() CommentQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."created_at" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
-	})
-}
-
-// order_by_author_created_at_desc orders the rows by the `created_at` of their
-// `author`, descending.
-pub fn (q CommentQuery) order_by_author_created_at_desc() CommentQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."created_at" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
-		desc: true
-	})
-}
-
-// order_by_author_updated_at orders the rows by the `updated_at` of their `author`.
-pub fn (q CommentQuery) order_by_author_updated_at() CommentQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."updated_at" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
-	})
-}
-
-// order_by_author_updated_at_desc orders the rows by the `updated_at` of their
-// `author`, descending.
-pub fn (q CommentQuery) order_by_author_updated_at_desc() CommentQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."updated_at" FROM "users" AS "t1" WHERE "t1"."id" = "t0"."user_id")'
-		desc: true
-	})
-}
-
 // order_by_author_deleted_at orders the rows by the `deleted_at` of their `author`.
 pub fn (q CommentQuery) order_by_author_deleted_at() CommentQuery {
 	return q.order_by(load.Order{
@@ -1585,18 +1453,34 @@ pub fn (q CommentQuery) order_by_author_deleted_at_desc() CommentQuery {
 	})
 }
 
-// order_by_parent_slug orders the rows by the `slug` of their `parent`.
-pub fn (q CommentQuery) order_by_parent_slug() CommentQuery {
+// order_by_parent_created_at orders the rows by the `Stamps.created_at` of their `parent`.
+pub fn (q CommentQuery) order_by_parent_created_at() CommentQuery {
 	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."slug" FROM "comments" AS "t1" WHERE "t1"."id" = "t0"."parent_id")'
+		expr: '(SELECT "t1"."Stamps.created_at" FROM "comments" AS "t1" WHERE "t1"."id" = "t0"."parent_id")'
 	})
 }
 
-// order_by_parent_slug_desc orders the rows by the `slug` of their
+// order_by_parent_created_at_desc orders the rows by the `Stamps.created_at` of their
 // `parent`, descending.
-pub fn (q CommentQuery) order_by_parent_slug_desc() CommentQuery {
+pub fn (q CommentQuery) order_by_parent_created_at_desc() CommentQuery {
 	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."slug" FROM "comments" AS "t1" WHERE "t1"."id" = "t0"."parent_id")'
+		expr: '(SELECT "t1"."Stamps.created_at" FROM "comments" AS "t1" WHERE "t1"."id" = "t0"."parent_id")'
+		desc: true
+	})
+}
+
+// order_by_parent_updated_at orders the rows by the `Stamps.updated_at` of their `parent`.
+pub fn (q CommentQuery) order_by_parent_updated_at() CommentQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."Stamps.updated_at" FROM "comments" AS "t1" WHERE "t1"."id" = "t0"."parent_id")'
+	})
+}
+
+// order_by_parent_updated_at_desc orders the rows by the `Stamps.updated_at` of their
+// `parent`, descending.
+pub fn (q CommentQuery) order_by_parent_updated_at_desc() CommentQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."Stamps.updated_at" FROM "comments" AS "t1" WHERE "t1"."id" = "t0"."parent_id")'
 		desc: true
 	})
 }
@@ -1681,38 +1565,6 @@ pub fn (q CommentQuery) order_by_parent_body_desc() CommentQuery {
 	})
 }
 
-// order_by_parent_created_at orders the rows by the `created_at` of their `parent`.
-pub fn (q CommentQuery) order_by_parent_created_at() CommentQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."created_at" FROM "comments" AS "t1" WHERE "t1"."id" = "t0"."parent_id")'
-	})
-}
-
-// order_by_parent_created_at_desc orders the rows by the `created_at` of their
-// `parent`, descending.
-pub fn (q CommentQuery) order_by_parent_created_at_desc() CommentQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."created_at" FROM "comments" AS "t1" WHERE "t1"."id" = "t0"."parent_id")'
-		desc: true
-	})
-}
-
-// order_by_parent_updated_at orders the rows by the `updated_at` of their `parent`.
-pub fn (q CommentQuery) order_by_parent_updated_at() CommentQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."updated_at" FROM "comments" AS "t1" WHERE "t1"."id" = "t0"."parent_id")'
-	})
-}
-
-// order_by_parent_updated_at_desc orders the rows by the `updated_at` of their
-// `parent`, descending.
-pub fn (q CommentQuery) order_by_parent_updated_at_desc() CommentQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."updated_at" FROM "comments" AS "t1" WHERE "t1"."id" = "t0"."parent_id")'
-		desc: true
-	})
-}
-
 // order_by_parent_deleted_at orders the rows by the `deleted_at` of their `parent`.
 pub fn (q CommentQuery) order_by_parent_deleted_at() CommentQuery {
 	return q.order_by(load.Order{
@@ -1729,18 +1581,34 @@ pub fn (q CommentQuery) order_by_parent_deleted_at_desc() CommentQuery {
 	})
 }
 
-// order_by_article_slug orders the rows by the `slug` of their `article`.
-pub fn (q CommentQuery) order_by_article_slug() CommentQuery {
+// order_by_article_created_at orders the rows by the `Stamps.created_at` of their `article`.
+pub fn (q CommentQuery) order_by_article_created_at() CommentQuery {
 	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."slug" FROM "articles" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Article\')'
+		expr: '(SELECT "t1"."Stamps.created_at" FROM "articles" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Article\')'
 	})
 }
 
-// order_by_article_slug_desc orders the rows by the `slug` of their
+// order_by_article_created_at_desc orders the rows by the `Stamps.created_at` of their
 // `article`, descending.
-pub fn (q CommentQuery) order_by_article_slug_desc() CommentQuery {
+pub fn (q CommentQuery) order_by_article_created_at_desc() CommentQuery {
 	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."slug" FROM "articles" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Article\')'
+		expr: '(SELECT "t1"."Stamps.created_at" FROM "articles" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Article\')'
+		desc: true
+	})
+}
+
+// order_by_article_updated_at orders the rows by the `Stamps.updated_at` of their `article`.
+pub fn (q CommentQuery) order_by_article_updated_at() CommentQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."Stamps.updated_at" FROM "articles" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Article\')'
+	})
+}
+
+// order_by_article_updated_at_desc orders the rows by the `Stamps.updated_at` of their
+// `article`, descending.
+pub fn (q CommentQuery) order_by_article_updated_at_desc() CommentQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."Stamps.updated_at" FROM "articles" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Article\')'
 		desc: true
 	})
 }
@@ -1825,38 +1693,6 @@ pub fn (q CommentQuery) order_by_article_published_at_desc() CommentQuery {
 	})
 }
 
-// order_by_article_created_at orders the rows by the `created_at` of their `article`.
-pub fn (q CommentQuery) order_by_article_created_at() CommentQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."created_at" FROM "articles" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Article\')'
-	})
-}
-
-// order_by_article_created_at_desc orders the rows by the `created_at` of their
-// `article`, descending.
-pub fn (q CommentQuery) order_by_article_created_at_desc() CommentQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."created_at" FROM "articles" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Article\')'
-		desc: true
-	})
-}
-
-// order_by_article_updated_at orders the rows by the `updated_at` of their `article`.
-pub fn (q CommentQuery) order_by_article_updated_at() CommentQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."updated_at" FROM "articles" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Article\')'
-	})
-}
-
-// order_by_article_updated_at_desc orders the rows by the `updated_at` of their
-// `article`, descending.
-pub fn (q CommentQuery) order_by_article_updated_at_desc() CommentQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."updated_at" FROM "articles" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Article\')'
-		desc: true
-	})
-}
-
 // order_by_article_deleted_at orders the rows by the `deleted_at` of their `article`.
 pub fn (q CommentQuery) order_by_article_deleted_at() CommentQuery {
 	return q.order_by(load.Order{
@@ -1873,18 +1709,34 @@ pub fn (q CommentQuery) order_by_article_deleted_at_desc() CommentQuery {
 	})
 }
 
-// order_by_post_slug orders the rows by the `slug` of their `post`.
-pub fn (q CommentQuery) order_by_post_slug() CommentQuery {
+// order_by_post_created_at orders the rows by the `Stamps.created_at` of their `post`.
+pub fn (q CommentQuery) order_by_post_created_at() CommentQuery {
 	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."slug" FROM "posts" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Post\')'
+		expr: '(SELECT "t1"."Stamps.created_at" FROM "posts" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Post\')'
 	})
 }
 
-// order_by_post_slug_desc orders the rows by the `slug` of their
+// order_by_post_created_at_desc orders the rows by the `Stamps.created_at` of their
 // `post`, descending.
-pub fn (q CommentQuery) order_by_post_slug_desc() CommentQuery {
+pub fn (q CommentQuery) order_by_post_created_at_desc() CommentQuery {
 	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."slug" FROM "posts" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Post\')'
+		expr: '(SELECT "t1"."Stamps.created_at" FROM "posts" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Post\')'
+		desc: true
+	})
+}
+
+// order_by_post_updated_at orders the rows by the `Stamps.updated_at` of their `post`.
+pub fn (q CommentQuery) order_by_post_updated_at() CommentQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."Stamps.updated_at" FROM "posts" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Post\')'
+	})
+}
+
+// order_by_post_updated_at_desc orders the rows by the `Stamps.updated_at` of their
+// `post`, descending.
+pub fn (q CommentQuery) order_by_post_updated_at_desc() CommentQuery {
+	return q.order_by(load.Order{
+		expr: '(SELECT "t1"."Stamps.updated_at" FROM "posts" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Post\')'
 		desc: true
 	})
 }
@@ -1917,38 +1769,6 @@ pub fn (q CommentQuery) order_by_post_body() CommentQuery {
 pub fn (q CommentQuery) order_by_post_body_desc() CommentQuery {
 	return q.order_by(load.Order{
 		expr: '(SELECT "t1"."body" FROM "posts" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Post\')'
-		desc: true
-	})
-}
-
-// order_by_post_created_at orders the rows by the `created_at` of their `post`.
-pub fn (q CommentQuery) order_by_post_created_at() CommentQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."created_at" FROM "posts" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Post\')'
-	})
-}
-
-// order_by_post_created_at_desc orders the rows by the `created_at` of their
-// `post`, descending.
-pub fn (q CommentQuery) order_by_post_created_at_desc() CommentQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."created_at" FROM "posts" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Post\')'
-		desc: true
-	})
-}
-
-// order_by_post_updated_at orders the rows by the `updated_at` of their `post`.
-pub fn (q CommentQuery) order_by_post_updated_at() CommentQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."updated_at" FROM "posts" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Post\')'
-	})
-}
-
-// order_by_post_updated_at_desc orders the rows by the `updated_at` of their
-// `post`, descending.
-pub fn (q CommentQuery) order_by_post_updated_at_desc() CommentQuery {
-	return q.order_by(load.Order{
-		expr: '(SELECT "t1"."updated_at" FROM "posts" AS "t1" WHERE "t1"."id" = "t0"."owner_id" AND "t0"."owner_type" = \'Post\')'
 		desc: true
 	})
 }
@@ -2042,7 +1862,7 @@ pub fn (q CommentQuery) with_replies(configure ...fn (CommentQuery) CommentQuery
 
 // all returns the matching rows, with the requested edges.
 pub fn (q CommentQuery) all() ![]CommentNode {
-	rows := load.select_where[comments_models.Comment](q.graph.client.conn, q.graph.client.prepare_query('comments', q.query)!)!
+	rows := load.select_where[models.Comment](q.graph.client.conn, q.graph.client.prepare_query('comments', q.query)!)!
 	return q.nodes(rows)
 }
 
@@ -2060,7 +1880,7 @@ pub fn (q CommentQuery) first() !CommentNode {
 
 // nodes loads the requested edges onto `rows`, which the caller already has: one
 // query per edge, however many rows there are.
-pub fn (q CommentQuery) nodes(rows []comments_models.Comment) ![]CommentNode {
+pub fn (q CommentQuery) nodes(rows []models.Comment) ![]CommentNode {
 	mut nodes := rows.map(CommentNode{
 		graph:   q.graph
 		comment: it
@@ -2134,7 +1954,7 @@ pub fn (q CommentQuery) nodes(rows []comments_models.Comment) ![]CommentNode {
 }
 
 // load_author loads the `author` of `rows`, keyed by each row's key.
-fn (q CommentQuery) load_author(rows []comments_models.Comment, fns []fn (UserQuery) UserQuery) !map[string][]UserNode {
+fn (q CommentQuery) load_author(rows []models.Comment, fns []fn (UserQuery) UserQuery) !map[string][]UserNode {
 	mut sub := q.graph.users()
 	for configure in fns {
 		sub = configure(sub)
@@ -2143,9 +1963,8 @@ fn (q CommentQuery) load_author(rows []comments_models.Comment, fns []fn (UserQu
 	for row in rows {
 		keys << row.user_id.str()
 	}
-	targets := sub.nodes(load.select_in[users_models.User](q.graph.client.conn, 'id',
-		load.unique(keys),
-		query: q.graph.client.prepare_query('users', sub.query)!
+	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id', load.unique(keys),
+		query: q.graph.client.prepare_edge_query('users', sub.query)!
 	)!)!
 	mut by_key := map[string]UserNode{}
 	for target in targets {
@@ -2177,7 +1996,7 @@ pub fn (n CommentNode) author_or_err() !&UserNode {
 }
 
 // load_parent loads the `parent` of `rows`, keyed by each row's key.
-fn (q CommentQuery) load_parent(rows []comments_models.Comment, fns []fn (CommentQuery) CommentQuery) !map[string][]CommentNode {
+fn (q CommentQuery) load_parent(rows []models.Comment, fns []fn (CommentQuery) CommentQuery) !map[string][]CommentNode {
 	mut sub := q.graph.comments()
 	for configure in fns {
 		sub = configure(sub)
@@ -2188,9 +2007,9 @@ fn (q CommentQuery) load_parent(rows []comments_models.Comment, fns []fn (Commen
 			keys << fk.str()
 		}
 	}
-	targets := sub.nodes(load.select_in[comments_models.Comment](q.graph.client.conn, 'id',
+	targets := sub.nodes(load.select_in[models.Comment](q.graph.client.conn, 'id',
 		load.unique(keys),
-		query: q.graph.client.prepare_query('comments', sub.query)!
+		query: q.graph.client.prepare_edge_query('comments', sub.query)!
 	)!)!
 	mut by_key := map[string]CommentNode{}
 	for target in targets {
@@ -2223,7 +2042,7 @@ pub fn (n CommentNode) parent_or_err() !&CommentNode {
 }
 
 // load_article loads the `article` of `rows`, keyed by each row's key.
-fn (q CommentQuery) load_article(rows []comments_models.Comment, fns []fn (ArticleQuery) ArticleQuery) !map[string][]ArticleNode {
+fn (q CommentQuery) load_article(rows []models.Comment, fns []fn (ArticleQuery) ArticleQuery) !map[string][]ArticleNode {
 	mut sub := q.graph.articles()
 	for configure in fns {
 		sub = configure(sub)
@@ -2235,9 +2054,9 @@ fn (q CommentQuery) load_article(rows []comments_models.Comment, fns []fn (Artic
 		}
 		keys << row.owner_id.str()
 	}
-	targets := sub.nodes(load.select_in[articles_models.Article](q.graph.client.conn, 'id',
+	targets := sub.nodes(load.select_in[models.Article](q.graph.client.conn, 'id',
 		load.unique(keys),
-		query: q.graph.client.prepare_query('articles', sub.query)!
+		query: q.graph.client.prepare_edge_query('articles', sub.query)!
 	)!)!
 	mut by_key := map[string]ArticleNode{}
 	for target in targets {
@@ -2272,7 +2091,7 @@ pub fn (n CommentNode) article_or_err() !&ArticleNode {
 }
 
 // load_post loads the `post` of `rows`, keyed by each row's key.
-fn (q CommentQuery) load_post(rows []comments_models.Comment, fns []fn (PostQuery) PostQuery) !map[string][]PostNode {
+fn (q CommentQuery) load_post(rows []models.Comment, fns []fn (PostQuery) PostQuery) !map[string][]PostNode {
 	mut sub := q.graph.posts()
 	for configure in fns {
 		sub = configure(sub)
@@ -2284,9 +2103,8 @@ fn (q CommentQuery) load_post(rows []comments_models.Comment, fns []fn (PostQuer
 		}
 		keys << row.owner_id.str()
 	}
-	targets := sub.nodes(load.select_in[posts_models.Post](q.graph.client.conn, 'id',
-		load.unique(keys),
-		query: q.graph.client.prepare_query('posts', sub.query)!
+	targets := sub.nodes(load.select_in[models.Post](q.graph.client.conn, 'id', load.unique(keys),
+		query: q.graph.client.prepare_edge_query('posts', sub.query)!
 	)!)!
 	mut by_key := map[string]PostNode{}
 	for target in targets {
@@ -2321,15 +2139,15 @@ pub fn (n CommentNode) post_or_err() !&PostNode {
 }
 
 // load_replies loads the `replies` of `rows`, keyed by each row's key.
-fn (q CommentQuery) load_replies(rows []comments_models.Comment, fns []fn (CommentQuery) CommentQuery) !map[string][]CommentNode {
+fn (q CommentQuery) load_replies(rows []models.Comment, fns []fn (CommentQuery) CommentQuery) !map[string][]CommentNode {
 	mut sub := q.graph.comments()
 	for configure in fns {
 		sub = configure(sub)
 	}
-	children := sub.nodes(load.select_each[comments_models.Comment](q.graph.client.conn,
-		'parent_id', rows.map(it.id.str()),
+	children := sub.nodes(load.select_each[models.Comment](q.graph.client.conn, 'parent_id',
+		rows.map(it.id.str()),
 		soft_del: 'deleted_at'
-		query:    q.graph.client.prepare_query('comments', sub.query)!
+		query:    q.graph.client.prepare_edge_query('comments', sub.query)!
 	)!)!
 	mut by_parent := map[string][]CommentNode{}
 	for child in children {

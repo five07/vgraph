@@ -1999,7 +1999,6 @@ pub mut:
 	follower_ids     []int
 	friend_ids       []int
 	device_ids       []string
-	gadget_ids       []i64
 	liked_gadget_ids []i64
 }
 
@@ -2032,9 +2031,6 @@ pub fn (b UserCreate) set_input(input CreateUserInput) UserCreate {
 	}
 	if input.device_ids.len > 0 {
 		next = next.add_devices_ids(...input.device_ids)
-	}
-	if input.gadget_ids.len > 0 {
-		next = next.add_gadgets_ids(...input.gadget_ids)
 	}
 	if input.liked_gadget_ids.len > 0 {
 		next = next.add_liked_gadgets_ids(...input.liked_gadget_ids)
@@ -2070,9 +2066,6 @@ pub mut:
 	add_device_ids          []string
 	remove_device_ids       []string
 	clear_devices           bool
-	add_gadget_ids          []i64
-	remove_gadget_ids       []i64
-	clear_gadgets           bool
 	add_liked_gadget_ids    []i64
 	remove_liked_gadget_ids []i64
 	clear_liked_gadgets     bool
@@ -2104,9 +2097,6 @@ pub fn (b UserUpdateOne) set_input(input UpdateUserInput) UserUpdateOne {
 	}
 	if input.clear_devices {
 		next = next.clear_devices()
-	}
-	if input.clear_gadgets {
-		next = next.clear_gadgets()
 	}
 	if input.clear_liked_gadgets {
 		next = next.clear_liked_gadgets()
@@ -2155,12 +2145,6 @@ pub fn (b UserUpdateOne) set_input(input UpdateUserInput) UserUpdateOne {
 	}
 	if input.remove_device_ids.len > 0 {
 		next = next.remove_devices_ids(...input.remove_device_ids)
-	}
-	if input.add_gadget_ids.len > 0 {
-		next = next.add_gadgets_ids(...input.add_gadget_ids)
-	}
-	if input.remove_gadget_ids.len > 0 {
-		next = next.remove_gadgets_ids(...input.remove_gadget_ids)
 	}
 	if input.add_liked_gadget_ids.len > 0 {
 		next = next.add_liked_gadgets_ids(...input.add_liked_gadget_ids)

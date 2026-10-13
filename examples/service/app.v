@@ -4,103 +4,55 @@ import veb
 import db.sqlite
 import net.http
 import orm
+import five07.vgraph
 import five07.vgraph.graphql
+import five07.vgraph.sqlite as vsqlite
 import graph
 import migrations
 // `app.Context` is written out in this module: importing `Context` by name
 // makes V 0.5.2 generate C for veb's generics against a `main.Context`.
 import app
-import articles
-import articles.models as article_models
-import comments
-import comments.models as comment_models
-import posts
-import posts.models as post_models
-import users
-import users.models as user_models
 
 pub struct App {
-	veb.Controller
 	db  sqlite.DB
 	gql &graphql.Server = unsafe { nil }
 }
 
-// new_app opens the database named by `cfg`, runs any pending migrations,
-// loads the example data when `cfg.seed` is set and there are no users yet,
-// and mounts each model's controller.
+// new_app opens the database named by `cfg`, runs any pending migrations, and
+// loads the example data when `cfg.seed` is set and there are no users yet.
 fn new_app(cfg app.Config) !&App {
-	db := app.connect(cfg)!
-	return new_app_on(cfg, db, db)
+	return new_app_on(cfg, app.connect(cfg)!, none)
 }
 
-// new_app_on builds the app on the open database `db`, and runs every store's
-// queries through `conn`: `db` itself, or a wrapper such as the
-// `app.CountingConnection` the tests use.
-fn new_app_on(cfg app.Config, db sqlite.DB, conn orm.Connection) !&App {
-	// the tables, and the indexes their edges need, through v.migrations. They
-	// run on `db`, so that a counting `conn` logs only the app's own queries.
+// new_app_on builds the app on the open database `db`. When `tracer` is set,
+// it receives every statement the graph runs, as the tests use it to count
+// selects; migrations aren't traced.
+fn new_app_on(cfg app.Config, db sqlite.DB, tracer ?vgraph.Tracer) !&App {
+	// the tables, the indexes their edges need and the ranges of their global
+	// ids, through v.migrations
 	mut migrator_db := db
 	mut migrator := migrations.new(mut migrator_db)!
 	migrator.migrate()!
 
-	// the client `vgraph gen` writes into `graph/`, which checks the edges
+	// the client `vgraph gen` writes into `graph/`, on vgraph's SQLite driver,
+	// which runs the SQL the ORM can't: connections ordered by any field, and
+	// nested pages cut by the database
+	driver := vsqlite.new(db)
+	conn := if t := tracer { vgraph.trace(driver, t) } else { orm.Connection(driver) }
 	g := graph.Graph.new(conn)!
-
-	user_store := user_models.UserStore.new(conn)
-	article_store := article_models.ArticleStore.new(conn)
-	post_store := post_models.PostStore.new(conn)
-	comment_store := comment_models.CommentStore.new(conn)
-	// The kinds of records that take comments, keyed by `owner_type`.
-	comment_service := comments.Service.new(g, comment_store, user_store, {
-		comment_models.owner_type[article_models.Article](): comments.Owner{
-			id_of: fn [article_store] (slug string) !int {
-				return article_store.id_of(slug)
-			}
-		}
-		comment_models.owner_type[post_models.Post]():       comments.Owner{
-			id_of: fn [post_store] (slug string) !int {
-				return post_store.id_of(slug)
-			}
-		}
-	})
+	// the checks that read other tables: a comment's owner and parent
+	register_comment_checks(g)
 
 	if cfg.seed {
-		seed(user_store, article_store, post_store, comment_store)!
+		seed(g)!
 	}
 
-	// GraphQL: the schema vgraph gen wrote, with the mutations of api.graphql,
-	// which go through the same stores and services as the REST endpoints
-	mut server := g.graphql(graph.Resolvers{
-		graph:             g
-		users:             user_store
-		articles:          article_store
-		posts:             post_store
-		comments:          comment_store
-		create_comment:    fn [comment_service] (input comment_models.CommentInput) !comment_models.Comment {
-			return comment_service.create_row(input)
-		}
-		create_comment_on: fn [comment_service] (owner_type string, owner_slug string, input comment_models.OwnedCommentInput) !comment_models.Comment {
-			return comment_service.create_on_row(owner_type, owner_slug, input)
-		}
-	})!
-	// a request's mutations run in one transaction, rolled back if one fails
-	server.transaction = SqliteTransaction{
-		db: db
-	}
-
-	mut api := &App{
+	// GraphQL: the schema vgraph gen wrote. A request's mutations run in one
+	// transaction, and the models' options and hooks check every write.
+	return &App{
 		db:  db
-		gql: server
+		gql: g.graphql(graph.Resolvers{})!
 	}
-	mut user_handler := users.Handler.new(user_store, article_store, post_store, comment_service)
-	api.register_controller[users.Handler, app.Context]('/users', mut user_handler)!
-	mut article_handler := articles.Handler.new(g, article_store, user_store, comment_service)
-	api.register_controller[articles.Handler, app.Context]('/articles', mut article_handler)!
-	mut post_handler := posts.Handler.new(g, post_store, user_store, comment_service)
-	api.register_controller[posts.Handler, app.Context]('/posts', mut post_handler)!
-	mut comment_handler := comments.Handler.new(comment_service)
-	api.register_controller[comments.Handler, app.Context]('/comments', mut comment_handler)!
-	return api
 }
 
 // serve_graphql answers GraphQL requests: queries by GET or POST, mutations by
@@ -119,28 +71,6 @@ pub fn (a &App) serve_graphql(mut ctx app.Context) veb.Result {
 	}
 	ctx.res.set_status(http.status_from_int(res.status))
 	return ctx.send_response_to_client(res.content_type, res.body)
-}
-
-// SqliteTransaction runs a GraphQL request's mutations in one SQLite
-// transaction, on the connection the stores share.
-struct SqliteTransaction {
-	db sqlite.DB
-}
-
-fn (t SqliteTransaction) begin(ctx graphql.Context) !graphql.Context {
-	mut db := t.db
-	db.orm_begin()!
-	return ctx
-}
-
-fn (t SqliteTransaction) commit(_ graphql.Context) ! {
-	mut db := t.db
-	db.orm_commit()!
-}
-
-fn (t SqliteTransaction) rollback(_ graphql.Context) ! {
-	mut db := t.db
-	db.orm_rollback()!
 }
 
 // HealthResponse is the body of `GET /health`.

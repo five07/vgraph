@@ -1139,6 +1139,49 @@ is Phase 7 (Q107).
   waits for 6e's generated mutations: the generated resolvers use the graph they were
   built with, so on a pool a request's transaction needs a per-request graph.
 
+**Phase 7: `examples/service` on vgraph alone** (Q58, Q107). Its REST API, handlers
+and stores go, and it serves GraphQL from what vgraph generates.
+
+Decisions (Q109–Q120, 2026-10-13): the defaults. Keys are global ids and slugs go
+(Q110 (a)); a deleted author still shows (Q112 (b)); no authentication (Q116); after
+Phase 7, stop for further instructions (Q119). Later, in chat: one `models` module
+instead of a module per model, since REST's layout no longer fits.
+
+*Result (2026-10-13, done):*
+- **vgraph:** `Interceptor.edges` (default `true`): with `false`, an interceptor runs
+  on root queries, counts, traversals and edge predicates, not on edge loads, which
+  prepare their query with `Client.prepare_edge_query` (`load_one` / `load_many`, the
+  generated `load_<edge>`, GraphQL's per-parent counts). Tested in `hooks_test.v`.
+- **SQLite driver:** threads sharing it take turns at transactions (a mutex from
+  `begin_tx` / `orm_begin` to commit or rollback; a failed commit rolls back), since
+  SQLite has one per connection and every vgraph write runs in one: before, two
+  concurrent writes failed with "cannot start a transaction within a transaction".
+  Its errors no longer carry the SQL `db.sqlite` appends (`without_sql`), which
+  reached GraphQL clients. Tested in `write_test.v`.
+- **Generator:** a one_to_many or one_to_one edge whose targets hold its key in an
+  immutable column, or under an immutable inverse edge, has no input fields
+  (`held_immutably`): setting it would change that column. `examples/relations`
+  loses `gadgetIDs` on users.
+- **`examples/service`:** GraphQL and `/health` only. `models/` holds the four models
+  (one module, as `examples/relations`), with their rules as field options
+  (lengths, required, an email's `@`, bodies not blank), hooks (trimming, the
+  lowercase email, soft delete) and the root-only soft-delete interceptor
+  (`models/stamps.v`, with the `Stamps` mixin); server-owned fields (`createdAt`,
+  `updatedAt`, `deletedAt`) are out of the inputs. `hooks.v` (main) registers the
+  comment-owner check on the graph. Keys are `i64` global ids, all four types
+  `node` and `relay`; the migration creates the tables from the schema and runs
+  `global_ids`. The app runs on the traced SQLite driver with the generated
+  `GraphqlTransaction`. Gone: the REST routes and handlers, the stores and their
+  tests, `api.graphql`, the comment service and `Owner` registry, slugs,
+  `CountingConnection`, and `app`'s body, error and slug helpers. The seed writes
+  through the builders, in one transaction.
+- **Tests:** `main_test.v`, over HTTP: users, articles, posts and comments with
+  every rule and message, the deleted author, comments' owners and their errors,
+  server-owned fields, 30 concurrent writers, connections, a fixed set of selects
+  per query that doesn't grow with the rows, rollback of a request, seeding (once),
+  migrations with the global-id ranges, and introspection against graphql-js. The
+  README's walkthrough was run against a live server.
+
 ## 7. Questions
 
 **Q1.** Repository and name: a GitHub repo `vgraph` under which account? The VPM name
@@ -2394,3 +2437,143 @@ merging it.
   introspection checks are regenerated;
 - the inventory's entgql rows are all done or moved with a reason.
 > A: agree
+
+### Phase 7 (`examples/service` on vgraph alone): answer before Phase 7 starts
+
+Background (checked 2026-10-13), from Q58 and Q107: once Phase 6 is complete,
+`examples/service` drops its REST API and runs on vgraph alone. What it has today:
+- **REST:** 20 routes on veb (CRUD with `PUT` and `PATCH` for four resources, nested
+  lists such as `/users/:slug/articles`, comments on an owner, `/health`), with
+  handlers, `app/body.v` and `app/render.v` for JSON, and `app/errors.v` mapping
+  error kinds to 404 / 409 / 422.
+- **Stores** (`*/models/store.v`, about 640 lines, with their own tests): normalize
+  (trim), validate (required, lengths, a body that isn't blank, an email), make
+  slugs (UUID v7), set `created_at` / `updated_at`, turn `published` into
+  `published_at`, soft delete, and read back by slug. Every record is addressed by
+  slug; ids never leave the server.
+- **Comments:** polymorphic (`owner_type` / `owner_id`), with an `Owner` registry
+  in the app, so `comments/` doesn't import the article and post stores; a comment's
+  owner must exist and not be deleted, and a reply must have its parent's owner.
+- **Deleted authors still show:** an article by a deleted user keeps its author
+  (`test_articles_keep_a_deleted_author`); edges to comments and replies leave
+  deleted ones out (per-edge `soft_del`).
+- **GraphQL:** `api.graphql` declares 14 mutations keyed by slug, resolved through
+  the stores (`mutations: []` on all four models, Q107); a `SqliteTransaction` on the
+  shared connection.
+- **Tests:** `main_test.v` (998 lines) tests REST over HTTP, the selects of each read
+  endpoint, and GraphQL running the same selects as REST; the four store tests.
+- **Keys** are `int`; there is no driver: the app runs on `sqlite.DB` through its
+  own `CountingConnection` (`app/trace.v`), not `vgraph.trace`.
+
+**Q109. What the example serves.** **Default:** GraphQL only: `POST` and `GET
+/graphql` and `/health`, on veb. The REST routes, handlers, `app/body.v`,
+`app/render.v`, `app/errors.v` and the stores and their tests go. `examples/service`
+keeps its name and folder layout (one module per model, `models/` inside), now
+holding the struct, its edges and its options. A GraphiQL page on `GET /graphql`
+stays future state, with Apollo's extras (Q30).
+> A: correct
+
+**Q110. Ids and slugs.** The generated mutations take `id: ID!`, and the API has
+used slugs. **Default:** (a).
+- (a) Keys become `i64` global ids, and the four types are `node` and `relay`
+  (Q95, Q96), so the example shows the whole of entgql: `node(id:)`, connections,
+  generated mutations by id. Slugs go: a global id is already opaque and stable.
+- (b) Keep `int` keys and slugs: `slug` gets a `default` (a UUID v7) and is
+  `immutable` and unique; clients read one record with
+  `articles(where: {slug: "…"})`, and the mutations take ids.
+- (c) Keep slugs as the only public key: hand-written mutations by slug, as today.
+
+With (a), the migration creates the tables through `vgraph.create_table` and runs
+`global_ids`; an existing database file is deleted, as the README already says for
+schema changes.
+> A: (a) no longer need slugs
+
+**Q111. Where the stores' logic goes** (Q40). **Default:** each rule to the place
+Ent would put it:
+- lengths, required and not empty: `vgraph.Field` checks (`not_empty`, `max_len`,
+  `pattern` for the email);
+- a body that isn't only spaces, trimming titles: a model hook (`hooks()`);
+- `created_at` / `updated_at`: a `Stamps` mixin with `default_now` / `update_now`,
+  as `examples/relations` has;
+- `published`: the input sets `publishedAt` itself; there is no `published`
+  boolean. The other choice is hand-written `publishArticle(id)` /
+  `unpublishArticle(id)` mutations in `api.graphql`;
+- soft delete: `vgraph.soft_delete_hook` and `soft_delete_query` on all four tables
+  (but see Q112);
+- the unique email: `@[unique]`, and the database's error.
+> A: agreed
+
+**Q112. A deleted author.** Ent's soft delete is an interceptor, and it hides a
+deleted user everywhere, an article's `author` included, which today shows.
+**Default:** (b).
+- (a) Accept Ent's behavior: a deleted user's articles show `author: null`.
+- (b) Keep today's: vgraph adds a way for an interceptor to run on root queries
+  and traversals but not on edge loads (`vgraph.Interceptor{edges: false}`), and
+  users' soft delete uses it; comments and replies keep hiding deleted ones on their
+  edges. A small addition to vgraph, tested in `hooks_test.v`.
+- (c) Don't soft-delete users through vgraph: a hand-written `deleteUser` sets
+  `deleted_at`, and the users list filters it out.
+> A: (b)
+
+**Q113. Comments and their owners.** **Default:** the generated `createComment`
+takes `ownerType` and `ownerID` (checked against `Article` / `Post`, 6e) and
+`parentID`. A runtime hook the app registers on the graph (it can see the generated
+`graph`, which a model's hook can't, Q54) checks that the owner exists and isn't
+deleted, and that a reply's parent has the same owner. The `Owner` registry goes.
+The owner stays two fields, `article` and `post`; a union stays future state (Q105).
+> A: agreed
+
+**Q114. The connection.** **Default:** the app runs on the SQLite driver
+(`five07.vgraph.sqlite`), traced with `vgraph.trace` for the query counts, so
+connections can order by any field and nested pages are cut in SQL. The generated
+`GraphqlTransaction` replaces `SqliteTransaction`, and `app/trace.v`'s
+`CountingConnection` goes (Q67 left it until now).
+> A: agreed
+
+**Q115. Errors.** REST answered with status codes and its own messages (`an
+article needs a title`). GraphQL answers 200 with the errors at their fields.
+**Default:** vgraph's messages (`` `articles.title`: is empty ``), not REST's, and
+no `extensions.code`: Apollo's error codes stay future state (Q30). The other choice is a
+hook per model that rewrites the checks' errors into today's messages.
+> A: agreed
+
+**Q116. Viewer and access.** The API has no authentication, and the JWT example
+waits with `TODO.md` (Q60). **Default:** none in Phase 7: the server passes no
+context. The other choice is a header naming a user (`X-User: <id>`), a
+`Viewer` context and a policy that only an author may update or delete their own
+records, which shows privacy in the example without real auth.
+> A: agreed, no auth. We plan a different auth/hook example anyway
+
+**Q117. Tests.** **Default:**
+- `main_test.v` becomes GraphQL over HTTP: every behavior the REST tests check
+  (CRUD, validation, a deleted author, comments on both owners and their errors,
+  nested lists, concurrent requests, seed once, migrations, introspection against
+  graphql-js), through queries and generated mutations;
+- each read's selects are asserted as a fixed list, through `vgraph.trace`; the
+  REST-to-GraphQL comparison ends (Q58);
+- a mutation that fails rolls back the request's others;
+- the store tests go with the stores; the hooks get their tests in `main_test.v`.
+> A: agreed
+
+**Q118. What else changes.** **Default:** `seed.v` writes through the generated
+builders; `api.graphql` keeps only what the generated schema lacks (nothing, with
+Q110 (a)), and `resolvers.v` its stubs, if any; the README describes the GraphQL API
+with example queries and mutations in place of the REST table; `.env`'s
+`DB_DRIVER` stays SQLite only.
+> A: agreed
+
+**Q119. After Phase 7.** The plan says Phase 6 and this rewrite finish on `develop`
+before `main` and `v0.1.0`, and `TODO.md` now holds your notes for after that
+(rewrite PLAN.md, coverage, N+1 checks, contributing). **Default:** Phase 7 ends
+with a short release checklist, not a phase of its own: merge `develop` to `main`
+so CI runs for the first time and passes, check the README against the code, and
+tag `v0.1.0`. Pinning a V release with `v.migrations` (Q13) and the VPM submission
+stay as they are: when V and VPM allow. Then PLAN.md is rewritten from `TODO.md`.
+> A: when complete with phase 7, stop. I have further instructions
+
+**Q120. Exit criteria for Phase 7.** **Default:** Q59's, and: `examples/service` has
+no REST route but `/health`, no store, no hand-written resolver it doesn't need;
+every rule the stores enforced is enforced by field options, hooks or policies,
+each with a test; its tests pass on SQLite through the driver; CI checks its
+generated code and its schema with graphql-js; the README matches what it serves.
+> A: agreed

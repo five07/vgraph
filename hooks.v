@@ -86,6 +86,10 @@ pub struct Interceptor {
 pub:
 	name string // lets `skip` leave it out
 	run  Intercept @[required]
+	// edges: it runs on edge loads too. With `false` it runs on root queries,
+	// counts, traversals and edge predicates only, so an edge still reaches
+	// the rows it hides, such as an article's soft-deleted author.
+	edges bool = true
 }
 
 // Decision is what a privacy rule decides.
@@ -255,6 +259,17 @@ fn (c Client) policies_of(table string) []Policy {
 // prepare_query returns `q` as the privacy rules and interceptors of `table`
 // leave it, in that order, or the error of a rule that denies it.
 pub fn (c Client) prepare_query(table string, q load.Query) !load.Query {
+	return c.prepare(table, q, false)
+}
+
+// prepare_edge_query returns `q`, a query of the targets of an edge load, as
+// `prepare_query` does, but without the interceptors that leave edge loads out
+// (`Interceptor.edges`).
+pub fn (c Client) prepare_edge_query(table string, q load.Query) !load.Query {
+	return c.prepare(table, q, true)
+}
+
+fn (c Client) prepare(table string, q load.Query, edge bool) !load.Query {
 	mut query := load.Query{
 		...q
 		conds: q.conds.clone()
@@ -282,7 +297,7 @@ pub fn (c Client) prepare_query(table string, q load.Query) !load.Query {
 	all << c.registry.table_ints[table] or { []Interceptor{} }
 	all << c.schema.interceptors[table] or { []Interceptor{} }
 	for i in all {
-		if i.name != '' && i.name in c.skipped {
+		if (i.name != '' && i.name in c.skipped) || (edge && !i.edges) {
 			continue
 		}
 		i.run(c.ctx, table, mut query)!

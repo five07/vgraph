@@ -3,10 +3,7 @@ module graph
 
 import five07.vgraph.load
 import time
-import users.models as users_models
-import articles.models as articles_models
-import posts.models as posts_models
-import comments.models as comments_models
+import models
 
 // UserQuery selects `users` rows, and the edges to load with them. Start one with
 // `Graph.users()`.
@@ -29,7 +26,7 @@ mut:
 pub struct UserNode {
 	graph Graph
 pub mut:
-	user           users_models.User
+	user           models.User
 	articles       []ArticleNode            // set by `with_articles()`
 	named_articles map[string][]ArticleNode // set by `with_named_articles()`
 	posts          []PostNode               // set by `with_posts()`
@@ -85,97 +82,107 @@ pub fn (q UserQuery) offset(count int) UserQuery {
 // count returns how many rows match, in one query; order, limit and offset
 // do not apply.
 pub fn (q UserQuery) count() !int {
-	return load.count_where[users_models.User](q.graph.client.conn, q.graph.client.prepare_query('users', q.query)!)
+	return load.count_where[models.User](q.graph.client.conn, q.graph.client.prepare_query('users', q.query)!)
+}
+
+// user_created_at_eq returns the condition that `Stamps.created_at` is `value`.
+pub fn user_created_at_eq(value time.Time) load.Cond {
+	return load.eq('Stamps.created_at', value)
+}
+
+// user_created_at_ne returns the condition that `Stamps.created_at` is not `value`.
+pub fn user_created_at_ne(value time.Time) load.Cond {
+	return load.ne('Stamps.created_at', value)
+}
+
+// user_created_at_lt returns the condition that `Stamps.created_at` comes before `value`.
+pub fn user_created_at_lt(value time.Time) load.Cond {
+	return load.lt('Stamps.created_at', value)
+}
+
+// user_created_at_le returns the condition that `Stamps.created_at` comes at or before `value`.
+pub fn user_created_at_le(value time.Time) load.Cond {
+	return load.le('Stamps.created_at', value)
+}
+
+// user_created_at_gt returns the condition that `Stamps.created_at` comes after `value`.
+pub fn user_created_at_gt(value time.Time) load.Cond {
+	return load.gt('Stamps.created_at', value)
+}
+
+// user_created_at_ge returns the condition that `Stamps.created_at` comes at or after `value`.
+pub fn user_created_at_ge(value time.Time) load.Cond {
+	return load.ge('Stamps.created_at', value)
+}
+
+// user_updated_at_eq returns the condition that `Stamps.updated_at` is `value`.
+pub fn user_updated_at_eq(value time.Time) load.Cond {
+	return load.eq('Stamps.updated_at', value)
+}
+
+// user_updated_at_ne returns the condition that `Stamps.updated_at` is not `value`.
+pub fn user_updated_at_ne(value time.Time) load.Cond {
+	return load.ne('Stamps.updated_at', value)
+}
+
+// user_updated_at_lt returns the condition that `Stamps.updated_at` comes before `value`.
+pub fn user_updated_at_lt(value time.Time) load.Cond {
+	return load.lt('Stamps.updated_at', value)
+}
+
+// user_updated_at_le returns the condition that `Stamps.updated_at` comes at or before `value`.
+pub fn user_updated_at_le(value time.Time) load.Cond {
+	return load.le('Stamps.updated_at', value)
+}
+
+// user_updated_at_gt returns the condition that `Stamps.updated_at` comes after `value`.
+pub fn user_updated_at_gt(value time.Time) load.Cond {
+	return load.gt('Stamps.updated_at', value)
+}
+
+// user_updated_at_ge returns the condition that `Stamps.updated_at` comes at or after `value`.
+pub fn user_updated_at_ge(value time.Time) load.Cond {
+	return load.ge('Stamps.updated_at', value)
 }
 
 // user_id_eq returns the condition that `id` is `value`.
-pub fn user_id_eq(value int) load.Cond {
+pub fn user_id_eq(value i64) load.Cond {
 	return load.eq('id', value)
 }
 
 // user_id_ne returns the condition that `id` is not `value`.
-pub fn user_id_ne(value int) load.Cond {
+pub fn user_id_ne(value i64) load.Cond {
 	return load.ne('id', value)
 }
 
 // user_id_lt returns the condition that `id` comes before `value`.
-pub fn user_id_lt(value int) load.Cond {
+pub fn user_id_lt(value i64) load.Cond {
 	return load.lt('id', value)
 }
 
 // user_id_le returns the condition that `id` comes at or before `value`.
-pub fn user_id_le(value int) load.Cond {
+pub fn user_id_le(value i64) load.Cond {
 	return load.le('id', value)
 }
 
 // user_id_gt returns the condition that `id` comes after `value`.
-pub fn user_id_gt(value int) load.Cond {
+pub fn user_id_gt(value i64) load.Cond {
 	return load.gt('id', value)
 }
 
 // user_id_ge returns the condition that `id` comes at or after `value`.
-pub fn user_id_ge(value int) load.Cond {
+pub fn user_id_ge(value i64) load.Cond {
 	return load.ge('id', value)
 }
 
 // user_id_in returns the condition that `id` is one of `values`.
-pub fn user_id_in(values []int) load.Cond {
-	return load.in_ints('id', values)
+pub fn user_id_in(values []i64) load.Cond {
+	return load.in_i64s('id', values)
 }
 
 // user_id_not_in returns the condition that `id` is none of `values`.
-pub fn user_id_not_in(values []int) load.Cond {
-	return load.not_in_ints('id', values)
-}
-
-// user_slug_eq returns the condition that `slug` is `value`.
-pub fn user_slug_eq(value string) load.Cond {
-	return load.eq('slug', value)
-}
-
-// user_slug_ne returns the condition that `slug` is not `value`.
-pub fn user_slug_ne(value string) load.Cond {
-	return load.ne('slug', value)
-}
-
-// user_slug_in returns the condition that `slug` is one of `values`.
-pub fn user_slug_in(values []string) load.Cond {
-	return load.in_strings('slug', values)
-}
-
-// user_slug_not_in returns the condition that `slug` is none of `values`.
-pub fn user_slug_not_in(values []string) load.Cond {
-	return load.not_in_strings('slug', values)
-}
-
-// user_slug_like returns the condition that `slug` matches the SQL LIKE `pattern`.
-pub fn user_slug_like(pattern string) load.Cond {
-	return load.like('slug', pattern)
-}
-
-// user_slug_contains returns the condition that `slug` contains `value`.
-pub fn user_slug_contains(value string) load.Cond {
-	return load.contains('slug', value)
-}
-
-// user_slug_has_prefix returns the condition that `slug` starts with `value`.
-pub fn user_slug_has_prefix(value string) load.Cond {
-	return load.has_prefix('slug', value)
-}
-
-// user_slug_has_suffix returns the condition that `slug` ends with `value`.
-pub fn user_slug_has_suffix(value string) load.Cond {
-	return load.has_suffix('slug', value)
-}
-
-// user_slug_equal_fold returns the condition that `slug` is `value`, ignoring case.
-pub fn user_slug_equal_fold(value string) load.Cond {
-	return load.equal_fold('slug', value)
-}
-
-// user_slug_contains_fold returns the condition that `slug` contains `value`, ignoring case.
-pub fn user_slug_contains_fold(value string) load.Cond {
-	return load.contains_fold('slug', value)
+pub fn user_id_not_in(values []i64) load.Cond {
+	return load.not_in_i64s('id', values)
 }
 
 // user_name_eq returns the condition that `name` is `value`.
@@ -278,66 +285,6 @@ pub fn user_email_contains_fold(value string) load.Cond {
 	return load.contains_fold('email', value)
 }
 
-// user_created_at_eq returns the condition that `created_at` is `value`.
-pub fn user_created_at_eq(value time.Time) load.Cond {
-	return load.eq('created_at', value)
-}
-
-// user_created_at_ne returns the condition that `created_at` is not `value`.
-pub fn user_created_at_ne(value time.Time) load.Cond {
-	return load.ne('created_at', value)
-}
-
-// user_created_at_lt returns the condition that `created_at` comes before `value`.
-pub fn user_created_at_lt(value time.Time) load.Cond {
-	return load.lt('created_at', value)
-}
-
-// user_created_at_le returns the condition that `created_at` comes at or before `value`.
-pub fn user_created_at_le(value time.Time) load.Cond {
-	return load.le('created_at', value)
-}
-
-// user_created_at_gt returns the condition that `created_at` comes after `value`.
-pub fn user_created_at_gt(value time.Time) load.Cond {
-	return load.gt('created_at', value)
-}
-
-// user_created_at_ge returns the condition that `created_at` comes at or after `value`.
-pub fn user_created_at_ge(value time.Time) load.Cond {
-	return load.ge('created_at', value)
-}
-
-// user_updated_at_eq returns the condition that `updated_at` is `value`.
-pub fn user_updated_at_eq(value time.Time) load.Cond {
-	return load.eq('updated_at', value)
-}
-
-// user_updated_at_ne returns the condition that `updated_at` is not `value`.
-pub fn user_updated_at_ne(value time.Time) load.Cond {
-	return load.ne('updated_at', value)
-}
-
-// user_updated_at_lt returns the condition that `updated_at` comes before `value`.
-pub fn user_updated_at_lt(value time.Time) load.Cond {
-	return load.lt('updated_at', value)
-}
-
-// user_updated_at_le returns the condition that `updated_at` comes at or before `value`.
-pub fn user_updated_at_le(value time.Time) load.Cond {
-	return load.le('updated_at', value)
-}
-
-// user_updated_at_gt returns the condition that `updated_at` comes after `value`.
-pub fn user_updated_at_gt(value time.Time) load.Cond {
-	return load.gt('updated_at', value)
-}
-
-// user_updated_at_ge returns the condition that `updated_at` comes at or after `value`.
-pub fn user_updated_at_ge(value time.Time) load.Cond {
-	return load.ge('updated_at', value)
-}
-
 // user_deleted_at_eq returns the condition that `deleted_at` is `value`.
 pub fn user_deleted_at_eq(value time.Time) load.Cond {
 	return load.eq('deleted_at', value)
@@ -380,32 +327,56 @@ pub fn user_deleted_at_is_not_null() load.Cond {
 
 // user_has_articles returns the condition that it has a `articles`.
 pub fn user_has_articles() load.Cond {
-	return load.in_sub('id', load.Sub{ table: 'articles', column: 'user_id', kind: .int, conds: with_conds([]load.Cond{}, load.is_null('deleted_at')) })
+	return load.in_sub('id', load.Sub{ table: 'articles', column: 'user_id', kind: .i64, conds: with_conds([]load.Cond{}, load.is_null('deleted_at')) })
 }
 
 // user_has_articles_with returns the condition that it has a `articles` that matches `conds`.
 pub fn user_has_articles_with(conds ...load.Cond) load.Cond {
-	return load.in_sub('id', load.Sub{ table: 'articles', column: 'user_id', kind: .int, conds: with_conds(conds, load.is_null('deleted_at')) })
+	return load.in_sub('id', load.Sub{ table: 'articles', column: 'user_id', kind: .i64, conds: with_conds(conds, load.is_null('deleted_at')) })
 }
 
 // user_has_posts returns the condition that it has a `posts`.
 pub fn user_has_posts() load.Cond {
-	return load.in_sub('id', load.Sub{ table: 'posts', column: 'user_id', kind: .int, conds: with_conds([]load.Cond{}, load.is_null('deleted_at')) })
+	return load.in_sub('id', load.Sub{ table: 'posts', column: 'user_id', kind: .i64, conds: with_conds([]load.Cond{}, load.is_null('deleted_at')) })
 }
 
 // user_has_posts_with returns the condition that it has a `posts` that matches `conds`.
 pub fn user_has_posts_with(conds ...load.Cond) load.Cond {
-	return load.in_sub('id', load.Sub{ table: 'posts', column: 'user_id', kind: .int, conds: with_conds(conds, load.is_null('deleted_at')) })
+	return load.in_sub('id', load.Sub{ table: 'posts', column: 'user_id', kind: .i64, conds: with_conds(conds, load.is_null('deleted_at')) })
 }
 
 // user_has_comments returns the condition that it has a `comments`.
 pub fn user_has_comments() load.Cond {
-	return load.in_sub('id', load.Sub{ table: 'comments', column: 'user_id', kind: .int, conds: with_conds([]load.Cond{}, load.is_null('deleted_at')) })
+	return load.in_sub('id', load.Sub{ table: 'comments', column: 'user_id', kind: .i64, conds: with_conds([]load.Cond{}, load.is_null('deleted_at')) })
 }
 
 // user_has_comments_with returns the condition that it has a `comments` that matches `conds`.
 pub fn user_has_comments_with(conds ...load.Cond) load.Cond {
-	return load.in_sub('id', load.Sub{ table: 'comments', column: 'user_id', kind: .int, conds: with_conds(conds, load.is_null('deleted_at')) })
+	return load.in_sub('id', load.Sub{ table: 'comments', column: 'user_id', kind: .i64, conds: with_conds(conds, load.is_null('deleted_at')) })
+}
+
+// order_by_created_at orders the rows by `Stamps.created_at`, ascending, after the orders
+// given before.
+pub fn (q UserQuery) order_by_created_at() UserQuery {
+	return q.order_by(load.asc('Stamps.created_at'))
+}
+
+// order_by_created_at_desc orders the rows by `Stamps.created_at`, descending, after the
+// orders given before.
+pub fn (q UserQuery) order_by_created_at_desc() UserQuery {
+	return q.order_by(load.desc('Stamps.created_at'))
+}
+
+// order_by_updated_at orders the rows by `Stamps.updated_at`, ascending, after the orders
+// given before.
+pub fn (q UserQuery) order_by_updated_at() UserQuery {
+	return q.order_by(load.asc('Stamps.updated_at'))
+}
+
+// order_by_updated_at_desc orders the rows by `Stamps.updated_at`, descending, after the
+// orders given before.
+pub fn (q UserQuery) order_by_updated_at_desc() UserQuery {
+	return q.order_by(load.desc('Stamps.updated_at'))
 }
 
 // order_by_id orders the rows by `id`, ascending, after the orders
@@ -418,18 +389,6 @@ pub fn (q UserQuery) order_by_id() UserQuery {
 // orders given before.
 pub fn (q UserQuery) order_by_id_desc() UserQuery {
 	return q.order_by(load.desc('id'))
-}
-
-// order_by_slug orders the rows by `slug`, ascending, after the orders
-// given before.
-pub fn (q UserQuery) order_by_slug() UserQuery {
-	return q.order_by(load.asc('slug'))
-}
-
-// order_by_slug_desc orders the rows by `slug`, descending, after the
-// orders given before.
-pub fn (q UserQuery) order_by_slug_desc() UserQuery {
-	return q.order_by(load.desc('slug'))
 }
 
 // order_by_name orders the rows by `name`, ascending, after the orders
@@ -456,30 +415,6 @@ pub fn (q UserQuery) order_by_email_desc() UserQuery {
 	return q.order_by(load.desc('email'))
 }
 
-// order_by_created_at orders the rows by `created_at`, ascending, after the orders
-// given before.
-pub fn (q UserQuery) order_by_created_at() UserQuery {
-	return q.order_by(load.asc('created_at'))
-}
-
-// order_by_created_at_desc orders the rows by `created_at`, descending, after the
-// orders given before.
-pub fn (q UserQuery) order_by_created_at_desc() UserQuery {
-	return q.order_by(load.desc('created_at'))
-}
-
-// order_by_updated_at orders the rows by `updated_at`, ascending, after the orders
-// given before.
-pub fn (q UserQuery) order_by_updated_at() UserQuery {
-	return q.order_by(load.asc('updated_at'))
-}
-
-// order_by_updated_at_desc orders the rows by `updated_at`, descending, after the
-// orders given before.
-pub fn (q UserQuery) order_by_updated_at_desc() UserQuery {
-	return q.order_by(load.desc('updated_at'))
-}
-
 // order_by_deleted_at orders the rows by `deleted_at`, ascending, after the orders
 // given before.
 pub fn (q UserQuery) order_by_deleted_at() UserQuery {
@@ -492,94 +427,104 @@ pub fn (q UserQuery) order_by_deleted_at_desc() UserQuery {
 	return q.order_by(load.desc('deleted_at'))
 }
 
+// where_created_at keeps the rows where `Stamps.created_at` is `value`.
+pub fn (q UserQuery) where_created_at(value time.Time) UserQuery {
+	return q.where(user_created_at_eq(value))
+}
+
+// where_created_at_ne keeps the rows where `Stamps.created_at` is not `value`.
+pub fn (q UserQuery) where_created_at_ne(value time.Time) UserQuery {
+	return q.where(user_created_at_ne(value))
+}
+
+// where_created_at_lt keeps the rows where `Stamps.created_at` comes before `value`.
+pub fn (q UserQuery) where_created_at_lt(value time.Time) UserQuery {
+	return q.where(user_created_at_lt(value))
+}
+
+// where_created_at_le keeps the rows where `Stamps.created_at` comes at or before `value`.
+pub fn (q UserQuery) where_created_at_le(value time.Time) UserQuery {
+	return q.where(user_created_at_le(value))
+}
+
+// where_created_at_gt keeps the rows where `Stamps.created_at` comes after `value`.
+pub fn (q UserQuery) where_created_at_gt(value time.Time) UserQuery {
+	return q.where(user_created_at_gt(value))
+}
+
+// where_created_at_ge keeps the rows where `Stamps.created_at` comes at or after `value`.
+pub fn (q UserQuery) where_created_at_ge(value time.Time) UserQuery {
+	return q.where(user_created_at_ge(value))
+}
+
+// where_updated_at keeps the rows where `Stamps.updated_at` is `value`.
+pub fn (q UserQuery) where_updated_at(value time.Time) UserQuery {
+	return q.where(user_updated_at_eq(value))
+}
+
+// where_updated_at_ne keeps the rows where `Stamps.updated_at` is not `value`.
+pub fn (q UserQuery) where_updated_at_ne(value time.Time) UserQuery {
+	return q.where(user_updated_at_ne(value))
+}
+
+// where_updated_at_lt keeps the rows where `Stamps.updated_at` comes before `value`.
+pub fn (q UserQuery) where_updated_at_lt(value time.Time) UserQuery {
+	return q.where(user_updated_at_lt(value))
+}
+
+// where_updated_at_le keeps the rows where `Stamps.updated_at` comes at or before `value`.
+pub fn (q UserQuery) where_updated_at_le(value time.Time) UserQuery {
+	return q.where(user_updated_at_le(value))
+}
+
+// where_updated_at_gt keeps the rows where `Stamps.updated_at` comes after `value`.
+pub fn (q UserQuery) where_updated_at_gt(value time.Time) UserQuery {
+	return q.where(user_updated_at_gt(value))
+}
+
+// where_updated_at_ge keeps the rows where `Stamps.updated_at` comes at or after `value`.
+pub fn (q UserQuery) where_updated_at_ge(value time.Time) UserQuery {
+	return q.where(user_updated_at_ge(value))
+}
+
 // where_id keeps the rows where `id` is `value`.
-pub fn (q UserQuery) where_id(value int) UserQuery {
+pub fn (q UserQuery) where_id(value i64) UserQuery {
 	return q.where(user_id_eq(value))
 }
 
 // where_id_ne keeps the rows where `id` is not `value`.
-pub fn (q UserQuery) where_id_ne(value int) UserQuery {
+pub fn (q UserQuery) where_id_ne(value i64) UserQuery {
 	return q.where(user_id_ne(value))
 }
 
 // where_id_lt keeps the rows where `id` comes before `value`.
-pub fn (q UserQuery) where_id_lt(value int) UserQuery {
+pub fn (q UserQuery) where_id_lt(value i64) UserQuery {
 	return q.where(user_id_lt(value))
 }
 
 // where_id_le keeps the rows where `id` comes at or before `value`.
-pub fn (q UserQuery) where_id_le(value int) UserQuery {
+pub fn (q UserQuery) where_id_le(value i64) UserQuery {
 	return q.where(user_id_le(value))
 }
 
 // where_id_gt keeps the rows where `id` comes after `value`.
-pub fn (q UserQuery) where_id_gt(value int) UserQuery {
+pub fn (q UserQuery) where_id_gt(value i64) UserQuery {
 	return q.where(user_id_gt(value))
 }
 
 // where_id_ge keeps the rows where `id` comes at or after `value`.
-pub fn (q UserQuery) where_id_ge(value int) UserQuery {
+pub fn (q UserQuery) where_id_ge(value i64) UserQuery {
 	return q.where(user_id_ge(value))
 }
 
 // where_id_in keeps the rows where `id` is one of `values`.
-pub fn (q UserQuery) where_id_in(values []int) UserQuery {
+pub fn (q UserQuery) where_id_in(values []i64) UserQuery {
 	return q.where(user_id_in(values))
 }
 
 // where_id_not_in keeps the rows where `id` is none of `values`.
-pub fn (q UserQuery) where_id_not_in(values []int) UserQuery {
+pub fn (q UserQuery) where_id_not_in(values []i64) UserQuery {
 	return q.where(user_id_not_in(values))
-}
-
-// where_slug keeps the rows where `slug` is `value`.
-pub fn (q UserQuery) where_slug(value string) UserQuery {
-	return q.where(user_slug_eq(value))
-}
-
-// where_slug_ne keeps the rows where `slug` is not `value`.
-pub fn (q UserQuery) where_slug_ne(value string) UserQuery {
-	return q.where(user_slug_ne(value))
-}
-
-// where_slug_in keeps the rows where `slug` is one of `values`.
-pub fn (q UserQuery) where_slug_in(values []string) UserQuery {
-	return q.where(user_slug_in(values))
-}
-
-// where_slug_not_in keeps the rows where `slug` is none of `values`.
-pub fn (q UserQuery) where_slug_not_in(values []string) UserQuery {
-	return q.where(user_slug_not_in(values))
-}
-
-// where_slug_like keeps the rows where `slug` matches the SQL LIKE `pattern`.
-pub fn (q UserQuery) where_slug_like(pattern string) UserQuery {
-	return q.where(user_slug_like(pattern))
-}
-
-// where_slug_contains keeps the rows where `slug` contains `value`.
-pub fn (q UserQuery) where_slug_contains(value string) UserQuery {
-	return q.where(user_slug_contains(value))
-}
-
-// where_slug_has_prefix keeps the rows where `slug` starts with `value`.
-pub fn (q UserQuery) where_slug_has_prefix(value string) UserQuery {
-	return q.where(user_slug_has_prefix(value))
-}
-
-// where_slug_has_suffix keeps the rows where `slug` ends with `value`.
-pub fn (q UserQuery) where_slug_has_suffix(value string) UserQuery {
-	return q.where(user_slug_has_suffix(value))
-}
-
-// where_slug_equal_fold keeps the rows where `slug` is `value`, ignoring case.
-pub fn (q UserQuery) where_slug_equal_fold(value string) UserQuery {
-	return q.where(user_slug_equal_fold(value))
-}
-
-// where_slug_contains_fold keeps the rows where `slug` contains `value`, ignoring case.
-pub fn (q UserQuery) where_slug_contains_fold(value string) UserQuery {
-	return q.where(user_slug_contains_fold(value))
 }
 
 // where_name keeps the rows where `name` is `value`.
@@ -682,66 +627,6 @@ pub fn (q UserQuery) where_email_contains_fold(value string) UserQuery {
 	return q.where(user_email_contains_fold(value))
 }
 
-// where_created_at keeps the rows where `created_at` is `value`.
-pub fn (q UserQuery) where_created_at(value time.Time) UserQuery {
-	return q.where(user_created_at_eq(value))
-}
-
-// where_created_at_ne keeps the rows where `created_at` is not `value`.
-pub fn (q UserQuery) where_created_at_ne(value time.Time) UserQuery {
-	return q.where(user_created_at_ne(value))
-}
-
-// where_created_at_lt keeps the rows where `created_at` comes before `value`.
-pub fn (q UserQuery) where_created_at_lt(value time.Time) UserQuery {
-	return q.where(user_created_at_lt(value))
-}
-
-// where_created_at_le keeps the rows where `created_at` comes at or before `value`.
-pub fn (q UserQuery) where_created_at_le(value time.Time) UserQuery {
-	return q.where(user_created_at_le(value))
-}
-
-// where_created_at_gt keeps the rows where `created_at` comes after `value`.
-pub fn (q UserQuery) where_created_at_gt(value time.Time) UserQuery {
-	return q.where(user_created_at_gt(value))
-}
-
-// where_created_at_ge keeps the rows where `created_at` comes at or after `value`.
-pub fn (q UserQuery) where_created_at_ge(value time.Time) UserQuery {
-	return q.where(user_created_at_ge(value))
-}
-
-// where_updated_at keeps the rows where `updated_at` is `value`.
-pub fn (q UserQuery) where_updated_at(value time.Time) UserQuery {
-	return q.where(user_updated_at_eq(value))
-}
-
-// where_updated_at_ne keeps the rows where `updated_at` is not `value`.
-pub fn (q UserQuery) where_updated_at_ne(value time.Time) UserQuery {
-	return q.where(user_updated_at_ne(value))
-}
-
-// where_updated_at_lt keeps the rows where `updated_at` comes before `value`.
-pub fn (q UserQuery) where_updated_at_lt(value time.Time) UserQuery {
-	return q.where(user_updated_at_lt(value))
-}
-
-// where_updated_at_le keeps the rows where `updated_at` comes at or before `value`.
-pub fn (q UserQuery) where_updated_at_le(value time.Time) UserQuery {
-	return q.where(user_updated_at_le(value))
-}
-
-// where_updated_at_gt keeps the rows where `updated_at` comes after `value`.
-pub fn (q UserQuery) where_updated_at_gt(value time.Time) UserQuery {
-	return q.where(user_updated_at_gt(value))
-}
-
-// where_updated_at_ge keeps the rows where `updated_at` comes at or after `value`.
-pub fn (q UserQuery) where_updated_at_ge(value time.Time) UserQuery {
-	return q.where(user_updated_at_ge(value))
-}
-
 // where_deleted_at keeps the rows where `deleted_at` is `value`.
 pub fn (q UserQuery) where_deleted_at(value time.Time) UserQuery {
 	return q.where(user_deleted_at_eq(value))
@@ -815,19 +700,19 @@ pub fn (q UserQuery) has_comments_with(configure fn (CommentQuery) CommentQuery)
 // query_articles starts a query of the `articles` of the rows that match this
 // query's conditions; its order, limit and offset don't apply.
 pub fn (q UserQuery) query_articles() ArticleQuery {
-	return q.graph.articles().where(load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: q.query.conds }), load.is_null('deleted_at'))
+	return q.graph.articles().where(load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .i64, conds: q.query.conds }), load.is_null('deleted_at'))
 }
 
 // query_posts starts a query of the `posts` of the rows that match this
 // query's conditions; its order, limit and offset don't apply.
 pub fn (q UserQuery) query_posts() PostQuery {
-	return q.graph.posts().where(load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: q.query.conds }), load.is_null('deleted_at'))
+	return q.graph.posts().where(load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .i64, conds: q.query.conds }), load.is_null('deleted_at'))
 }
 
 // query_comments starts a query of the `comments` of the rows that match this
 // query's conditions; its order, limit and offset don't apply.
 pub fn (q UserQuery) query_comments() CommentQuery {
-	return q.graph.comments().where(load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .int, conds: q.query.conds }), load.is_null('deleted_at'))
+	return q.graph.comments().where(load.in_sub('user_id', load.Sub{ table: 'users', column: 'id', kind: .i64, conds: q.query.conds }), load.is_null('deleted_at'))
 }
 
 // only returns the one matching row, with the requested edges: a
@@ -848,13 +733,13 @@ pub fn (q UserQuery) only() !UserNode {
 }
 
 // ids returns the keys of the matching rows, in order, and no edges.
-pub fn (q UserQuery) ids() ![]int {
-	keys := load.select_keys_where(q.graph.client.conn, 'users', 'id', .int, q.graph.client.prepare_query('users', q.query)!, true)!
-	return keys.map(it.int())
+pub fn (q UserQuery) ids() ![]i64 {
+	keys := load.select_keys_where(q.graph.client.conn, 'users', 'id', .i64, q.graph.client.prepare_query('users', q.query)!, true)!
+	return keys.map(it.i64())
 }
 
 // first_id returns the key of the first matching row, or a `NotFoundError`.
-pub fn (q UserQuery) first_id() !int {
+pub fn (q UserQuery) first_id() !i64 {
 	ids := q.limit(1).ids()!
 	if ids.len == 0 {
 		return NotFoundError{
@@ -866,7 +751,7 @@ pub fn (q UserQuery) first_id() !int {
 
 // only_id returns the key of the one matching row: a `NotFoundError` when
 // there is none, a `NotSingularError` when there are more.
-pub fn (q UserQuery) only_id() !int {
+pub fn (q UserQuery) only_id() !i64 {
 	ids := q.limit(2).ids()!
 	if ids.len == 0 {
 		return NotFoundError{
@@ -914,7 +799,7 @@ pub fn (q UserQuery) unique() UserQuery {
 // scan reads the matching rows into `T`, the app's struct for some of the
 // columns, by column name.
 pub fn (q UserQuery) scan[T]() ![]T {
-	return load.select_into[T](q.graph.client.conn, 'users', 'id', .int, q.graph.client.prepare_query('users', q.query)!)
+	return load.select_into[T](q.graph.client.conn, 'users', 'id', .i64, q.graph.client.prepare_query('users', q.query)!)
 }
 
 // order_by orders the rows by `orders` too, after the orders given before,
@@ -1053,12 +938,11 @@ pub fn (g UserGroupBy) scan[T]() ![]T {
 // user_column_type returns the V type of a column of `users`.
 fn user_column_type(column string) string {
 	return match column {
-		'id' { 'int' }
-		'slug' { 'string' }
+		'Stamps.created_at' { 'time.Time' }
+		'Stamps.updated_at' { 'time.Time' }
+		'id' { 'i64' }
 		'name' { 'string' }
 		'email' { 'string' }
-		'created_at' { 'time.Time' }
-		'updated_at' { 'time.Time' }
 		'deleted_at' { '?time.Time' }
 		else { '' }
 	}
@@ -1171,7 +1055,7 @@ pub fn (q UserQuery) with_comments(configure ...fn (CommentQuery) CommentQuery) 
 
 // all returns the matching rows, with the requested edges.
 pub fn (q UserQuery) all() ![]UserNode {
-	rows := load.select_where[users_models.User](q.graph.client.conn, q.graph.client.prepare_query('users', q.query)!)!
+	rows := load.select_where[models.User](q.graph.client.conn, q.graph.client.prepare_query('users', q.query)!)!
 	return q.nodes(rows)
 }
 
@@ -1189,7 +1073,7 @@ pub fn (q UserQuery) first() !UserNode {
 
 // nodes loads the requested edges onto `rows`, which the caller already has: one
 // query per edge, however many rows there are.
-pub fn (q UserQuery) nodes(rows []users_models.User) ![]UserNode {
+pub fn (q UserQuery) nodes(rows []models.User) ![]UserNode {
 	mut nodes := rows.map(UserNode{
 		graph: q.graph
 		user:  it
@@ -1237,15 +1121,15 @@ pub fn (q UserQuery) nodes(rows []users_models.User) ![]UserNode {
 }
 
 // load_articles loads the `articles` of `rows`, keyed by each row's key.
-fn (q UserQuery) load_articles(rows []users_models.User, fns []fn (ArticleQuery) ArticleQuery) !map[string][]ArticleNode {
+fn (q UserQuery) load_articles(rows []models.User, fns []fn (ArticleQuery) ArticleQuery) !map[string][]ArticleNode {
 	mut sub := q.graph.articles()
 	for configure in fns {
 		sub = configure(sub)
 	}
-	children := sub.nodes(load.select_each[articles_models.Article](q.graph.client.conn, 'user_id',
+	children := sub.nodes(load.select_each[models.Article](q.graph.client.conn, 'user_id',
 		rows.map(it.id.str()),
 		soft_del: 'deleted_at'
-		query:    q.graph.client.prepare_query('articles', sub.query)!
+		query:    q.graph.client.prepare_edge_query('articles', sub.query)!
 	)!)!
 	mut by_parent := map[string][]ArticleNode{}
 	for child in children {
@@ -1266,15 +1150,15 @@ pub fn (n UserNode) articles_or_err() ![]ArticleNode {
 }
 
 // load_posts loads the `posts` of `rows`, keyed by each row's key.
-fn (q UserQuery) load_posts(rows []users_models.User, fns []fn (PostQuery) PostQuery) !map[string][]PostNode {
+fn (q UserQuery) load_posts(rows []models.User, fns []fn (PostQuery) PostQuery) !map[string][]PostNode {
 	mut sub := q.graph.posts()
 	for configure in fns {
 		sub = configure(sub)
 	}
-	children := sub.nodes(load.select_each[posts_models.Post](q.graph.client.conn, 'user_id',
+	children := sub.nodes(load.select_each[models.Post](q.graph.client.conn, 'user_id',
 		rows.map(it.id.str()),
 		soft_del: 'deleted_at'
-		query:    q.graph.client.prepare_query('posts', sub.query)!
+		query:    q.graph.client.prepare_edge_query('posts', sub.query)!
 	)!)!
 	mut by_parent := map[string][]PostNode{}
 	for child in children {
@@ -1295,15 +1179,15 @@ pub fn (n UserNode) posts_or_err() ![]PostNode {
 }
 
 // load_comments loads the `comments` of `rows`, keyed by each row's key.
-fn (q UserQuery) load_comments(rows []users_models.User, fns []fn (CommentQuery) CommentQuery) !map[string][]CommentNode {
+fn (q UserQuery) load_comments(rows []models.User, fns []fn (CommentQuery) CommentQuery) !map[string][]CommentNode {
 	mut sub := q.graph.comments()
 	for configure in fns {
 		sub = configure(sub)
 	}
-	children := sub.nodes(load.select_each[comments_models.Comment](q.graph.client.conn, 'user_id',
+	children := sub.nodes(load.select_each[models.Comment](q.graph.client.conn, 'user_id',
 		rows.map(it.id.str()),
 		soft_del: 'deleted_at'
-		query:    q.graph.client.prepare_query('comments', sub.query)!
+		query:    q.graph.client.prepare_edge_query('comments', sub.query)!
 	)!)!
 	mut by_parent := map[string][]CommentNode{}
 	for child in children {

@@ -895,7 +895,7 @@ fn (q DeviceQuery) load_owner(rows []models.Device, fns []fn (UserQuery) UserQue
 		keys << row.owner_id.str()
 	}
 	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id', load.unique(keys),
-		query: q.graph.client.prepare_query('users', sub.query)!
+		query: q.graph.client.prepare_edge_query('users', sub.query)!
 	)!)!
 	mut by_key := map[string]UserNode{}
 	for target in targets {
@@ -934,7 +934,7 @@ fn (q DeviceQuery) load_logins(rows []models.Device, fns []fn (LoginQuery) Login
 	}
 	children := sub.nodes(load.select_each[models.Login](q.graph.client.conn, 'device_id',
 		rows.map(it.id.str()),
-		query: q.graph.client.prepare_query('logins', sub.query)!
+		query: q.graph.client.prepare_edge_query('logins', sub.query)!
 	)!)!
 	mut by_parent := map[string][]LoginNode{}
 	for child in children {
@@ -961,7 +961,7 @@ fn (q DeviceQuery) load_groups(rows []models.Device, fns []fn (GroupQuery) Group
 		sub = configure(sub)
 	}
 	if sub.query.limit > 0 || sub.query.offset > 0 {
-		prepared := q.graph.client.prepare_query('groups', sub.query)!
+		prepared := q.graph.client.prepare_edge_query('groups', sub.query)!
 		cut := load.link_each(q.graph.client.conn, 'device_groups', 'device_id', 'group_id',
 			rows.map(it.id.str()), .string, .int, 'groups', 'id', load.Query{
 				...prepared
@@ -988,7 +988,7 @@ fn (q DeviceQuery) load_groups(rows []models.Device, fns []fn (GroupQuery) Group
 		'group_id', rows.map(it.id.str()), .string, .int)!
 	targets := sub.nodes(load.select_in[models.Group](q.graph.client.conn, 'id',
 		load.unique(pairs.map(it[1])),
-		query: q.graph.client.prepare_query('groups', sub.query)!
+		query: q.graph.client.prepare_edge_query('groups', sub.query)!
 	)!)!
 	// each parent's targets in the order of the query
 	mut parents_of := map[string][]string{}

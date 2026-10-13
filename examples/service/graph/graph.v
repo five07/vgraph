@@ -5,10 +5,7 @@ import orm
 import five07.vgraph
 import five07.vgraph.graphql
 import five07.vgraph.load
-import articles.models as articles_models
-import comments.models as comments_models
-import posts.models as posts_models
-import users.models as users_models
+import models
 
 // Graph is the typed client for the schema: start a query with the method named
 // after a table, such as `articles()`.
@@ -30,10 +27,10 @@ pub fn Graph.new(conn orm.Connection) !Graph {
 // connection. `Graph.new` checks it.
 pub fn schema() !vgraph.Schema {
 	mut s := vgraph.Schema{}
-	s.add[articles_models.Article]()!
-	s.add[comments_models.Comment]()!
-	s.add[posts_models.Post]()!
-	s.add[users_models.User]()!
+	s.add[models.Article]()!
+	s.add[models.Comment]()!
+	s.add[models.Post]()!
+	s.add[models.User]()!
 	return s
 }
 

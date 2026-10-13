@@ -4,38 +4,110 @@ module graph
 import five07.vgraph
 import five07.vgraph.graphql
 import five07.vgraph.load
-import articles.models as articles_models
-import comments.models as comments_models
-import posts.models as posts_models
-import users.models as users_models
+import orm
+import models
 import time
 
 // schema_sdl is the GraphQL schema: the tables, with entgql's conventions, and
 // the project's own .graphql files. schema.graphql holds the same.
 pub const schema_sdl = 'type Query {
-  articles(where: ArticleWhereInput, orderBy: [ArticleOrder!], limit: Int, offset: Int): [Article!]!
-  articlesCount(where: ArticleWhereInput): Int!
-  comments(where: CommentWhereInput, orderBy: [CommentOrder!], limit: Int, offset: Int): [Comment!]!
-  commentsCount(where: CommentWhereInput): Int!
-  posts(where: PostWhereInput, orderBy: [PostOrder!], limit: Int, offset: Int): [Post!]!
-  postsCount(where: PostWhereInput): Int!
-  users(where: UserWhereInput, orderBy: [UserOrder!], limit: Int, offset: Int): [User!]!
-  usersCount(where: UserWhereInput): Int!
+  """Fetches an object given its ID."""
+  node(
+    """ID of the object."""
+    id: ID!
+  ): Node
+
+  """Lookup nodes by a list of IDs."""
+  nodes(
+    """The list of node IDs."""
+    ids: [ID!]!
+  ): [Node]!
+  articles(after: Cursor, first: Int, before: Cursor, last: Int, orderBy: [ArticleOrder!], where: ArticleWhereInput): ArticleConnection!
+  comments(after: Cursor, first: Int, before: Cursor, last: Int, orderBy: [CommentOrder!], where: CommentWhereInput): CommentConnection!
+  posts(after: Cursor, first: Int, before: Cursor, last: Int, orderBy: [PostOrder!], where: PostWhereInput): PostConnection!
+  users(after: Cursor, first: Int, before: Cursor, last: Int, orderBy: [UserOrder!], where: UserWhereInput): UserConnection!
 }
 
-type Article {
+type Mutation {
+  """Creates a Article."""
+  createArticle(input: CreateArticleInput!): Article!
+
+  """Updates the Article with the id `id`."""
+  updateArticle(id: ID!, input: UpdateArticleInput!): Article!
+
+  """Deletes the Article with the id `id`, and returns the id."""
+  deleteArticle(id: ID!): ID!
+
+  """Creates a Comment."""
+  createComment(input: CreateCommentInput!): Comment!
+
+  """Updates the Comment with the id `id`."""
+  updateComment(id: ID!, input: UpdateCommentInput!): Comment!
+
+  """Deletes the Comment with the id `id`, and returns the id."""
+  deleteComment(id: ID!): ID!
+
+  """Creates a Post."""
+  createPost(input: CreatePostInput!): Post!
+
+  """Updates the Post with the id `id`."""
+  updatePost(id: ID!, input: UpdatePostInput!): Post!
+
+  """Deletes the Post with the id `id`, and returns the id."""
+  deletePost(id: ID!): ID!
+
+  """Creates a User."""
+  createUser(input: CreateUserInput!): User!
+
+  """Updates the User with the id `id`."""
+  updateUser(id: ID!, input: UpdateUserInput!): User!
+
+  """Deletes the User with the id `id`, and returns the id."""
+  deleteUser(id: ID!): ID!
+}
+
+"""
+An object with an ID.
+Follows the [Relay Global Object Identification Specification](https://relay.dev/graphql/objectidentification.htm)
+"""
+interface Node {
+  """The id of the object."""
   id: ID!
-  slug: String!
+}
+
+type Article implements Node {
+  createdAt: Time!
+  updatedAt: Time!
+  id: ID!
   userID: ID!
   title: String!
   summary: String!
   body: String!
   publishedAt: Time
-  createdAt: Time!
-  updatedAt: Time!
   deletedAt: Time
   author: User
-  comments(where: CommentWhereInput, orderBy: [CommentOrder!], limit: Int, offset: Int): [Comment!]
+  comments(after: Cursor, first: Int, before: Cursor, last: Int, orderBy: [CommentOrder!], where: CommentWhereInput): CommentConnection!
+}
+
+"""A connection to a list of items."""
+type ArticleConnection {
+  """A list of edges."""
+  edges: [ArticleEdge]
+
+  """Information to aid in pagination."""
+  pageInfo: PageInfo!
+
+  """Identifies the total count of items in the connection."""
+  totalCount: Int!
+}
+
+"""An edge in a connection."""
+type ArticleEdge {
+  """The item at the end of the edge."""
+  node: Article
+
+  """A cursor for use in pagination."""
+  cursor: Cursor!
 }
 
 """
@@ -47,6 +119,26 @@ input ArticleWhereInput {
   and: [ArticleWhereInput!]
   or: [ArticleWhereInput!]
 
+  """createdAt field predicates"""
+  createdAt: Time
+  createdAtNEQ: Time
+  createdAtIn: [Time!]
+  createdAtNotIn: [Time!]
+  createdAtGT: Time
+  createdAtGTE: Time
+  createdAtLT: Time
+  createdAtLTE: Time
+
+  """updatedAt field predicates"""
+  updatedAt: Time
+  updatedAtNEQ: Time
+  updatedAtIn: [Time!]
+  updatedAtNotIn: [Time!]
+  updatedAtGT: Time
+  updatedAtGTE: Time
+  updatedAtLT: Time
+  updatedAtLTE: Time
+
   """id field predicates"""
   id: ID
   idNEQ: ID
@@ -56,21 +148,6 @@ input ArticleWhereInput {
   idGTE: ID
   idLT: ID
   idLTE: ID
-
-  """slug field predicates"""
-  slug: String
-  slugNEQ: String
-  slugIn: [String!]
-  slugNotIn: [String!]
-  slugGT: String
-  slugGTE: String
-  slugLT: String
-  slugLTE: String
-  slugContains: String
-  slugHasPrefix: String
-  slugHasSuffix: String
-  slugEqualFold: String
-  slugContainsFold: String
 
   """userID field predicates"""
   userID: ID
@@ -135,26 +212,6 @@ input ArticleWhereInput {
   publishedAtIsNil: Boolean
   publishedAtNotNil: Boolean
 
-  """createdAt field predicates"""
-  createdAt: Time
-  createdAtNEQ: Time
-  createdAtIn: [Time!]
-  createdAtNotIn: [Time!]
-  createdAtGT: Time
-  createdAtGTE: Time
-  createdAtLT: Time
-  createdAtLTE: Time
-
-  """updatedAt field predicates"""
-  updatedAt: Time
-  updatedAtNEQ: Time
-  updatedAtIn: [Time!]
-  updatedAtNotIn: [Time!]
-  updatedAtGT: Time
-  updatedAtGTE: Time
-  updatedAtLT: Time
-  updatedAtLTE: Time
-
   """deletedAt field predicates"""
   deletedAt: Time
   deletedAtNEQ: Time
@@ -187,35 +244,72 @@ input ArticleOrder {
 
 """Properties by which Article connections can be ordered."""
 enum ArticleOrderField {
+  CREATED_AT
+  UPDATED_AT
   ID
-  SLUG
   USER_ID
   TITLE
   SUMMARY
   BODY
   PUBLISHED_AT
-  CREATED_AT
-  UPDATED_AT
   DELETED_AT
   COMMENTS_COUNT
 }
 
-type Comment {
+"""CreateArticleInput is used for create Article object."""
+input CreateArticleInput {
+  userID: ID!
+  title: String!
+  summary: String
+  body: String!
+  publishedAt: Time
+}
+
+"""UpdateArticleInput is used for update Article object."""
+input UpdateArticleInput {
+  title: String
+  summary: String
+  body: String
+  publishedAt: Time
+  clearPublishedAt: Boolean
+}
+
+type Comment implements Node {
+  createdAt: Time!
+  updatedAt: Time!
   id: ID!
-  slug: String!
   userID: ID!
   ownerType: String!
   ownerID: ID!
   parentID: ID
   body: String!
-  createdAt: Time!
-  updatedAt: Time!
   deletedAt: Time
   author: User
   parent: Comment
   article: Article
   post: Post
-  replies(where: CommentWhereInput, orderBy: [CommentOrder!], limit: Int, offset: Int): [Comment!]
+  replies(after: Cursor, first: Int, before: Cursor, last: Int, orderBy: [CommentOrder!], where: CommentWhereInput): CommentConnection!
+}
+
+"""A connection to a list of items."""
+type CommentConnection {
+  """A list of edges."""
+  edges: [CommentEdge]
+
+  """Information to aid in pagination."""
+  pageInfo: PageInfo!
+
+  """Identifies the total count of items in the connection."""
+  totalCount: Int!
+}
+
+"""An edge in a connection."""
+type CommentEdge {
+  """The item at the end of the edge."""
+  node: Comment
+
+  """A cursor for use in pagination."""
+  cursor: Cursor!
 }
 
 """
@@ -227,6 +321,26 @@ input CommentWhereInput {
   and: [CommentWhereInput!]
   or: [CommentWhereInput!]
 
+  """createdAt field predicates"""
+  createdAt: Time
+  createdAtNEQ: Time
+  createdAtIn: [Time!]
+  createdAtNotIn: [Time!]
+  createdAtGT: Time
+  createdAtGTE: Time
+  createdAtLT: Time
+  createdAtLTE: Time
+
+  """updatedAt field predicates"""
+  updatedAt: Time
+  updatedAtNEQ: Time
+  updatedAtIn: [Time!]
+  updatedAtNotIn: [Time!]
+  updatedAtGT: Time
+  updatedAtGTE: Time
+  updatedAtLT: Time
+  updatedAtLTE: Time
+
   """id field predicates"""
   id: ID
   idNEQ: ID
@@ -236,21 +350,6 @@ input CommentWhereInput {
   idGTE: ID
   idLT: ID
   idLTE: ID
-
-  """slug field predicates"""
-  slug: String
-  slugNEQ: String
-  slugIn: [String!]
-  slugNotIn: [String!]
-  slugGT: String
-  slugGTE: String
-  slugLT: String
-  slugLTE: String
-  slugContains: String
-  slugHasPrefix: String
-  slugHasSuffix: String
-  slugEqualFold: String
-  slugContainsFold: String
 
   """userID field predicates"""
   userID: ID
@@ -302,26 +401,6 @@ input CommentWhereInput {
   bodyEqualFold: String
   bodyContainsFold: String
 
-  """createdAt field predicates"""
-  createdAt: Time
-  createdAtNEQ: Time
-  createdAtIn: [Time!]
-  createdAtNotIn: [Time!]
-  createdAtGT: Time
-  createdAtGTE: Time
-  createdAtLT: Time
-  createdAtLTE: Time
-
-  """updatedAt field predicates"""
-  updatedAt: Time
-  updatedAtNEQ: Time
-  updatedAtIn: [Time!]
-  updatedAtNotIn: [Time!]
-  updatedAtGT: Time
-  updatedAtGTE: Time
-  updatedAtLT: Time
-  updatedAtLTE: Time
-
   """deletedAt field predicates"""
   deletedAt: Time
   deletedAtNEQ: Time
@@ -366,29 +445,62 @@ input CommentOrder {
 
 """Properties by which Comment connections can be ordered."""
 enum CommentOrderField {
+  CREATED_AT
+  UPDATED_AT
   ID
-  SLUG
   USER_ID
   OWNER_TYPE
   OWNER_ID
   PARENT_ID
   BODY
-  CREATED_AT
-  UPDATED_AT
   DELETED_AT
   REPLIES_COUNT
 }
 
-type Post {
-  id: ID!
-  slug: String!
+"""CreateCommentInput is used for create Comment object."""
+input CreateCommentInput {
   userID: ID!
+  ownerType: String!
+  ownerID: ID!
+  parentID: ID
   body: String!
+}
+
+"""UpdateCommentInput is used for update Comment object."""
+input UpdateCommentInput {
+  body: String
+}
+
+type Post implements Node {
   createdAt: Time!
   updatedAt: Time!
+  id: ID!
+  userID: ID!
+  body: String!
   deletedAt: Time
   author: User
-  comments(where: CommentWhereInput, orderBy: [CommentOrder!], limit: Int, offset: Int): [Comment!]
+  comments(after: Cursor, first: Int, before: Cursor, last: Int, orderBy: [CommentOrder!], where: CommentWhereInput): CommentConnection!
+}
+
+"""A connection to a list of items."""
+type PostConnection {
+  """A list of edges."""
+  edges: [PostEdge]
+
+  """Information to aid in pagination."""
+  pageInfo: PageInfo!
+
+  """Identifies the total count of items in the connection."""
+  totalCount: Int!
+}
+
+"""An edge in a connection."""
+type PostEdge {
+  """The item at the end of the edge."""
+  node: Post
+
+  """A cursor for use in pagination."""
+  cursor: Cursor!
 }
 
 """
@@ -400,6 +512,26 @@ input PostWhereInput {
   and: [PostWhereInput!]
   or: [PostWhereInput!]
 
+  """createdAt field predicates"""
+  createdAt: Time
+  createdAtNEQ: Time
+  createdAtIn: [Time!]
+  createdAtNotIn: [Time!]
+  createdAtGT: Time
+  createdAtGTE: Time
+  createdAtLT: Time
+  createdAtLTE: Time
+
+  """updatedAt field predicates"""
+  updatedAt: Time
+  updatedAtNEQ: Time
+  updatedAtIn: [Time!]
+  updatedAtNotIn: [Time!]
+  updatedAtGT: Time
+  updatedAtGTE: Time
+  updatedAtLT: Time
+  updatedAtLTE: Time
+
   """id field predicates"""
   id: ID
   idNEQ: ID
@@ -409,21 +541,6 @@ input PostWhereInput {
   idGTE: ID
   idLT: ID
   idLTE: ID
-
-  """slug field predicates"""
-  slug: String
-  slugNEQ: String
-  slugIn: [String!]
-  slugNotIn: [String!]
-  slugGT: String
-  slugGTE: String
-  slugLT: String
-  slugLTE: String
-  slugContains: String
-  slugHasPrefix: String
-  slugHasSuffix: String
-  slugEqualFold: String
-  slugContainsFold: String
 
   """userID field predicates"""
   userID: ID
@@ -445,26 +562,6 @@ input PostWhereInput {
   bodyHasSuffix: String
   bodyEqualFold: String
   bodyContainsFold: String
-
-  """createdAt field predicates"""
-  createdAt: Time
-  createdAtNEQ: Time
-  createdAtIn: [Time!]
-  createdAtNotIn: [Time!]
-  createdAtGT: Time
-  createdAtGTE: Time
-  createdAtLT: Time
-  createdAtLTE: Time
-
-  """updatedAt field predicates"""
-  updatedAt: Time
-  updatedAtNEQ: Time
-  updatedAtIn: [Time!]
-  updatedAtNotIn: [Time!]
-  updatedAtGT: Time
-  updatedAtGTE: Time
-  updatedAtLT: Time
-  updatedAtLTE: Time
 
   """deletedAt field predicates"""
   deletedAt: Time
@@ -498,27 +595,57 @@ input PostOrder {
 
 """Properties by which Post connections can be ordered."""
 enum PostOrderField {
-  ID
-  SLUG
-  USER_ID
-  BODY
   CREATED_AT
   UPDATED_AT
+  ID
+  USER_ID
+  BODY
   DELETED_AT
   COMMENTS_COUNT
 }
 
-type User {
-  id: ID!
-  slug: String!
-  name: String!
-  email: String!
+"""CreatePostInput is used for create Post object."""
+input CreatePostInput {
+  userID: ID!
+  body: String!
+}
+
+"""UpdatePostInput is used for update Post object."""
+input UpdatePostInput {
+  body: String
+}
+
+type User implements Node {
   createdAt: Time!
   updatedAt: Time!
+  id: ID!
+  name: String!
+  email: String!
   deletedAt: Time
-  articles(where: ArticleWhereInput, orderBy: [ArticleOrder!], limit: Int, offset: Int): [Article!]
-  posts(where: PostWhereInput, orderBy: [PostOrder!], limit: Int, offset: Int): [Post!]
-  comments(where: CommentWhereInput, orderBy: [CommentOrder!], limit: Int, offset: Int): [Comment!]
+  articles(after: Cursor, first: Int, before: Cursor, last: Int, orderBy: [ArticleOrder!], where: ArticleWhereInput): ArticleConnection!
+  posts(after: Cursor, first: Int, before: Cursor, last: Int, orderBy: [PostOrder!], where: PostWhereInput): PostConnection!
+  comments(after: Cursor, first: Int, before: Cursor, last: Int, orderBy: [CommentOrder!], where: CommentWhereInput): CommentConnection!
+}
+
+"""A connection to a list of items."""
+type UserConnection {
+  """A list of edges."""
+  edges: [UserEdge]
+
+  """Information to aid in pagination."""
+  pageInfo: PageInfo!
+
+  """Identifies the total count of items in the connection."""
+  totalCount: Int!
+}
+
+"""An edge in a connection."""
+type UserEdge {
+  """The item at the end of the edge."""
+  node: User
+
+  """A cursor for use in pagination."""
+  cursor: Cursor!
 }
 
 """
@@ -530,6 +657,26 @@ input UserWhereInput {
   and: [UserWhereInput!]
   or: [UserWhereInput!]
 
+  """createdAt field predicates"""
+  createdAt: Time
+  createdAtNEQ: Time
+  createdAtIn: [Time!]
+  createdAtNotIn: [Time!]
+  createdAtGT: Time
+  createdAtGTE: Time
+  createdAtLT: Time
+  createdAtLTE: Time
+
+  """updatedAt field predicates"""
+  updatedAt: Time
+  updatedAtNEQ: Time
+  updatedAtIn: [Time!]
+  updatedAtNotIn: [Time!]
+  updatedAtGT: Time
+  updatedAtGTE: Time
+  updatedAtLT: Time
+  updatedAtLTE: Time
+
   """id field predicates"""
   id: ID
   idNEQ: ID
@@ -539,21 +686,6 @@ input UserWhereInput {
   idGTE: ID
   idLT: ID
   idLTE: ID
-
-  """slug field predicates"""
-  slug: String
-  slugNEQ: String
-  slugIn: [String!]
-  slugNotIn: [String!]
-  slugGT: String
-  slugGTE: String
-  slugLT: String
-  slugLTE: String
-  slugContains: String
-  slugHasPrefix: String
-  slugHasSuffix: String
-  slugEqualFold: String
-  slugContainsFold: String
 
   """name field predicates"""
   name: String
@@ -584,26 +716,6 @@ input UserWhereInput {
   emailHasSuffix: String
   emailEqualFold: String
   emailContainsFold: String
-
-  """createdAt field predicates"""
-  createdAt: Time
-  createdAtNEQ: Time
-  createdAtIn: [Time!]
-  createdAtNotIn: [Time!]
-  createdAtGT: Time
-  createdAtGTE: Time
-  createdAtLT: Time
-  createdAtLTE: Time
-
-  """updatedAt field predicates"""
-  updatedAt: Time
-  updatedAtNEQ: Time
-  updatedAtIn: [Time!]
-  updatedAtNotIn: [Time!]
-  updatedAtGT: Time
-  updatedAtGTE: Time
-  updatedAtLT: Time
-  updatedAtLTE: Time
 
   """deletedAt field predicates"""
   deletedAt: Time
@@ -641,16 +753,27 @@ input UserOrder {
 
 """Properties by which User connections can be ordered."""
 enum UserOrderField {
-  ID
-  SLUG
-  NAME
-  EMAIL
   CREATED_AT
   UPDATED_AT
+  ID
+  NAME
+  EMAIL
   DELETED_AT
   ARTICLES_COUNT
   POSTS_COUNT
   COMMENTS_COUNT
+}
+
+"""CreateUserInput is used for create User object."""
+input CreateUserInput {
+  name: String!
+  email: String!
+}
+
+"""UpdateUserInput is used for update User object."""
+input UpdateUserInput {
+  name: String
+  email: String
 }
 
 """
@@ -664,146 +787,32 @@ enum OrderDirection {
   DESC
 }
 
+"""
+Information about pagination in a connection.
+https://relay.dev/graphql/connections.htm#sec-undefined.PageInfo
+"""
+type PageInfo {
+  """When paginating forwards, are there more items?"""
+  hasNextPage: Boolean!
+
+  """When paginating backwards, are there more items?"""
+  hasPreviousPage: Boolean!
+
+  """When paginating backwards, the cursor to continue."""
+  startCursor: Cursor
+
+  """When paginating forwards, the cursor to continue."""
+  endCursor: Cursor
+}
+
+"""
+Define a Relay Cursor type:
+https://relay.dev/graphql/connections.htm#sec-Cursor
+"""
+scalar Cursor
+
 """An RFC 3339 date and time, such as `2026-10-13T07:30:00Z`."""
-scalar Time @specifiedBy(url: "https://scalars.graphql.org/chillicream/date-time.html")
-
-"""A new user, or every field of one."""
-input UserInput {
-  name: String!
-  email: String!
-}
-
-"""The fields of a user to change."""
-input UserPatch {
-  name: String
-  email: String
-}
-
-"""A new article, by the user `userSlug`."""
-input ArticleInput {
-  userSlug: String!
-  title: String!
-  summary: String! = ""
-  body: String!
-  published: Boolean! = false
-}
-
-"""Every writable field of an article."""
-input ArticleUpdate {
-  title: String!
-  summary: String! = ""
-  body: String!
-  published: Boolean! = false
-}
-
-"""The fields of an article to change."""
-input ArticlePatch {
-  title: String
-  summary: String
-  body: String
-  published: Boolean
-}
-
-"""A new post, by the user `userSlug`."""
-input PostInput {
-  userSlug: String!
-  body: String!
-}
-
-"""Every writable field of a post."""
-input PostUpdate {
-  body: String!
-}
-
-"""The fields of a post to change."""
-input PostPatch {
-  body: String
-}
-
-"""
-A new comment on the record of the type `ownerType` (`Article` or `Post`) with
-the slug `ownerSlug`, answering the comment `parentSlug` when it is set.
-"""
-input CommentInput {
-  userSlug: String!
-  ownerType: String!
-  ownerSlug: String!
-  parentSlug: String
-  body: String!
-}
-
-"""A new comment on a record the mutation names."""
-input OwnedCommentInput {
-  userSlug: String!
-  parentSlug: String
-  body: String!
-}
-
-"""Every writable field of a comment."""
-input CommentUpdate {
-  body: String!
-}
-
-"""The fields of a comment to change."""
-input CommentPatch {
-  body: String
-}
-
-type Mutation {
-  """`POST /users`"""
-  createUser(input: UserInput!): User!
-
-  """`PUT /users/:slug`"""
-  replaceUser(slug: String!, input: UserInput!): User!
-
-  """`PATCH /users/:slug`"""
-  updateUser(slug: String!, input: UserPatch!): User!
-
-  """`DELETE /users/:slug`: marks the user deleted."""
-  deleteUser(slug: String!): Boolean!
-
-  """`POST /articles`"""
-  createArticle(input: ArticleInput!): Article!
-
-  """`PUT /articles/:slug`"""
-  replaceArticle(slug: String!, input: ArticleUpdate!): Article!
-
-  """`PATCH /articles/:slug`"""
-  updateArticle(slug: String!, input: ArticlePatch!): Article!
-
-  """`DELETE /articles/:slug`: marks the article deleted."""
-  deleteArticle(slug: String!): Boolean!
-
-  """`POST /articles/:slug/comments`"""
-  createArticleComment(slug: String!, input: OwnedCommentInput!): Comment!
-
-  """`POST /posts`"""
-  createPost(input: PostInput!): Post!
-
-  """`PUT /posts/:slug`"""
-  replacePost(slug: String!, input: PostUpdate!): Post!
-
-  """`PATCH /posts/:slug`"""
-  updatePost(slug: String!, input: PostPatch!): Post!
-
-  """`DELETE /posts/:slug`: marks the post deleted."""
-  deletePost(slug: String!): Boolean!
-
-  """`POST /posts/:slug/comments`"""
-  createPostComment(slug: String!, input: OwnedCommentInput!): Comment!
-
-  """`POST /comments`"""
-  createComment(input: CommentInput!): Comment!
-
-  """`PUT /comments/:slug`"""
-  replaceComment(slug: String!, input: CommentUpdate!): Comment!
-
-  """`PATCH /comments/:slug`"""
-  updateComment(slug: String!, input: CommentPatch!): Comment!
-
-  """`DELETE /comments/:slug`: marks the comment deleted."""
-  deleteComment(slug: String!): Boolean!
-}'
+scalar Time @specifiedBy(url: "https://scalars.graphql.org/chillicream/date-time.html")'
 
 // graphql returns a GraphQL server for the graph. Its resolvers read through
 // the client, one query per edge per level of a request, and a request's
@@ -817,19 +826,36 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 	}
 	s.scalar('Time', time_scalar)
+	s.scalar('Cursor', graphql.cursor_scalar)
+
+	// Node: each type's ids are global ids, which `vgraph.global_ids` gives;
+	// their ranges never move, so they are read once
+	types := g.client.global_types() or {
+		return error('the GraphQL schema has Node types, whose global ids are in `vgraph_types`: ${err.msg()}')
+	}
+	for table in ['articles', 'comments', 'posts', 'users'] {
+		if table !in types.values() {
+			return error('`${table}` implements Node, but has no global ids: run `vgraph.global_ids` in a migration')
+		}
+	}
+	s.resolve('Query', 'node', fn [g, types] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := graphql_nodes(g.with_ctx(ctx), types, [info.arg('id')])!
+		return parents.map(found[0])
+	})
+	s.resolve('Query', 'nodes', fn [g, types] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		result := graphql.list(graphql_nodes(g.with_ctx(ctx), types, info.arg('ids').as_list())!)
+		return parents.map(result)
+	})
 
 	// Article
 	s.resolve('Query', 'articles', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.with_ctx(ctx).articles().graphql_args(info.args)!.all()!
-		result := graphql.list(found.map(graphql.obj(it)))
+		page := article_connection(g.with_ctx(ctx).articles().graphql_where(info.args)!, info)!
+		result := graphql.obj(page)
 		return parents.map(result)
 	})
-	s.resolve('Query', 'articlesCount', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		n := g.with_ctx(ctx).articles().graphql_where(info.args)!.count()!
-		return parents.map(graphql.Resolved(graphql.Value(n)))
-	})
-	for name in ['id', 'slug', 'userID', 'title', 'summary', 'body', 'publishedAt', 'createdAt',
-		'updatedAt', 'deletedAt'] {
+	s.connection('ArticleConnection', 'ArticleEdge')
+	for name in ['createdAt', 'updatedAt', 'id', 'userID', 'title', 'summary', 'body', 'publishedAt',
+		'deletedAt'] {
 		s.resolve('Article', name, resolve_article_field)
 	}
 	s.resolve('Article', 'author', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
@@ -843,29 +869,57 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 	s.resolve('Article', 'comments', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.comments().graphql_args(info.args)!
+		p := graphql.page_args(info.args)!
+		orders := comment_order(info.arg('orderBy'), true)!
+		where := cg.comments().graphql_where(info.args)!
+		sub := where.graphql_paged(orders, p)!
+		rows := parents.map((it as ArticleNode).article)
 		loaded := cg.articles().with_comments(fn [sub] (_ CommentQuery) CommentQuery {
 			return sub
-		}).nodes(parents.map((it as ArticleNode).article))!
+		}).nodes(rows)!
+		counts := if info.selected('totalCount') {
+			article_count_comments(cg, rows, where)!
+		} else {
+			map[string]int{}
+		}
 		mut out := []graphql.Resolved{cap: loaded.len}
 		for n in loaded {
-			out << graphql.list(n.comments.map(graphql.obj(it)))
+			page := comment_page(cg, n.comments, orders, p, counts[n.article.id.str()] or {
+				0
+			})!
+			out << graphql.obj(page)
 		}
 		return out
+	})
+	s.resolve('Mutation', 'createArticle', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		input := article_create_input(info.arg('input'))!
+		node := g.with_ctx(ctx).articles().create().set_input(input).save()!
+		result := graphql.obj(node)
+		return parents.map(result)
+	})
+	s.resolve('Mutation', 'updateArticle', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		id := gql_i64_id(info.arg('id'))!
+		input := article_update_input(info.arg('input'))!
+		node := g.with_ctx(ctx).articles().update_one_id(id).set_input(input).save()!
+		result := graphql.obj(node)
+		return parents.map(result)
+	})
+	s.resolve('Mutation', 'deleteArticle', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		id := gql_i64_id(info.arg('id'))!
+		g.with_ctx(ctx).articles().delete_one_id(id).exec()!
+		result := graphql.Resolved(graphql.Value(id.str()))
+		return parents.map(result)
 	})
 
 	// Comment
 	s.resolve('Query', 'comments', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.with_ctx(ctx).comments().graphql_args(info.args)!.all()!
-		result := graphql.list(found.map(graphql.obj(it)))
+		page := comment_connection(g.with_ctx(ctx).comments().graphql_where(info.args)!, info)!
+		result := graphql.obj(page)
 		return parents.map(result)
 	})
-	s.resolve('Query', 'commentsCount', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		n := g.with_ctx(ctx).comments().graphql_where(info.args)!.count()!
-		return parents.map(graphql.Resolved(graphql.Value(n)))
-	})
-	for name in ['id', 'slug', 'userID', 'ownerType', 'ownerID', 'parentID', 'body', 'createdAt',
-		'updatedAt', 'deletedAt'] {
+	s.connection('CommentConnection', 'CommentEdge')
+	for name in ['createdAt', 'updatedAt', 'id', 'userID', 'ownerType', 'ownerID', 'parentID',
+		'body', 'deletedAt'] {
 		s.resolve('Comment', name, resolve_comment_field)
 	}
 	s.resolve('Comment', 'author', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
@@ -906,28 +960,56 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 	s.resolve('Comment', 'replies', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.comments().graphql_args(info.args)!
+		p := graphql.page_args(info.args)!
+		orders := comment_order(info.arg('orderBy'), true)!
+		where := cg.comments().graphql_where(info.args)!
+		sub := where.graphql_paged(orders, p)!
+		rows := parents.map((it as CommentNode).comment)
 		loaded := cg.comments().with_replies(fn [sub] (_ CommentQuery) CommentQuery {
 			return sub
-		}).nodes(parents.map((it as CommentNode).comment))!
+		}).nodes(rows)!
+		counts := if info.selected('totalCount') {
+			comment_count_replies(cg, rows, where)!
+		} else {
+			map[string]int{}
+		}
 		mut out := []graphql.Resolved{cap: loaded.len}
 		for n in loaded {
-			out << graphql.list(n.replies.map(graphql.obj(it)))
+			page := comment_page(cg, n.replies, orders, p, counts[n.comment.id.str()] or {
+				0
+			})!
+			out << graphql.obj(page)
 		}
 		return out
+	})
+	s.resolve('Mutation', 'createComment', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		input := comment_create_input(info.arg('input'))!
+		node := g.with_ctx(ctx).comments().create().set_input(input).save()!
+		result := graphql.obj(node)
+		return parents.map(result)
+	})
+	s.resolve('Mutation', 'updateComment', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		id := gql_i64_id(info.arg('id'))!
+		input := comment_update_input(info.arg('input'))!
+		node := g.with_ctx(ctx).comments().update_one_id(id).set_input(input).save()!
+		result := graphql.obj(node)
+		return parents.map(result)
+	})
+	s.resolve('Mutation', 'deleteComment', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		id := gql_i64_id(info.arg('id'))!
+		g.with_ctx(ctx).comments().delete_one_id(id).exec()!
+		result := graphql.Resolved(graphql.Value(id.str()))
+		return parents.map(result)
 	})
 
 	// Post
 	s.resolve('Query', 'posts', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.with_ctx(ctx).posts().graphql_args(info.args)!.all()!
-		result := graphql.list(found.map(graphql.obj(it)))
+		page := post_connection(g.with_ctx(ctx).posts().graphql_where(info.args)!, info)!
+		result := graphql.obj(page)
 		return parents.map(result)
 	})
-	s.resolve('Query', 'postsCount', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		n := g.with_ctx(ctx).posts().graphql_where(info.args)!.count()!
-		return parents.map(graphql.Resolved(graphql.Value(n)))
-	})
-	for name in ['id', 'slug', 'userID', 'body', 'createdAt', 'updatedAt', 'deletedAt'] {
+	s.connection('PostConnection', 'PostEdge')
+	for name in ['createdAt', 'updatedAt', 'id', 'userID', 'body', 'deletedAt'] {
 		s.resolve('Post', name, resolve_post_field)
 	}
 	s.resolve('Post', 'author', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
@@ -941,123 +1023,195 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 	s.resolve('Post', 'comments', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.comments().graphql_args(info.args)!
+		p := graphql.page_args(info.args)!
+		orders := comment_order(info.arg('orderBy'), true)!
+		where := cg.comments().graphql_where(info.args)!
+		sub := where.graphql_paged(orders, p)!
+		rows := parents.map((it as PostNode).post)
 		loaded := cg.posts().with_comments(fn [sub] (_ CommentQuery) CommentQuery {
 			return sub
-		}).nodes(parents.map((it as PostNode).post))!
+		}).nodes(rows)!
+		counts := if info.selected('totalCount') {
+			post_count_comments(cg, rows, where)!
+		} else {
+			map[string]int{}
+		}
 		mut out := []graphql.Resolved{cap: loaded.len}
 		for n in loaded {
-			out << graphql.list(n.comments.map(graphql.obj(it)))
+			page := comment_page(cg, n.comments, orders, p, counts[n.post.id.str()] or {
+				0
+			})!
+			out << graphql.obj(page)
 		}
 		return out
+	})
+	s.resolve('Mutation', 'createPost', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		input := post_create_input(info.arg('input'))!
+		node := g.with_ctx(ctx).posts().create().set_input(input).save()!
+		result := graphql.obj(node)
+		return parents.map(result)
+	})
+	s.resolve('Mutation', 'updatePost', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		id := gql_i64_id(info.arg('id'))!
+		input := post_update_input(info.arg('input'))!
+		node := g.with_ctx(ctx).posts().update_one_id(id).set_input(input).save()!
+		result := graphql.obj(node)
+		return parents.map(result)
+	})
+	s.resolve('Mutation', 'deletePost', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		id := gql_i64_id(info.arg('id'))!
+		g.with_ctx(ctx).posts().delete_one_id(id).exec()!
+		result := graphql.Resolved(graphql.Value(id.str()))
+		return parents.map(result)
 	})
 
 	// User
 	s.resolve('Query', 'users', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.with_ctx(ctx).users().graphql_args(info.args)!.all()!
-		result := graphql.list(found.map(graphql.obj(it)))
+		page := user_connection(g.with_ctx(ctx).users().graphql_where(info.args)!, info)!
+		result := graphql.obj(page)
 		return parents.map(result)
 	})
-	s.resolve('Query', 'usersCount', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		n := g.with_ctx(ctx).users().graphql_where(info.args)!.count()!
-		return parents.map(graphql.Resolved(graphql.Value(n)))
-	})
-	for name in ['id', 'slug', 'name', 'email', 'createdAt', 'updatedAt', 'deletedAt'] {
+	s.connection('UserConnection', 'UserEdge')
+	for name in ['createdAt', 'updatedAt', 'id', 'name', 'email', 'deletedAt'] {
 		s.resolve('User', name, resolve_user_field)
 	}
 	s.resolve('User', 'articles', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.articles().graphql_args(info.args)!
+		p := graphql.page_args(info.args)!
+		orders := article_order(info.arg('orderBy'), true)!
+		where := cg.articles().graphql_where(info.args)!
+		sub := where.graphql_paged(orders, p)!
+		rows := parents.map((it as UserNode).user)
 		loaded := cg.users().with_articles(fn [sub] (_ ArticleQuery) ArticleQuery {
 			return sub
-		}).nodes(parents.map((it as UserNode).user))!
+		}).nodes(rows)!
+		counts := if info.selected('totalCount') {
+			user_count_articles(cg, rows, where)!
+		} else {
+			map[string]int{}
+		}
 		mut out := []graphql.Resolved{cap: loaded.len}
 		for n in loaded {
-			out << graphql.list(n.articles.map(graphql.obj(it)))
+			page := article_page(cg, n.articles, orders, p, counts[n.user.id.str()] or {
+				0
+			})!
+			out << graphql.obj(page)
 		}
 		return out
 	})
 	s.resolve('User', 'posts', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.posts().graphql_args(info.args)!
+		p := graphql.page_args(info.args)!
+		orders := post_order(info.arg('orderBy'), true)!
+		where := cg.posts().graphql_where(info.args)!
+		sub := where.graphql_paged(orders, p)!
+		rows := parents.map((it as UserNode).user)
 		loaded := cg.users().with_posts(fn [sub] (_ PostQuery) PostQuery {
 			return sub
-		}).nodes(parents.map((it as UserNode).user))!
+		}).nodes(rows)!
+		counts := if info.selected('totalCount') {
+			user_count_posts(cg, rows, where)!
+		} else {
+			map[string]int{}
+		}
 		mut out := []graphql.Resolved{cap: loaded.len}
 		for n in loaded {
-			out << graphql.list(n.posts.map(graphql.obj(it)))
+			page := post_page(cg, n.posts, orders, p, counts[n.user.id.str()] or {
+				0
+			})!
+			out << graphql.obj(page)
 		}
 		return out
 	})
 	s.resolve('User', 'comments', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.comments().graphql_args(info.args)!
+		p := graphql.page_args(info.args)!
+		orders := comment_order(info.arg('orderBy'), true)!
+		where := cg.comments().graphql_where(info.args)!
+		sub := where.graphql_paged(orders, p)!
+		rows := parents.map((it as UserNode).user)
 		loaded := cg.users().with_comments(fn [sub] (_ CommentQuery) CommentQuery {
 			return sub
-		}).nodes(parents.map((it as UserNode).user))!
+		}).nodes(rows)!
+		counts := if info.selected('totalCount') {
+			user_count_comments(cg, rows, where)!
+		} else {
+			map[string]int{}
+		}
 		mut out := []graphql.Resolved{cap: loaded.len}
 		for n in loaded {
-			out << graphql.list(n.comments.map(graphql.obj(it)))
+			page := comment_page(cg, n.comments, orders, p, counts[n.user.id.str()] or {
+				0
+			})!
+			out << graphql.obj(page)
 		}
 		return out
 	})
-
-	// the fields the project's .graphql files add
-	s.resolve('Mutation', 'createUser', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		return r.mutation_create_user(ctx, info, parents)
+	s.resolve('Mutation', 'createUser', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		input := user_create_input(info.arg('input'))!
+		node := g.with_ctx(ctx).users().create().set_input(input).save()!
+		result := graphql.obj(node)
+		return parents.map(result)
 	})
-	s.resolve('Mutation', 'replaceUser', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		return r.mutation_replace_user(ctx, info, parents)
+	s.resolve('Mutation', 'updateUser', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		id := gql_i64_id(info.arg('id'))!
+		input := user_update_input(info.arg('input'))!
+		node := g.with_ctx(ctx).users().update_one_id(id).set_input(input).save()!
+		result := graphql.obj(node)
+		return parents.map(result)
 	})
-	s.resolve('Mutation', 'updateUser', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		return r.mutation_update_user(ctx, info, parents)
-	})
-	s.resolve('Mutation', 'deleteUser', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		return r.mutation_delete_user(ctx, info, parents)
-	})
-	s.resolve('Mutation', 'createArticle', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		return r.mutation_create_article(ctx, info, parents)
-	})
-	s.resolve('Mutation', 'replaceArticle', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		return r.mutation_replace_article(ctx, info, parents)
-	})
-	s.resolve('Mutation', 'updateArticle', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		return r.mutation_update_article(ctx, info, parents)
-	})
-	s.resolve('Mutation', 'deleteArticle', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		return r.mutation_delete_article(ctx, info, parents)
-	})
-	s.resolve('Mutation', 'createArticleComment', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		return r.mutation_create_article_comment(ctx, info, parents)
-	})
-	s.resolve('Mutation', 'createPost', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		return r.mutation_create_post(ctx, info, parents)
-	})
-	s.resolve('Mutation', 'replacePost', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		return r.mutation_replace_post(ctx, info, parents)
-	})
-	s.resolve('Mutation', 'updatePost', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		return r.mutation_update_post(ctx, info, parents)
-	})
-	s.resolve('Mutation', 'deletePost', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		return r.mutation_delete_post(ctx, info, parents)
-	})
-	s.resolve('Mutation', 'createPostComment', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		return r.mutation_create_post_comment(ctx, info, parents)
-	})
-	s.resolve('Mutation', 'createComment', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		return r.mutation_create_comment(ctx, info, parents)
-	})
-	s.resolve('Mutation', 'replaceComment', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		return r.mutation_replace_comment(ctx, info, parents)
-	})
-	s.resolve('Mutation', 'updateComment', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		return r.mutation_update_comment(ctx, info, parents)
-	})
-	s.resolve('Mutation', 'deleteComment', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		return r.mutation_delete_comment(ctx, info, parents)
+	s.resolve('Mutation', 'deleteUser', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		id := gql_i64_id(info.arg('id'))!
+		g.with_ctx(ctx).users().delete_one_id(id).exec()!
+		result := graphql.Resolved(graphql.Value(id.str()))
+		return parents.map(result)
 	})
 	return s
+}
+
+// graphql_nodes returns the rows with the global ids `ids`, in order, reading
+// each table's in one query: an error at the place of an id no row has.
+// `types` names the table of each range (`Client.global_types`).
+fn graphql_nodes(g Graph, types map[int]string, ids []graphql.Value) ![]graphql.Resolved {
+	mut keys := []i64{cap: ids.len}
+	mut by_table := map[string][]i64{}
+	for v in ids {
+		key := gql_i64_id(v) or { -1 }
+		keys << key
+		if key >= 0 {
+			by_table[types[int(key >> 32)] or { '' }] << key
+		}
+	}
+	mut found := map[i64]graphql.Resolved{}
+	if keys_of := by_table['articles'] {
+		for n in g.articles().where_id_in(keys_of).all()! {
+			found[n.article.id] = graphql.obj_of('Article', n)
+		}
+	}
+	if keys_of := by_table['comments'] {
+		for n in g.comments().where_id_in(keys_of).all()! {
+			found[n.comment.id] = graphql.obj_of('Comment', n)
+		}
+	}
+	if keys_of := by_table['posts'] {
+		for n in g.posts().where_id_in(keys_of).all()! {
+			found[n.post.id] = graphql.obj_of('Post', n)
+		}
+	}
+	if keys_of := by_table['users'] {
+		for n in g.users().where_id_in(keys_of).all()! {
+			found[n.user.id] = graphql.obj_of('User', n)
+		}
+	}
+	mut out := []graphql.Resolved{cap: ids.len}
+	for i, key in keys {
+		out << found[key] or {
+			graphql.Resolved(graphql.FieldError{
+				message: 'Could not resolve to a node with the global ID of "${ids[i].as_string()}".'
+			})
+		}
+	}
+	return out
 }
 
 // resolve_article_field resolves the columns of `Article`.
@@ -1065,10 +1219,11 @@ fn resolve_article_field(_ graphql.Context, info graphql.FieldInfo, parents []gr
 	return parents.map(graphql.Resolved(article_value((it as ArticleNode).article, info.field_name)))
 }
 
-fn article_value(row articles_models.Article, field string) graphql.Value {
+fn article_value(row models.Article, field string) graphql.Value {
 	return match field {
+		'createdAt' { graphql.Value(row.created_at.format_rfc3339()) }
+		'updatedAt' { graphql.Value(row.updated_at.format_rfc3339()) }
 		'id' { graphql.Value(row.id.str()) }
-		'slug' { graphql.Value(string(row.slug)) }
 		'userID' { graphql.Value(row.user_id.str()) }
 		'title' { graphql.Value(string(row.title)) }
 		'summary' { graphql.Value(string(row.summary)) }
@@ -1076,8 +1231,6 @@ fn article_value(row articles_models.Article, field string) graphql.Value {
 		'publishedAt' {
 			if v := row.published_at { graphql.Value(v.format_rfc3339()) } else { graphql.null }
 		}
-		'createdAt' { graphql.Value(row.created_at.format_rfc3339()) }
-		'updatedAt' { graphql.Value(row.updated_at.format_rfc3339()) }
 		'deletedAt' {
 			if v := row.deleted_at { graphql.Value(v.format_rfc3339()) } else { graphql.null }
 		}
@@ -1132,15 +1285,18 @@ fn article_order(v graphql.Value, with_key bool) ![]load.Order {
 		desc := (o['direction'] or { graphql.null }).as_string() == 'DESC'
 		field := (o['field'] or { graphql.null }).as_string()
 		match field {
+			'CREATED_AT' {
+				orders << load.Order{ column: 'Stamps.created_at', desc: desc, typ: 'time.Time' }
+			}
+			'UPDATED_AT' {
+				orders << load.Order{ column: 'Stamps.updated_at', desc: desc, typ: 'time.Time' }
+			}
 			'ID' {
-				orders << load.Order{ column: 'id', desc: desc, typ: 'int' }
+				orders << load.Order{ column: 'id', desc: desc, typ: 'i64' }
 				keyed = true
 			}
-			'SLUG' {
-				orders << load.Order{ column: 'slug', desc: desc, typ: 'string' }
-			}
 			'USER_ID' {
-				orders << load.Order{ column: 'user_id', desc: desc, typ: 'int' }
+				orders << load.Order{ column: 'user_id', desc: desc, typ: 'i64' }
 			}
 			'TITLE' {
 				orders << load.Order{ column: 'title', desc: desc, typ: 'string' }
@@ -1153,12 +1309,6 @@ fn article_order(v graphql.Value, with_key bool) ![]load.Order {
 			}
 			'PUBLISHED_AT' {
 				orders << load.Order{ column: 'published_at', desc: desc, typ: '?time.Time' }
-			}
-			'CREATED_AT' {
-				orders << load.Order{ column: 'created_at', desc: desc, typ: 'time.Time' }
-			}
-			'UPDATED_AT' {
-				orders << load.Order{ column: 'updated_at', desc: desc, typ: 'time.Time' }
 			}
 			'DELETED_AT' {
 				orders << load.Order{ column: 'deleted_at', desc: desc, typ: '?time.Time' }
@@ -1174,7 +1324,7 @@ fn article_order(v graphql.Value, with_key bool) ![]load.Order {
 		orders << load.Order{
 			column: 'id'
 			desc:   orders.len > 0 && orders.last().desc
-			typ:    'int'
+			typ:    'i64'
 		}
 	}
 	return orders
@@ -1203,31 +1353,42 @@ fn article_where(w map[string]graphql.Value) ![]load.Cond {
 				}
 				conds << load.or(...any)
 			}
-			'id' { conds << load.eq('id', gql_int_id(v)!) }
-			'idNEQ' { conds << load.ne('id', gql_int_id(v)!) }
-			'idIn' { conds << load.in_ints('id', gql_int_ids(v)!) }
-			'idNotIn' { conds << load.not_in_ints('id', gql_int_ids(v)!) }
-			'idGT' { conds << load.gt('id', gql_int_id(v)!) }
-			'idGTE' { conds << load.ge('id', gql_int_id(v)!) }
-			'idLT' { conds << load.lt('id', gql_int_id(v)!) }
-			'idLTE' { conds << load.le('id', gql_int_id(v)!) }
-			'slug' { conds << load.eq('slug', v.as_string()) }
-			'slugNEQ' { conds << load.ne('slug', v.as_string()) }
-			'slugIn' { conds << load.in_strings('slug', gql_strings(v)) }
-			'slugNotIn' { conds << load.not_in_strings('slug', gql_strings(v)) }
-			'slugGT' { conds << load.gt('slug', v.as_string()) }
-			'slugGTE' { conds << load.ge('slug', v.as_string()) }
-			'slugLT' { conds << load.lt('slug', v.as_string()) }
-			'slugLTE' { conds << load.le('slug', v.as_string()) }
-			'slugContains' { conds << load.contains('slug', v.as_string()) }
-			'slugHasPrefix' { conds << load.has_prefix('slug', v.as_string()) }
-			'slugHasSuffix' { conds << load.has_suffix('slug', v.as_string()) }
-			'slugEqualFold' { conds << load.equal_fold('slug', v.as_string()) }
-			'slugContainsFold' { conds << load.contains_fold('slug', v.as_string()) }
-			'userID' { conds << load.eq('user_id', gql_int_id(v)!) }
-			'userIDNEQ' { conds << load.ne('user_id', gql_int_id(v)!) }
-			'userIDIn' { conds << load.in_ints('user_id', gql_int_ids(v)!) }
-			'userIDNotIn' { conds << load.not_in_ints('user_id', gql_int_ids(v)!) }
+			'createdAt' { conds << load.eq('Stamps.created_at', gql_time(v)!) }
+			'createdAtNEQ' { conds << load.ne('Stamps.created_at', gql_time(v)!) }
+			'createdAtIn' {
+				conds << load.or(...gql_times(v)!.map(load.eq('Stamps.created_at', it)))
+			}
+			'createdAtNotIn' {
+				conds << load.and(...gql_times(v)!.map(load.ne('Stamps.created_at', it)))
+			}
+			'createdAtGT' { conds << load.gt('Stamps.created_at', gql_time(v)!) }
+			'createdAtGTE' { conds << load.ge('Stamps.created_at', gql_time(v)!) }
+			'createdAtLT' { conds << load.lt('Stamps.created_at', gql_time(v)!) }
+			'createdAtLTE' { conds << load.le('Stamps.created_at', gql_time(v)!) }
+			'updatedAt' { conds << load.eq('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtNEQ' { conds << load.ne('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtIn' {
+				conds << load.or(...gql_times(v)!.map(load.eq('Stamps.updated_at', it)))
+			}
+			'updatedAtNotIn' {
+				conds << load.and(...gql_times(v)!.map(load.ne('Stamps.updated_at', it)))
+			}
+			'updatedAtGT' { conds << load.gt('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtGTE' { conds << load.ge('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtLT' { conds << load.lt('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtLTE' { conds << load.le('Stamps.updated_at', gql_time(v)!) }
+			'id' { conds << load.eq('id', gql_i64_id(v)!) }
+			'idNEQ' { conds << load.ne('id', gql_i64_id(v)!) }
+			'idIn' { conds << load.in_i64s('id', gql_i64s(v)!) }
+			'idNotIn' { conds << load.not_in_i64s('id', gql_i64s(v)!) }
+			'idGT' { conds << load.gt('id', gql_i64_id(v)!) }
+			'idGTE' { conds << load.ge('id', gql_i64_id(v)!) }
+			'idLT' { conds << load.lt('id', gql_i64_id(v)!) }
+			'idLTE' { conds << load.le('id', gql_i64_id(v)!) }
+			'userID' { conds << load.eq('user_id', gql_i64_id(v)!) }
+			'userIDNEQ' { conds << load.ne('user_id', gql_i64_id(v)!) }
+			'userIDIn' { conds << load.in_i64s('user_id', gql_i64s(v)!) }
+			'userIDNotIn' { conds << load.not_in_i64s('user_id', gql_i64s(v)!) }
 			'title' { conds << load.eq('title', v.as_string()) }
 			'titleNEQ' { conds << load.ne('title', v.as_string()) }
 			'titleIn' { conds << load.in_strings('title', gql_strings(v)) }
@@ -1291,22 +1452,6 @@ fn article_where(w map[string]graphql.Value) ![]load.Cond {
 					load.is_null('published_at')
 				}
 			}
-			'createdAt' { conds << load.eq('created_at', gql_time(v)!) }
-			'createdAtNEQ' { conds << load.ne('created_at', gql_time(v)!) }
-			'createdAtIn' { conds << load.or(...gql_times(v)!.map(load.eq('created_at', it))) }
-			'createdAtNotIn' { conds << load.and(...gql_times(v)!.map(load.ne('created_at', it))) }
-			'createdAtGT' { conds << load.gt('created_at', gql_time(v)!) }
-			'createdAtGTE' { conds << load.ge('created_at', gql_time(v)!) }
-			'createdAtLT' { conds << load.lt('created_at', gql_time(v)!) }
-			'createdAtLTE' { conds << load.le('created_at', gql_time(v)!) }
-			'updatedAt' { conds << load.eq('updated_at', gql_time(v)!) }
-			'updatedAtNEQ' { conds << load.ne('updated_at', gql_time(v)!) }
-			'updatedAtIn' { conds << load.or(...gql_times(v)!.map(load.eq('updated_at', it))) }
-			'updatedAtNotIn' { conds << load.and(...gql_times(v)!.map(load.ne('updated_at', it))) }
-			'updatedAtGT' { conds << load.gt('updated_at', gql_time(v)!) }
-			'updatedAtGTE' { conds << load.ge('updated_at', gql_time(v)!) }
-			'updatedAtLT' { conds << load.lt('updated_at', gql_time(v)!) }
-			'updatedAtLTE' { conds << load.le('updated_at', gql_time(v)!) }
 			'deletedAt' { conds << load.eq('deleted_at', gql_time(v)!) }
 			'deletedAtNEQ' { conds << load.ne('deleted_at', gql_time(v)!) }
 			'deletedAtIn' { conds << load.or(...gql_times(v)!.map(load.eq('deleted_at', it))) }
@@ -1363,15 +1508,189 @@ fn article_where(w map[string]graphql.Value) ![]load.Cond {
 	return conds
 }
 
+// article_connection returns the page of `q` that a `ArticleConnection`'s arguments
+// ask for, and how many rows `q` matches when `totalCount` is asked for.
+fn article_connection(q ArticleQuery, info graphql.FieldInfo) !graphql.Connection {
+	p := graphql.page_args(info.args)!
+	orders := article_order(info.arg('orderBy'), true)!
+	rows := q.graphql_paged(orders, p)!.all()!
+	total := if info.selected('totalCount') { q.count()! } else { 0 }
+	return article_page(q.graph, rows, orders, p, total)
+}
+
+// graphql_paged returns `q` in `orders`, which end with the key (reversed for
+// `last`), past the cursors of `p`, and limited to one row past the page.
+fn (q ArticleQuery) graphql_paged(orders []load.Order, p graphql.PageArgs) !ArticleQuery {
+	types := orders.map(it.typ)
+	nulls := load.nulls_largest(q.graph.client.conn)
+	mut conds := q.query.conds.clone()
+	if c := p.after {
+		conds << load.keyset(orders, load.decode_cursor(c, types)!, true, nulls)!
+	}
+	if c := p.before {
+		conds << load.keyset(orders, load.decode_cursor(c, types)!, false, nulls)!
+	}
+	backward := p.last != none
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		conds:  conds
+		order:  ''
+		desc:   false
+		orders: if backward { orders.map(load.Order{ ...it, desc: !it.desc }) } else { orders }
+		limit:  if c := p.first {
+			c + 1
+		} else if c := p.last {
+			c + 1
+		} else {
+			0
+		}
+		offset: 0
+	}
+	return next
+}
+
+// article_page returns `nodes`, read in `orders` (reversed for `last`) and one row
+// past the page, as a connection.
+fn article_page(g Graph, nodes []ArticleNode, orders []load.Order, p graphql.PageArgs, total int) !graphql.Connection {
+	mut page := nodes.clone()
+	mut has_next := false
+	mut has_previous := false
+	if count := p.first {
+		if page.len > count {
+			has_next = true
+			page = page[..count].clone()
+		}
+	} else if count := p.last {
+		if page.len > count {
+			has_previous = true
+			page = page[..count].clone()
+		}
+		page.reverse_in_place()
+	}
+	cursors := article_cursors(g, page.map(it.article), orders)!
+	return graphql.connection(page.map(graphql.Source(it)), cursors, has_next, has_previous, total)
+}
+
+// article_cursors returns the cursors of `rows`: the values of their order
+// columns, those of edges read in one query.
+fn article_cursors(g Graph, rows []models.Article, orders []load.Order) ![]string {
+	exprs := load.expr_values(g.client.conn, 'articles', 'id', .i64,
+		rows.map(it.id.str()), orders)!
+	mut out := []string{cap: rows.len}
+	for row in rows {
+		from_exprs := exprs[row.id.str()] or { []orm.Primitive{} }
+		mut values := []orm.Primitive{cap: orders.len}
+		for i, o in orders {
+			values << if o.expr != '' {
+				from_exprs[i] or { orm.Primitive(orm.Null{}) }
+			} else {
+				article_order_value(row, o.column)
+			}
+		}
+		out << load.encode_cursor(values)
+	}
+	return out
+}
+
+// article_order_value returns a column of a `articles` row, for a cursor.
+fn article_order_value(row models.Article, column string) orm.Primitive {
+	return match column {
+		'Stamps.created_at' { orm.Primitive(row.created_at) }
+		'Stamps.updated_at' { orm.Primitive(row.updated_at) }
+		'id' { orm.Primitive(row.id) }
+		'user_id' { orm.Primitive(row.user_id) }
+		'title' { orm.Primitive(row.title) }
+		'summary' { orm.Primitive(row.summary) }
+		'body' { orm.Primitive(row.body) }
+		'published_at' {
+			if v := row.published_at { orm.Primitive(v) } else { orm.Primitive(orm.Null{}) }
+		}
+		'deleted_at' {
+			if v := row.deleted_at { orm.Primitive(v) } else { orm.Primitive(orm.Null{}) }
+		}
+		else { orm.Primitive(orm.Null{}) }
+	}
+}
+
+// article_count_comments counts the `comments` of each of `rows` that `sub` keeps, by the
+// row's key.
+fn article_count_comments(g Graph, rows []models.Article, sub CommentQuery) !map[string]int {
+	conds := with_conds(g.client.prepare_edge_query('comments', sub.query)!.conds, load.eq('owner_type', 'Article'), load.is_null('deleted_at'))
+	return load.count_each(g.client.conn, 'comments', 'owner_id', rows.map(it.id.str()),
+		.i64, load.Query{
+			conds: conds
+		})
+}
+
+// article_create_input reads the input of `createArticle`.
+fn article_create_input(value graphql.Value) !CreateArticleInput {
+	mut input := CreateArticleInput{}
+	for name, v in value.as_map() {
+		if v is graphql.Null {
+			continue
+		}
+		match name {
+			'userID' {
+				input.user_id = gql_i64_id(v)!
+			}
+			'title' {
+				input.title = v.as_string()
+			}
+			'summary' {
+				input.summary = v.as_string()
+			}
+			'body' {
+				input.body = v.as_string()
+			}
+			'publishedAt' {
+				input.published_at = gql_time(v)!
+			}
+			else {}
+		}
+	}
+	return input
+}
+
+// article_update_input reads the input of `updateArticle`.
+fn article_update_input(value graphql.Value) !UpdateArticleInput {
+	mut input := UpdateArticleInput{}
+	for name, v in value.as_map() {
+		if v is graphql.Null {
+			continue
+		}
+		match name {
+			'title' {
+				input.title = v.as_string()
+			}
+			'summary' {
+				input.summary = v.as_string()
+			}
+			'body' {
+				input.body = v.as_string()
+			}
+			'publishedAt' {
+				input.published_at = gql_time(v)!
+			}
+			'clearPublishedAt' {
+				input.clear_published_at = v.as_bool()
+			}
+			else {}
+		}
+	}
+	return input
+}
+
 // resolve_comment_field resolves the columns of `Comment`.
 fn resolve_comment_field(_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 	return parents.map(graphql.Resolved(comment_value((it as CommentNode).comment, info.field_name)))
 }
 
-fn comment_value(row comments_models.Comment, field string) graphql.Value {
+fn comment_value(row models.Comment, field string) graphql.Value {
 	return match field {
+		'createdAt' { graphql.Value(row.created_at.format_rfc3339()) }
+		'updatedAt' { graphql.Value(row.updated_at.format_rfc3339()) }
 		'id' { graphql.Value(row.id.str()) }
-		'slug' { graphql.Value(string(row.slug)) }
 		'userID' { graphql.Value(row.user_id.str()) }
 		'ownerType' { graphql.Value(string(row.owner_type)) }
 		'ownerID' { graphql.Value(row.owner_id.str()) }
@@ -1379,8 +1698,6 @@ fn comment_value(row comments_models.Comment, field string) graphql.Value {
 			if v := row.parent_id { graphql.Value(v.str()) } else { graphql.null }
 		}
 		'body' { graphql.Value(string(row.body)) }
-		'createdAt' { graphql.Value(row.created_at.format_rfc3339()) }
-		'updatedAt' { graphql.Value(row.updated_at.format_rfc3339()) }
 		'deletedAt' {
 			if v := row.deleted_at { graphql.Value(v.format_rfc3339()) } else { graphql.null }
 		}
@@ -1435,33 +1752,30 @@ fn comment_order(v graphql.Value, with_key bool) ![]load.Order {
 		desc := (o['direction'] or { graphql.null }).as_string() == 'DESC'
 		field := (o['field'] or { graphql.null }).as_string()
 		match field {
+			'CREATED_AT' {
+				orders << load.Order{ column: 'Stamps.created_at', desc: desc, typ: 'time.Time' }
+			}
+			'UPDATED_AT' {
+				orders << load.Order{ column: 'Stamps.updated_at', desc: desc, typ: 'time.Time' }
+			}
 			'ID' {
-				orders << load.Order{ column: 'id', desc: desc, typ: 'int' }
+				orders << load.Order{ column: 'id', desc: desc, typ: 'i64' }
 				keyed = true
 			}
-			'SLUG' {
-				orders << load.Order{ column: 'slug', desc: desc, typ: 'string' }
-			}
 			'USER_ID' {
-				orders << load.Order{ column: 'user_id', desc: desc, typ: 'int' }
+				orders << load.Order{ column: 'user_id', desc: desc, typ: 'i64' }
 			}
 			'OWNER_TYPE' {
 				orders << load.Order{ column: 'owner_type', desc: desc, typ: 'string' }
 			}
 			'OWNER_ID' {
-				orders << load.Order{ column: 'owner_id', desc: desc, typ: 'int' }
+				orders << load.Order{ column: 'owner_id', desc: desc, typ: 'i64' }
 			}
 			'PARENT_ID' {
-				orders << load.Order{ column: 'parent_id', desc: desc, typ: '?int' }
+				orders << load.Order{ column: 'parent_id', desc: desc, typ: '?i64' }
 			}
 			'BODY' {
 				orders << load.Order{ column: 'body', desc: desc, typ: 'string' }
-			}
-			'CREATED_AT' {
-				orders << load.Order{ column: 'created_at', desc: desc, typ: 'time.Time' }
-			}
-			'UPDATED_AT' {
-				orders << load.Order{ column: 'updated_at', desc: desc, typ: 'time.Time' }
 			}
 			'DELETED_AT' {
 				orders << load.Order{ column: 'deleted_at', desc: desc, typ: '?time.Time' }
@@ -1477,7 +1791,7 @@ fn comment_order(v graphql.Value, with_key bool) ![]load.Order {
 		orders << load.Order{
 			column: 'id'
 			desc:   orders.len > 0 && orders.last().desc
-			typ:    'int'
+			typ:    'i64'
 		}
 	}
 	return orders
@@ -1506,31 +1820,42 @@ fn comment_where(w map[string]graphql.Value) ![]load.Cond {
 				}
 				conds << load.or(...any)
 			}
-			'id' { conds << load.eq('id', gql_int_id(v)!) }
-			'idNEQ' { conds << load.ne('id', gql_int_id(v)!) }
-			'idIn' { conds << load.in_ints('id', gql_int_ids(v)!) }
-			'idNotIn' { conds << load.not_in_ints('id', gql_int_ids(v)!) }
-			'idGT' { conds << load.gt('id', gql_int_id(v)!) }
-			'idGTE' { conds << load.ge('id', gql_int_id(v)!) }
-			'idLT' { conds << load.lt('id', gql_int_id(v)!) }
-			'idLTE' { conds << load.le('id', gql_int_id(v)!) }
-			'slug' { conds << load.eq('slug', v.as_string()) }
-			'slugNEQ' { conds << load.ne('slug', v.as_string()) }
-			'slugIn' { conds << load.in_strings('slug', gql_strings(v)) }
-			'slugNotIn' { conds << load.not_in_strings('slug', gql_strings(v)) }
-			'slugGT' { conds << load.gt('slug', v.as_string()) }
-			'slugGTE' { conds << load.ge('slug', v.as_string()) }
-			'slugLT' { conds << load.lt('slug', v.as_string()) }
-			'slugLTE' { conds << load.le('slug', v.as_string()) }
-			'slugContains' { conds << load.contains('slug', v.as_string()) }
-			'slugHasPrefix' { conds << load.has_prefix('slug', v.as_string()) }
-			'slugHasSuffix' { conds << load.has_suffix('slug', v.as_string()) }
-			'slugEqualFold' { conds << load.equal_fold('slug', v.as_string()) }
-			'slugContainsFold' { conds << load.contains_fold('slug', v.as_string()) }
-			'userID' { conds << load.eq('user_id', gql_int_id(v)!) }
-			'userIDNEQ' { conds << load.ne('user_id', gql_int_id(v)!) }
-			'userIDIn' { conds << load.in_ints('user_id', gql_int_ids(v)!) }
-			'userIDNotIn' { conds << load.not_in_ints('user_id', gql_int_ids(v)!) }
+			'createdAt' { conds << load.eq('Stamps.created_at', gql_time(v)!) }
+			'createdAtNEQ' { conds << load.ne('Stamps.created_at', gql_time(v)!) }
+			'createdAtIn' {
+				conds << load.or(...gql_times(v)!.map(load.eq('Stamps.created_at', it)))
+			}
+			'createdAtNotIn' {
+				conds << load.and(...gql_times(v)!.map(load.ne('Stamps.created_at', it)))
+			}
+			'createdAtGT' { conds << load.gt('Stamps.created_at', gql_time(v)!) }
+			'createdAtGTE' { conds << load.ge('Stamps.created_at', gql_time(v)!) }
+			'createdAtLT' { conds << load.lt('Stamps.created_at', gql_time(v)!) }
+			'createdAtLTE' { conds << load.le('Stamps.created_at', gql_time(v)!) }
+			'updatedAt' { conds << load.eq('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtNEQ' { conds << load.ne('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtIn' {
+				conds << load.or(...gql_times(v)!.map(load.eq('Stamps.updated_at', it)))
+			}
+			'updatedAtNotIn' {
+				conds << load.and(...gql_times(v)!.map(load.ne('Stamps.updated_at', it)))
+			}
+			'updatedAtGT' { conds << load.gt('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtGTE' { conds << load.ge('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtLT' { conds << load.lt('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtLTE' { conds << load.le('Stamps.updated_at', gql_time(v)!) }
+			'id' { conds << load.eq('id', gql_i64_id(v)!) }
+			'idNEQ' { conds << load.ne('id', gql_i64_id(v)!) }
+			'idIn' { conds << load.in_i64s('id', gql_i64s(v)!) }
+			'idNotIn' { conds << load.not_in_i64s('id', gql_i64s(v)!) }
+			'idGT' { conds << load.gt('id', gql_i64_id(v)!) }
+			'idGTE' { conds << load.ge('id', gql_i64_id(v)!) }
+			'idLT' { conds << load.lt('id', gql_i64_id(v)!) }
+			'idLTE' { conds << load.le('id', gql_i64_id(v)!) }
+			'userID' { conds << load.eq('user_id', gql_i64_id(v)!) }
+			'userIDNEQ' { conds << load.ne('user_id', gql_i64_id(v)!) }
+			'userIDIn' { conds << load.in_i64s('user_id', gql_i64s(v)!) }
+			'userIDNotIn' { conds << load.not_in_i64s('user_id', gql_i64s(v)!) }
 			'ownerType' { conds << load.eq('owner_type', v.as_string()) }
 			'ownerTypeNEQ' { conds << load.ne('owner_type', v.as_string()) }
 			'ownerTypeIn' { conds << load.in_strings('owner_type', gql_strings(v)) }
@@ -1544,14 +1869,14 @@ fn comment_where(w map[string]graphql.Value) ![]load.Cond {
 			'ownerTypeHasSuffix' { conds << load.has_suffix('owner_type', v.as_string()) }
 			'ownerTypeEqualFold' { conds << load.equal_fold('owner_type', v.as_string()) }
 			'ownerTypeContainsFold' { conds << load.contains_fold('owner_type', v.as_string()) }
-			'ownerID' { conds << load.eq('owner_id', gql_int_id(v)!) }
-			'ownerIDNEQ' { conds << load.ne('owner_id', gql_int_id(v)!) }
-			'ownerIDIn' { conds << load.in_ints('owner_id', gql_int_ids(v)!) }
-			'ownerIDNotIn' { conds << load.not_in_ints('owner_id', gql_int_ids(v)!) }
-			'parentID' { conds << load.eq('parent_id', gql_int_id(v)!) }
-			'parentIDNEQ' { conds << load.ne('parent_id', gql_int_id(v)!) }
-			'parentIDIn' { conds << load.in_ints('parent_id', gql_int_ids(v)!) }
-			'parentIDNotIn' { conds << load.not_in_ints('parent_id', gql_int_ids(v)!) }
+			'ownerID' { conds << load.eq('owner_id', gql_i64_id(v)!) }
+			'ownerIDNEQ' { conds << load.ne('owner_id', gql_i64_id(v)!) }
+			'ownerIDIn' { conds << load.in_i64s('owner_id', gql_i64s(v)!) }
+			'ownerIDNotIn' { conds << load.not_in_i64s('owner_id', gql_i64s(v)!) }
+			'parentID' { conds << load.eq('parent_id', gql_i64_id(v)!) }
+			'parentIDNEQ' { conds << load.ne('parent_id', gql_i64_id(v)!) }
+			'parentIDIn' { conds << load.in_i64s('parent_id', gql_i64s(v)!) }
+			'parentIDNotIn' { conds << load.not_in_i64s('parent_id', gql_i64s(v)!) }
 			'parentIDIsNil' {
 				conds << if v.as_bool() {
 					load.is_null('parent_id')
@@ -1579,22 +1904,6 @@ fn comment_where(w map[string]graphql.Value) ![]load.Cond {
 			'bodyHasSuffix' { conds << load.has_suffix('body', v.as_string()) }
 			'bodyEqualFold' { conds << load.equal_fold('body', v.as_string()) }
 			'bodyContainsFold' { conds << load.contains_fold('body', v.as_string()) }
-			'createdAt' { conds << load.eq('created_at', gql_time(v)!) }
-			'createdAtNEQ' { conds << load.ne('created_at', gql_time(v)!) }
-			'createdAtIn' { conds << load.or(...gql_times(v)!.map(load.eq('created_at', it))) }
-			'createdAtNotIn' { conds << load.and(...gql_times(v)!.map(load.ne('created_at', it))) }
-			'createdAtGT' { conds << load.gt('created_at', gql_time(v)!) }
-			'createdAtGTE' { conds << load.ge('created_at', gql_time(v)!) }
-			'createdAtLT' { conds << load.lt('created_at', gql_time(v)!) }
-			'createdAtLTE' { conds << load.le('created_at', gql_time(v)!) }
-			'updatedAt' { conds << load.eq('updated_at', gql_time(v)!) }
-			'updatedAtNEQ' { conds << load.ne('updated_at', gql_time(v)!) }
-			'updatedAtIn' { conds << load.or(...gql_times(v)!.map(load.eq('updated_at', it))) }
-			'updatedAtNotIn' { conds << load.and(...gql_times(v)!.map(load.ne('updated_at', it))) }
-			'updatedAtGT' { conds << load.gt('updated_at', gql_time(v)!) }
-			'updatedAtGTE' { conds << load.ge('updated_at', gql_time(v)!) }
-			'updatedAtLT' { conds << load.lt('updated_at', gql_time(v)!) }
-			'updatedAtLTE' { conds << load.le('updated_at', gql_time(v)!) }
 			'deletedAt' { conds << load.eq('deleted_at', gql_time(v)!) }
 			'deletedAtNEQ' { conds << load.ne('deleted_at', gql_time(v)!) }
 			'deletedAtIn' { conds << load.or(...gql_times(v)!.map(load.eq('deleted_at', it))) }
@@ -1689,19 +1998,182 @@ fn comment_where(w map[string]graphql.Value) ![]load.Cond {
 	return conds
 }
 
+// comment_connection returns the page of `q` that a `CommentConnection`'s arguments
+// ask for, and how many rows `q` matches when `totalCount` is asked for.
+fn comment_connection(q CommentQuery, info graphql.FieldInfo) !graphql.Connection {
+	p := graphql.page_args(info.args)!
+	orders := comment_order(info.arg('orderBy'), true)!
+	rows := q.graphql_paged(orders, p)!.all()!
+	total := if info.selected('totalCount') { q.count()! } else { 0 }
+	return comment_page(q.graph, rows, orders, p, total)
+}
+
+// graphql_paged returns `q` in `orders`, which end with the key (reversed for
+// `last`), past the cursors of `p`, and limited to one row past the page.
+fn (q CommentQuery) graphql_paged(orders []load.Order, p graphql.PageArgs) !CommentQuery {
+	types := orders.map(it.typ)
+	nulls := load.nulls_largest(q.graph.client.conn)
+	mut conds := q.query.conds.clone()
+	if c := p.after {
+		conds << load.keyset(orders, load.decode_cursor(c, types)!, true, nulls)!
+	}
+	if c := p.before {
+		conds << load.keyset(orders, load.decode_cursor(c, types)!, false, nulls)!
+	}
+	backward := p.last != none
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		conds:  conds
+		order:  ''
+		desc:   false
+		orders: if backward { orders.map(load.Order{ ...it, desc: !it.desc }) } else { orders }
+		limit:  if c := p.first {
+			c + 1
+		} else if c := p.last {
+			c + 1
+		} else {
+			0
+		}
+		offset: 0
+	}
+	return next
+}
+
+// comment_page returns `nodes`, read in `orders` (reversed for `last`) and one row
+// past the page, as a connection.
+fn comment_page(g Graph, nodes []CommentNode, orders []load.Order, p graphql.PageArgs, total int) !graphql.Connection {
+	mut page := nodes.clone()
+	mut has_next := false
+	mut has_previous := false
+	if count := p.first {
+		if page.len > count {
+			has_next = true
+			page = page[..count].clone()
+		}
+	} else if count := p.last {
+		if page.len > count {
+			has_previous = true
+			page = page[..count].clone()
+		}
+		page.reverse_in_place()
+	}
+	cursors := comment_cursors(g, page.map(it.comment), orders)!
+	return graphql.connection(page.map(graphql.Source(it)), cursors, has_next, has_previous, total)
+}
+
+// comment_cursors returns the cursors of `rows`: the values of their order
+// columns, those of edges read in one query.
+fn comment_cursors(g Graph, rows []models.Comment, orders []load.Order) ![]string {
+	exprs := load.expr_values(g.client.conn, 'comments', 'id', .i64,
+		rows.map(it.id.str()), orders)!
+	mut out := []string{cap: rows.len}
+	for row in rows {
+		from_exprs := exprs[row.id.str()] or { []orm.Primitive{} }
+		mut values := []orm.Primitive{cap: orders.len}
+		for i, o in orders {
+			values << if o.expr != '' {
+				from_exprs[i] or { orm.Primitive(orm.Null{}) }
+			} else {
+				comment_order_value(row, o.column)
+			}
+		}
+		out << load.encode_cursor(values)
+	}
+	return out
+}
+
+// comment_order_value returns a column of a `comments` row, for a cursor.
+fn comment_order_value(row models.Comment, column string) orm.Primitive {
+	return match column {
+		'Stamps.created_at' { orm.Primitive(row.created_at) }
+		'Stamps.updated_at' { orm.Primitive(row.updated_at) }
+		'id' { orm.Primitive(row.id) }
+		'user_id' { orm.Primitive(row.user_id) }
+		'owner_type' { orm.Primitive(row.owner_type) }
+		'owner_id' { orm.Primitive(row.owner_id) }
+		'parent_id' {
+			if v := row.parent_id { orm.Primitive(v) } else { orm.Primitive(orm.Null{}) }
+		}
+		'body' { orm.Primitive(row.body) }
+		'deleted_at' {
+			if v := row.deleted_at { orm.Primitive(v) } else { orm.Primitive(orm.Null{}) }
+		}
+		else { orm.Primitive(orm.Null{}) }
+	}
+}
+
+// comment_count_replies counts the `replies` of each of `rows` that `sub` keeps, by the
+// row's key.
+fn comment_count_replies(g Graph, rows []models.Comment, sub CommentQuery) !map[string]int {
+	conds := with_conds(g.client.prepare_edge_query('comments', sub.query)!.conds, load.is_null('deleted_at'))
+	return load.count_each(g.client.conn, 'comments', 'parent_id', rows.map(it.id.str()),
+		.i64, load.Query{
+			conds: conds
+		})
+}
+
+// comment_create_input reads the input of `createComment`.
+fn comment_create_input(value graphql.Value) !CreateCommentInput {
+	mut input := CreateCommentInput{}
+	for name, v in value.as_map() {
+		if v is graphql.Null {
+			continue
+		}
+		match name {
+			'userID' {
+				input.user_id = gql_i64_id(v)!
+			}
+			'ownerType' {
+				if v.as_string() !in ['Article', 'Post'] {
+					return error('`ownerType` is one of Article, Post')
+				}
+				input.owner_type = v.as_string()
+			}
+			'ownerID' {
+				input.owner_id = gql_i64_id(v)!
+			}
+			'parentID' {
+				input.parent_id = gql_i64_id(v)!
+			}
+			'body' {
+				input.body = v.as_string()
+			}
+			else {}
+		}
+	}
+	return input
+}
+
+// comment_update_input reads the input of `updateComment`.
+fn comment_update_input(value graphql.Value) !UpdateCommentInput {
+	mut input := UpdateCommentInput{}
+	for name, v in value.as_map() {
+		if v is graphql.Null {
+			continue
+		}
+		match name {
+			'body' {
+				input.body = v.as_string()
+			}
+			else {}
+		}
+	}
+	return input
+}
+
 // resolve_post_field resolves the columns of `Post`.
 fn resolve_post_field(_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 	return parents.map(graphql.Resolved(post_value((it as PostNode).post, info.field_name)))
 }
 
-fn post_value(row posts_models.Post, field string) graphql.Value {
+fn post_value(row models.Post, field string) graphql.Value {
 	return match field {
-		'id' { graphql.Value(row.id.str()) }
-		'slug' { graphql.Value(string(row.slug)) }
-		'userID' { graphql.Value(row.user_id.str()) }
-		'body' { graphql.Value(string(row.body)) }
 		'createdAt' { graphql.Value(row.created_at.format_rfc3339()) }
 		'updatedAt' { graphql.Value(row.updated_at.format_rfc3339()) }
+		'id' { graphql.Value(row.id.str()) }
+		'userID' { graphql.Value(row.user_id.str()) }
+		'body' { graphql.Value(string(row.body)) }
 		'deletedAt' {
 			if v := row.deleted_at { graphql.Value(v.format_rfc3339()) } else { graphql.null }
 		}
@@ -1756,24 +2228,21 @@ fn post_order(v graphql.Value, with_key bool) ![]load.Order {
 		desc := (o['direction'] or { graphql.null }).as_string() == 'DESC'
 		field := (o['field'] or { graphql.null }).as_string()
 		match field {
+			'CREATED_AT' {
+				orders << load.Order{ column: 'Stamps.created_at', desc: desc, typ: 'time.Time' }
+			}
+			'UPDATED_AT' {
+				orders << load.Order{ column: 'Stamps.updated_at', desc: desc, typ: 'time.Time' }
+			}
 			'ID' {
-				orders << load.Order{ column: 'id', desc: desc, typ: 'int' }
+				orders << load.Order{ column: 'id', desc: desc, typ: 'i64' }
 				keyed = true
 			}
-			'SLUG' {
-				orders << load.Order{ column: 'slug', desc: desc, typ: 'string' }
-			}
 			'USER_ID' {
-				orders << load.Order{ column: 'user_id', desc: desc, typ: 'int' }
+				orders << load.Order{ column: 'user_id', desc: desc, typ: 'i64' }
 			}
 			'BODY' {
 				orders << load.Order{ column: 'body', desc: desc, typ: 'string' }
-			}
-			'CREATED_AT' {
-				orders << load.Order{ column: 'created_at', desc: desc, typ: 'time.Time' }
-			}
-			'UPDATED_AT' {
-				orders << load.Order{ column: 'updated_at', desc: desc, typ: 'time.Time' }
 			}
 			'DELETED_AT' {
 				orders << load.Order{ column: 'deleted_at', desc: desc, typ: '?time.Time' }
@@ -1789,7 +2258,7 @@ fn post_order(v graphql.Value, with_key bool) ![]load.Order {
 		orders << load.Order{
 			column: 'id'
 			desc:   orders.len > 0 && orders.last().desc
-			typ:    'int'
+			typ:    'i64'
 		}
 	}
 	return orders
@@ -1818,31 +2287,42 @@ fn post_where(w map[string]graphql.Value) ![]load.Cond {
 				}
 				conds << load.or(...any)
 			}
-			'id' { conds << load.eq('id', gql_int_id(v)!) }
-			'idNEQ' { conds << load.ne('id', gql_int_id(v)!) }
-			'idIn' { conds << load.in_ints('id', gql_int_ids(v)!) }
-			'idNotIn' { conds << load.not_in_ints('id', gql_int_ids(v)!) }
-			'idGT' { conds << load.gt('id', gql_int_id(v)!) }
-			'idGTE' { conds << load.ge('id', gql_int_id(v)!) }
-			'idLT' { conds << load.lt('id', gql_int_id(v)!) }
-			'idLTE' { conds << load.le('id', gql_int_id(v)!) }
-			'slug' { conds << load.eq('slug', v.as_string()) }
-			'slugNEQ' { conds << load.ne('slug', v.as_string()) }
-			'slugIn' { conds << load.in_strings('slug', gql_strings(v)) }
-			'slugNotIn' { conds << load.not_in_strings('slug', gql_strings(v)) }
-			'slugGT' { conds << load.gt('slug', v.as_string()) }
-			'slugGTE' { conds << load.ge('slug', v.as_string()) }
-			'slugLT' { conds << load.lt('slug', v.as_string()) }
-			'slugLTE' { conds << load.le('slug', v.as_string()) }
-			'slugContains' { conds << load.contains('slug', v.as_string()) }
-			'slugHasPrefix' { conds << load.has_prefix('slug', v.as_string()) }
-			'slugHasSuffix' { conds << load.has_suffix('slug', v.as_string()) }
-			'slugEqualFold' { conds << load.equal_fold('slug', v.as_string()) }
-			'slugContainsFold' { conds << load.contains_fold('slug', v.as_string()) }
-			'userID' { conds << load.eq('user_id', gql_int_id(v)!) }
-			'userIDNEQ' { conds << load.ne('user_id', gql_int_id(v)!) }
-			'userIDIn' { conds << load.in_ints('user_id', gql_int_ids(v)!) }
-			'userIDNotIn' { conds << load.not_in_ints('user_id', gql_int_ids(v)!) }
+			'createdAt' { conds << load.eq('Stamps.created_at', gql_time(v)!) }
+			'createdAtNEQ' { conds << load.ne('Stamps.created_at', gql_time(v)!) }
+			'createdAtIn' {
+				conds << load.or(...gql_times(v)!.map(load.eq('Stamps.created_at', it)))
+			}
+			'createdAtNotIn' {
+				conds << load.and(...gql_times(v)!.map(load.ne('Stamps.created_at', it)))
+			}
+			'createdAtGT' { conds << load.gt('Stamps.created_at', gql_time(v)!) }
+			'createdAtGTE' { conds << load.ge('Stamps.created_at', gql_time(v)!) }
+			'createdAtLT' { conds << load.lt('Stamps.created_at', gql_time(v)!) }
+			'createdAtLTE' { conds << load.le('Stamps.created_at', gql_time(v)!) }
+			'updatedAt' { conds << load.eq('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtNEQ' { conds << load.ne('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtIn' {
+				conds << load.or(...gql_times(v)!.map(load.eq('Stamps.updated_at', it)))
+			}
+			'updatedAtNotIn' {
+				conds << load.and(...gql_times(v)!.map(load.ne('Stamps.updated_at', it)))
+			}
+			'updatedAtGT' { conds << load.gt('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtGTE' { conds << load.ge('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtLT' { conds << load.lt('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtLTE' { conds << load.le('Stamps.updated_at', gql_time(v)!) }
+			'id' { conds << load.eq('id', gql_i64_id(v)!) }
+			'idNEQ' { conds << load.ne('id', gql_i64_id(v)!) }
+			'idIn' { conds << load.in_i64s('id', gql_i64s(v)!) }
+			'idNotIn' { conds << load.not_in_i64s('id', gql_i64s(v)!) }
+			'idGT' { conds << load.gt('id', gql_i64_id(v)!) }
+			'idGTE' { conds << load.ge('id', gql_i64_id(v)!) }
+			'idLT' { conds << load.lt('id', gql_i64_id(v)!) }
+			'idLTE' { conds << load.le('id', gql_i64_id(v)!) }
+			'userID' { conds << load.eq('user_id', gql_i64_id(v)!) }
+			'userIDNEQ' { conds << load.ne('user_id', gql_i64_id(v)!) }
+			'userIDIn' { conds << load.in_i64s('user_id', gql_i64s(v)!) }
+			'userIDNotIn' { conds << load.not_in_i64s('user_id', gql_i64s(v)!) }
 			'body' { conds << load.eq('body', v.as_string()) }
 			'bodyNEQ' { conds << load.ne('body', v.as_string()) }
 			'bodyIn' { conds << load.in_strings('body', gql_strings(v)) }
@@ -1856,22 +2336,6 @@ fn post_where(w map[string]graphql.Value) ![]load.Cond {
 			'bodyHasSuffix' { conds << load.has_suffix('body', v.as_string()) }
 			'bodyEqualFold' { conds << load.equal_fold('body', v.as_string()) }
 			'bodyContainsFold' { conds << load.contains_fold('body', v.as_string()) }
-			'createdAt' { conds << load.eq('created_at', gql_time(v)!) }
-			'createdAtNEQ' { conds << load.ne('created_at', gql_time(v)!) }
-			'createdAtIn' { conds << load.or(...gql_times(v)!.map(load.eq('created_at', it))) }
-			'createdAtNotIn' { conds << load.and(...gql_times(v)!.map(load.ne('created_at', it))) }
-			'createdAtGT' { conds << load.gt('created_at', gql_time(v)!) }
-			'createdAtGTE' { conds << load.ge('created_at', gql_time(v)!) }
-			'createdAtLT' { conds << load.lt('created_at', gql_time(v)!) }
-			'createdAtLTE' { conds << load.le('created_at', gql_time(v)!) }
-			'updatedAt' { conds << load.eq('updated_at', gql_time(v)!) }
-			'updatedAtNEQ' { conds << load.ne('updated_at', gql_time(v)!) }
-			'updatedAtIn' { conds << load.or(...gql_times(v)!.map(load.eq('updated_at', it))) }
-			'updatedAtNotIn' { conds << load.and(...gql_times(v)!.map(load.ne('updated_at', it))) }
-			'updatedAtGT' { conds << load.gt('updated_at', gql_time(v)!) }
-			'updatedAtGTE' { conds << load.ge('updated_at', gql_time(v)!) }
-			'updatedAtLT' { conds << load.lt('updated_at', gql_time(v)!) }
-			'updatedAtLTE' { conds << load.le('updated_at', gql_time(v)!) }
 			'deletedAt' { conds << load.eq('deleted_at', gql_time(v)!) }
 			'deletedAtNEQ' { conds << load.ne('deleted_at', gql_time(v)!) }
 			'deletedAtIn' { conds << load.or(...gql_times(v)!.map(load.eq('deleted_at', it))) }
@@ -1924,19 +2388,165 @@ fn post_where(w map[string]graphql.Value) ![]load.Cond {
 	return conds
 }
 
+// post_connection returns the page of `q` that a `PostConnection`'s arguments
+// ask for, and how many rows `q` matches when `totalCount` is asked for.
+fn post_connection(q PostQuery, info graphql.FieldInfo) !graphql.Connection {
+	p := graphql.page_args(info.args)!
+	orders := post_order(info.arg('orderBy'), true)!
+	rows := q.graphql_paged(orders, p)!.all()!
+	total := if info.selected('totalCount') { q.count()! } else { 0 }
+	return post_page(q.graph, rows, orders, p, total)
+}
+
+// graphql_paged returns `q` in `orders`, which end with the key (reversed for
+// `last`), past the cursors of `p`, and limited to one row past the page.
+fn (q PostQuery) graphql_paged(orders []load.Order, p graphql.PageArgs) !PostQuery {
+	types := orders.map(it.typ)
+	nulls := load.nulls_largest(q.graph.client.conn)
+	mut conds := q.query.conds.clone()
+	if c := p.after {
+		conds << load.keyset(orders, load.decode_cursor(c, types)!, true, nulls)!
+	}
+	if c := p.before {
+		conds << load.keyset(orders, load.decode_cursor(c, types)!, false, nulls)!
+	}
+	backward := p.last != none
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		conds:  conds
+		order:  ''
+		desc:   false
+		orders: if backward { orders.map(load.Order{ ...it, desc: !it.desc }) } else { orders }
+		limit:  if c := p.first {
+			c + 1
+		} else if c := p.last {
+			c + 1
+		} else {
+			0
+		}
+		offset: 0
+	}
+	return next
+}
+
+// post_page returns `nodes`, read in `orders` (reversed for `last`) and one row
+// past the page, as a connection.
+fn post_page(g Graph, nodes []PostNode, orders []load.Order, p graphql.PageArgs, total int) !graphql.Connection {
+	mut page := nodes.clone()
+	mut has_next := false
+	mut has_previous := false
+	if count := p.first {
+		if page.len > count {
+			has_next = true
+			page = page[..count].clone()
+		}
+	} else if count := p.last {
+		if page.len > count {
+			has_previous = true
+			page = page[..count].clone()
+		}
+		page.reverse_in_place()
+	}
+	cursors := post_cursors(g, page.map(it.post), orders)!
+	return graphql.connection(page.map(graphql.Source(it)), cursors, has_next, has_previous, total)
+}
+
+// post_cursors returns the cursors of `rows`: the values of their order
+// columns, those of edges read in one query.
+fn post_cursors(g Graph, rows []models.Post, orders []load.Order) ![]string {
+	exprs := load.expr_values(g.client.conn, 'posts', 'id', .i64,
+		rows.map(it.id.str()), orders)!
+	mut out := []string{cap: rows.len}
+	for row in rows {
+		from_exprs := exprs[row.id.str()] or { []orm.Primitive{} }
+		mut values := []orm.Primitive{cap: orders.len}
+		for i, o in orders {
+			values << if o.expr != '' {
+				from_exprs[i] or { orm.Primitive(orm.Null{}) }
+			} else {
+				post_order_value(row, o.column)
+			}
+		}
+		out << load.encode_cursor(values)
+	}
+	return out
+}
+
+// post_order_value returns a column of a `posts` row, for a cursor.
+fn post_order_value(row models.Post, column string) orm.Primitive {
+	return match column {
+		'Stamps.created_at' { orm.Primitive(row.created_at) }
+		'Stamps.updated_at' { orm.Primitive(row.updated_at) }
+		'id' { orm.Primitive(row.id) }
+		'user_id' { orm.Primitive(row.user_id) }
+		'body' { orm.Primitive(row.body) }
+		'deleted_at' {
+			if v := row.deleted_at { orm.Primitive(v) } else { orm.Primitive(orm.Null{}) }
+		}
+		else { orm.Primitive(orm.Null{}) }
+	}
+}
+
+// post_count_comments counts the `comments` of each of `rows` that `sub` keeps, by the
+// row's key.
+fn post_count_comments(g Graph, rows []models.Post, sub CommentQuery) !map[string]int {
+	conds := with_conds(g.client.prepare_edge_query('comments', sub.query)!.conds, load.eq('owner_type', 'Post'), load.is_null('deleted_at'))
+	return load.count_each(g.client.conn, 'comments', 'owner_id', rows.map(it.id.str()),
+		.i64, load.Query{
+			conds: conds
+		})
+}
+
+// post_create_input reads the input of `createPost`.
+fn post_create_input(value graphql.Value) !CreatePostInput {
+	mut input := CreatePostInput{}
+	for name, v in value.as_map() {
+		if v is graphql.Null {
+			continue
+		}
+		match name {
+			'userID' {
+				input.user_id = gql_i64_id(v)!
+			}
+			'body' {
+				input.body = v.as_string()
+			}
+			else {}
+		}
+	}
+	return input
+}
+
+// post_update_input reads the input of `updatePost`.
+fn post_update_input(value graphql.Value) !UpdatePostInput {
+	mut input := UpdatePostInput{}
+	for name, v in value.as_map() {
+		if v is graphql.Null {
+			continue
+		}
+		match name {
+			'body' {
+				input.body = v.as_string()
+			}
+			else {}
+		}
+	}
+	return input
+}
+
 // resolve_user_field resolves the columns of `User`.
 fn resolve_user_field(_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 	return parents.map(graphql.Resolved(user_value((it as UserNode).user, info.field_name)))
 }
 
-fn user_value(row users_models.User, field string) graphql.Value {
+fn user_value(row models.User, field string) graphql.Value {
 	return match field {
-		'id' { graphql.Value(row.id.str()) }
-		'slug' { graphql.Value(string(row.slug)) }
-		'name' { graphql.Value(string(row.name)) }
-		'email' { graphql.Value(string(row.email)) }
 		'createdAt' { graphql.Value(row.created_at.format_rfc3339()) }
 		'updatedAt' { graphql.Value(row.updated_at.format_rfc3339()) }
+		'id' { graphql.Value(row.id.str()) }
+		'name' { graphql.Value(string(row.name)) }
+		'email' { graphql.Value(string(row.email)) }
 		'deletedAt' {
 			if v := row.deleted_at { graphql.Value(v.format_rfc3339()) } else { graphql.null }
 		}
@@ -1991,24 +2601,21 @@ fn user_order(v graphql.Value, with_key bool) ![]load.Order {
 		desc := (o['direction'] or { graphql.null }).as_string() == 'DESC'
 		field := (o['field'] or { graphql.null }).as_string()
 		match field {
-			'ID' {
-				orders << load.Order{ column: 'id', desc: desc, typ: 'int' }
-				keyed = true
+			'CREATED_AT' {
+				orders << load.Order{ column: 'Stamps.created_at', desc: desc, typ: 'time.Time' }
 			}
-			'SLUG' {
-				orders << load.Order{ column: 'slug', desc: desc, typ: 'string' }
+			'UPDATED_AT' {
+				orders << load.Order{ column: 'Stamps.updated_at', desc: desc, typ: 'time.Time' }
+			}
+			'ID' {
+				orders << load.Order{ column: 'id', desc: desc, typ: 'i64' }
+				keyed = true
 			}
 			'NAME' {
 				orders << load.Order{ column: 'name', desc: desc, typ: 'string' }
 			}
 			'EMAIL' {
 				orders << load.Order{ column: 'email', desc: desc, typ: 'string' }
-			}
-			'CREATED_AT' {
-				orders << load.Order{ column: 'created_at', desc: desc, typ: 'time.Time' }
-			}
-			'UPDATED_AT' {
-				orders << load.Order{ column: 'updated_at', desc: desc, typ: 'time.Time' }
 			}
 			'DELETED_AT' {
 				orders << load.Order{ column: 'deleted_at', desc: desc, typ: '?time.Time' }
@@ -2030,7 +2637,7 @@ fn user_order(v graphql.Value, with_key bool) ![]load.Order {
 		orders << load.Order{
 			column: 'id'
 			desc:   orders.len > 0 && orders.last().desc
-			typ:    'int'
+			typ:    'i64'
 		}
 	}
 	return orders
@@ -2059,27 +2666,38 @@ fn user_where(w map[string]graphql.Value) ![]load.Cond {
 				}
 				conds << load.or(...any)
 			}
-			'id' { conds << load.eq('id', gql_int_id(v)!) }
-			'idNEQ' { conds << load.ne('id', gql_int_id(v)!) }
-			'idIn' { conds << load.in_ints('id', gql_int_ids(v)!) }
-			'idNotIn' { conds << load.not_in_ints('id', gql_int_ids(v)!) }
-			'idGT' { conds << load.gt('id', gql_int_id(v)!) }
-			'idGTE' { conds << load.ge('id', gql_int_id(v)!) }
-			'idLT' { conds << load.lt('id', gql_int_id(v)!) }
-			'idLTE' { conds << load.le('id', gql_int_id(v)!) }
-			'slug' { conds << load.eq('slug', v.as_string()) }
-			'slugNEQ' { conds << load.ne('slug', v.as_string()) }
-			'slugIn' { conds << load.in_strings('slug', gql_strings(v)) }
-			'slugNotIn' { conds << load.not_in_strings('slug', gql_strings(v)) }
-			'slugGT' { conds << load.gt('slug', v.as_string()) }
-			'slugGTE' { conds << load.ge('slug', v.as_string()) }
-			'slugLT' { conds << load.lt('slug', v.as_string()) }
-			'slugLTE' { conds << load.le('slug', v.as_string()) }
-			'slugContains' { conds << load.contains('slug', v.as_string()) }
-			'slugHasPrefix' { conds << load.has_prefix('slug', v.as_string()) }
-			'slugHasSuffix' { conds << load.has_suffix('slug', v.as_string()) }
-			'slugEqualFold' { conds << load.equal_fold('slug', v.as_string()) }
-			'slugContainsFold' { conds << load.contains_fold('slug', v.as_string()) }
+			'createdAt' { conds << load.eq('Stamps.created_at', gql_time(v)!) }
+			'createdAtNEQ' { conds << load.ne('Stamps.created_at', gql_time(v)!) }
+			'createdAtIn' {
+				conds << load.or(...gql_times(v)!.map(load.eq('Stamps.created_at', it)))
+			}
+			'createdAtNotIn' {
+				conds << load.and(...gql_times(v)!.map(load.ne('Stamps.created_at', it)))
+			}
+			'createdAtGT' { conds << load.gt('Stamps.created_at', gql_time(v)!) }
+			'createdAtGTE' { conds << load.ge('Stamps.created_at', gql_time(v)!) }
+			'createdAtLT' { conds << load.lt('Stamps.created_at', gql_time(v)!) }
+			'createdAtLTE' { conds << load.le('Stamps.created_at', gql_time(v)!) }
+			'updatedAt' { conds << load.eq('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtNEQ' { conds << load.ne('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtIn' {
+				conds << load.or(...gql_times(v)!.map(load.eq('Stamps.updated_at', it)))
+			}
+			'updatedAtNotIn' {
+				conds << load.and(...gql_times(v)!.map(load.ne('Stamps.updated_at', it)))
+			}
+			'updatedAtGT' { conds << load.gt('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtGTE' { conds << load.ge('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtLT' { conds << load.lt('Stamps.updated_at', gql_time(v)!) }
+			'updatedAtLTE' { conds << load.le('Stamps.updated_at', gql_time(v)!) }
+			'id' { conds << load.eq('id', gql_i64_id(v)!) }
+			'idNEQ' { conds << load.ne('id', gql_i64_id(v)!) }
+			'idIn' { conds << load.in_i64s('id', gql_i64s(v)!) }
+			'idNotIn' { conds << load.not_in_i64s('id', gql_i64s(v)!) }
+			'idGT' { conds << load.gt('id', gql_i64_id(v)!) }
+			'idGTE' { conds << load.ge('id', gql_i64_id(v)!) }
+			'idLT' { conds << load.lt('id', gql_i64_id(v)!) }
+			'idLTE' { conds << load.le('id', gql_i64_id(v)!) }
 			'name' { conds << load.eq('name', v.as_string()) }
 			'nameNEQ' { conds << load.ne('name', v.as_string()) }
 			'nameIn' { conds << load.in_strings('name', gql_strings(v)) }
@@ -2106,22 +2724,6 @@ fn user_where(w map[string]graphql.Value) ![]load.Cond {
 			'emailHasSuffix' { conds << load.has_suffix('email', v.as_string()) }
 			'emailEqualFold' { conds << load.equal_fold('email', v.as_string()) }
 			'emailContainsFold' { conds << load.contains_fold('email', v.as_string()) }
-			'createdAt' { conds << load.eq('created_at', gql_time(v)!) }
-			'createdAtNEQ' { conds << load.ne('created_at', gql_time(v)!) }
-			'createdAtIn' { conds << load.or(...gql_times(v)!.map(load.eq('created_at', it))) }
-			'createdAtNotIn' { conds << load.and(...gql_times(v)!.map(load.ne('created_at', it))) }
-			'createdAtGT' { conds << load.gt('created_at', gql_time(v)!) }
-			'createdAtGTE' { conds << load.ge('created_at', gql_time(v)!) }
-			'createdAtLT' { conds << load.lt('created_at', gql_time(v)!) }
-			'createdAtLTE' { conds << load.le('created_at', gql_time(v)!) }
-			'updatedAt' { conds << load.eq('updated_at', gql_time(v)!) }
-			'updatedAtNEQ' { conds << load.ne('updated_at', gql_time(v)!) }
-			'updatedAtIn' { conds << load.or(...gql_times(v)!.map(load.eq('updated_at', it))) }
-			'updatedAtNotIn' { conds << load.and(...gql_times(v)!.map(load.ne('updated_at', it))) }
-			'updatedAtGT' { conds << load.gt('updated_at', gql_time(v)!) }
-			'updatedAtGTE' { conds << load.ge('updated_at', gql_time(v)!) }
-			'updatedAtLT' { conds << load.lt('updated_at', gql_time(v)!) }
-			'updatedAtLTE' { conds << load.le('updated_at', gql_time(v)!) }
 			'deletedAt' { conds << load.eq('deleted_at', gql_time(v)!) }
 			'deletedAtNEQ' { conds << load.ne('deleted_at', gql_time(v)!) }
 			'deletedAtIn' { conds << load.or(...gql_times(v)!.map(load.eq('deleted_at', it))) }
@@ -2188,20 +2790,190 @@ fn user_where(w map[string]graphql.Value) ![]load.Cond {
 	return conds
 }
 
-// gql_int_id reads an int key from an ID.
-fn gql_int_id(v graphql.Value) !int {
+// user_connection returns the page of `q` that a `UserConnection`'s arguments
+// ask for, and how many rows `q` matches when `totalCount` is asked for.
+fn user_connection(q UserQuery, info graphql.FieldInfo) !graphql.Connection {
+	p := graphql.page_args(info.args)!
+	orders := user_order(info.arg('orderBy'), true)!
+	rows := q.graphql_paged(orders, p)!.all()!
+	total := if info.selected('totalCount') { q.count()! } else { 0 }
+	return user_page(q.graph, rows, orders, p, total)
+}
+
+// graphql_paged returns `q` in `orders`, which end with the key (reversed for
+// `last`), past the cursors of `p`, and limited to one row past the page.
+fn (q UserQuery) graphql_paged(orders []load.Order, p graphql.PageArgs) !UserQuery {
+	types := orders.map(it.typ)
+	nulls := load.nulls_largest(q.graph.client.conn)
+	mut conds := q.query.conds.clone()
+	if c := p.after {
+		conds << load.keyset(orders, load.decode_cursor(c, types)!, true, nulls)!
+	}
+	if c := p.before {
+		conds << load.keyset(orders, load.decode_cursor(c, types)!, false, nulls)!
+	}
+	backward := p.last != none
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		conds:  conds
+		order:  ''
+		desc:   false
+		orders: if backward { orders.map(load.Order{ ...it, desc: !it.desc }) } else { orders }
+		limit:  if c := p.first {
+			c + 1
+		} else if c := p.last {
+			c + 1
+		} else {
+			0
+		}
+		offset: 0
+	}
+	return next
+}
+
+// user_page returns `nodes`, read in `orders` (reversed for `last`) and one row
+// past the page, as a connection.
+fn user_page(g Graph, nodes []UserNode, orders []load.Order, p graphql.PageArgs, total int) !graphql.Connection {
+	mut page := nodes.clone()
+	mut has_next := false
+	mut has_previous := false
+	if count := p.first {
+		if page.len > count {
+			has_next = true
+			page = page[..count].clone()
+		}
+	} else if count := p.last {
+		if page.len > count {
+			has_previous = true
+			page = page[..count].clone()
+		}
+		page.reverse_in_place()
+	}
+	cursors := user_cursors(g, page.map(it.user), orders)!
+	return graphql.connection(page.map(graphql.Source(it)), cursors, has_next, has_previous, total)
+}
+
+// user_cursors returns the cursors of `rows`: the values of their order
+// columns, those of edges read in one query.
+fn user_cursors(g Graph, rows []models.User, orders []load.Order) ![]string {
+	exprs := load.expr_values(g.client.conn, 'users', 'id', .i64,
+		rows.map(it.id.str()), orders)!
+	mut out := []string{cap: rows.len}
+	for row in rows {
+		from_exprs := exprs[row.id.str()] or { []orm.Primitive{} }
+		mut values := []orm.Primitive{cap: orders.len}
+		for i, o in orders {
+			values << if o.expr != '' {
+				from_exprs[i] or { orm.Primitive(orm.Null{}) }
+			} else {
+				user_order_value(row, o.column)
+			}
+		}
+		out << load.encode_cursor(values)
+	}
+	return out
+}
+
+// user_order_value returns a column of a `users` row, for a cursor.
+fn user_order_value(row models.User, column string) orm.Primitive {
+	return match column {
+		'Stamps.created_at' { orm.Primitive(row.created_at) }
+		'Stamps.updated_at' { orm.Primitive(row.updated_at) }
+		'id' { orm.Primitive(row.id) }
+		'name' { orm.Primitive(row.name) }
+		'email' { orm.Primitive(row.email) }
+		'deleted_at' {
+			if v := row.deleted_at { orm.Primitive(v) } else { orm.Primitive(orm.Null{}) }
+		}
+		else { orm.Primitive(orm.Null{}) }
+	}
+}
+
+// user_count_articles counts the `articles` of each of `rows` that `sub` keeps, by the
+// row's key.
+fn user_count_articles(g Graph, rows []models.User, sub ArticleQuery) !map[string]int {
+	conds := with_conds(g.client.prepare_edge_query('articles', sub.query)!.conds, load.is_null('deleted_at'))
+	return load.count_each(g.client.conn, 'articles', 'user_id', rows.map(it.id.str()),
+		.i64, load.Query{
+			conds: conds
+		})
+}
+
+// user_count_posts counts the `posts` of each of `rows` that `sub` keeps, by the
+// row's key.
+fn user_count_posts(g Graph, rows []models.User, sub PostQuery) !map[string]int {
+	conds := with_conds(g.client.prepare_edge_query('posts', sub.query)!.conds, load.is_null('deleted_at'))
+	return load.count_each(g.client.conn, 'posts', 'user_id', rows.map(it.id.str()),
+		.i64, load.Query{
+			conds: conds
+		})
+}
+
+// user_count_comments counts the `comments` of each of `rows` that `sub` keeps, by the
+// row's key.
+fn user_count_comments(g Graph, rows []models.User, sub CommentQuery) !map[string]int {
+	conds := with_conds(g.client.prepare_edge_query('comments', sub.query)!.conds, load.is_null('deleted_at'))
+	return load.count_each(g.client.conn, 'comments', 'user_id', rows.map(it.id.str()),
+		.i64, load.Query{
+			conds: conds
+		})
+}
+
+// user_create_input reads the input of `createUser`.
+fn user_create_input(value graphql.Value) !CreateUserInput {
+	mut input := CreateUserInput{}
+	for name, v in value.as_map() {
+		if v is graphql.Null {
+			continue
+		}
+		match name {
+			'name' {
+				input.name = v.as_string()
+			}
+			'email' {
+				input.email = v.as_string()
+			}
+			else {}
+		}
+	}
+	return input
+}
+
+// user_update_input reads the input of `updateUser`.
+fn user_update_input(value graphql.Value) !UpdateUserInput {
+	mut input := UpdateUserInput{}
+	for name, v in value.as_map() {
+		if v is graphql.Null {
+			continue
+		}
+		match name {
+			'name' {
+				input.name = v.as_string()
+			}
+			'email' {
+				input.email = v.as_string()
+			}
+			else {}
+		}
+	}
+	return input
+}
+
+// gql_i64_id reads an i64 key from an ID.
+fn gql_i64_id(v graphql.Value) !i64 {
 	s := v.as_string()
-	n := s.int()
+	n := s.i64()
 	if n.str() != s {
 		return error('invalid ID "${s}"')
 	}
 	return n
 }
 
-fn gql_int_ids(v graphql.Value) ![]int {
-	mut out := []int{}
+fn gql_i64s(v graphql.Value) ![]i64 {
+	mut out := []i64{}
 	for item in v.as_list() {
-		out << gql_int_id(item)!
+		out << if item is string { gql_i64_id(item)! } else { i64(item.as_float()) }
 	}
 	return out
 }

@@ -1894,7 +1894,7 @@ fn (q GadgetQuery) load_owner(rows []models.Gadget, fns []fn (UserQuery) UserQue
 		keys << row.owner_id.str()
 	}
 	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id', load.unique(keys),
-		query: q.graph.client.prepare_query('users', sub.query)!
+		query: q.graph.client.prepare_edge_query('users', sub.query)!
 	)!)!
 	mut by_key := map[string]UserNode{}
 	for target in targets {
@@ -1932,7 +1932,7 @@ fn (q GadgetQuery) load_likers(rows []models.Gadget, fns []fn (UserQuery) UserQu
 		sub = configure(sub)
 	}
 	if sub.query.limit > 0 || sub.query.offset > 0 {
-		prepared := q.graph.client.prepare_query('users', sub.query)!
+		prepared := q.graph.client.prepare_edge_query('users', sub.query)!
 		cut := load.link_each(q.graph.client.conn, 'likes', 'gadget_id', 'user_id',
 			rows.map(it.id.str()), .i64, .int, 'users', 'id', load.Query{
 				...prepared
@@ -1959,7 +1959,7 @@ fn (q GadgetQuery) load_likers(rows []models.Gadget, fns []fn (UserQuery) UserQu
 		'user_id', rows.map(it.id.str()), .i64, .int)!
 	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
 		load.unique(pairs.map(it[1])),
-		query: q.graph.client.prepare_query('users', sub.query)!
+		query: q.graph.client.prepare_edge_query('users', sub.query)!
 	)!)!
 	// each parent's targets in the order of the query
 	mut parents_of := map[string][]string{}

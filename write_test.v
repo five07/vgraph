@@ -703,9 +703,49 @@ fn test_the_driver_runs_sql_with_parameters() {
 	rows := d.exec_params('SELECT ? + 1, ?, NULL', ['41', 'a'])!
 	assert rows.len == 1
 	assert rows[0].map(it or { 'null' }) == ['42', 'a', '']
+	// an error has SQLite's message and code, not the statement
+	if _ := d.exec_params('INSERT INTO missing VALUES (?)', ['secret']) {
+		assert false
+	} else {
+		assert err.msg() == 'no such table: missing'
+		assert err.code() == 1
+	}
 	conn := orm.Connection(d)
 	assert conn is Driver
 	assert orm.Connection(write_db()!) !is Driver
+}
+
+// Threads that share a driver take turns at transactions, which SQLite has one
+// of per connection: every write of every thread is stored.
+fn test_threads_share_a_driver() {
+	db := sq.connect_full(':memory:', [.readwrite, .create, .fullmutex], '')!
+	sql db {
+		create table Writer
+	}!
+	c := Client.new(sqlite.new(db), write_schema()!)!
+	mut threads := []thread !string{}
+	for i in 0 .. 20 {
+		threads << spawn create(c, 'writers', {
+			'name': orm.Primitive('w${i}')
+		})
+	}
+	mut keys := []string{}
+	for t in threads {
+		keys << t.wait()!
+	}
+	assert keys.len == 20 && load.unique(keys).len == 20
+	assert writers(c)!.len == 20
+	// and a transaction of one thread holds back another's until it ends
+	mut tx := c.begin()!
+	create(tx, 'writers', {
+		'name': orm.Primitive('in tx')
+	})!
+	other := spawn create(c, 'writers', {
+		'name': orm.Primitive('after')
+	})
+	tx.rollback()!
+	other.wait()!
+	assert writers(c)!.map(it.name).filter(it in ['in tx', 'after']) == ['after']
 }
 
 fn test_unique_fields_get_an_index() {
