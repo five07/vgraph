@@ -1,0 +1,31 @@
+// `args.map(it.name.value)` builds the wrong array when the element struct also
+// has a field named `value` whose type is a sum type: V types the mapped array
+// by `Arg.value` (`Lit`) rather than `Name.value` (`string`), and the C doesn't
+// compile (`initializing 'Lit' ... with an expression of incompatible type
+// 'string'`).
+// Run: `v run map_nested_field_name.vv`. Expect `['a']`.
+// Worked around in `graphql/` with `names_of` and a loop.
+module main
+
+struct Name {
+	value string
+}
+
+struct IntLit {
+	n int
+}
+
+type Lit = IntLit | bool
+
+struct Arg {
+	name  Name
+	value Lit
+}
+
+fn main() {
+	args := [Arg{
+		name:  Name{'a'}
+		value: IntLit{1}
+	}]
+	println(args.map(it.name.value))
+}

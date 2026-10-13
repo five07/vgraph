@@ -8,7 +8,7 @@ import db.pg
 import os
 
 const relation_tables = ['users', 'cards', 'pets', 'groups', 'group_users', 'follows', 'friendships',
-	'nodes', 'categories']
+	'nodes', 'categories', 'devices', 'logins', 'device_groups']
 
 fn fixture() !Fixture {
 	mut db := pg.connect(pg.Config{
@@ -59,4 +59,12 @@ fn test_m2m_bidirectional() {
 
 fn test_one_to_one_indexes_are_unique() {
 	check_one_to_one_indexes_are_unique(fixture()!)!
+}
+
+fn test_uuid_keys() {
+	check_uuid_keys(fixture()!)!
+}
+
+fn test_graphql() {
+	check_graphql(fixture()!)!
 }

@@ -53,6 +53,23 @@ pub fn (q PetQuery) limit(count int) PetQuery {
 	return next
 }
 
+// offset skips the first `count` rows. It applies to `all()` and `first()`, not
+// to the rows of an edge load.
+pub fn (q PetQuery) offset(count int) PetQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		offset: count
+	}
+	return next
+}
+
+// count returns how many rows match, in one query; order, limit and offset
+// do not apply.
+pub fn (q PetQuery) count() !int {
+	return load.count_where[models.Pet](q.graph.client.conn, q.query)
+}
+
 // where_id keeps the rows whose `id` is `value`.
 pub fn (q PetQuery) where_id(value int) PetQuery {
 	return q.where(load.eq('id', value))
@@ -243,25 +260,25 @@ pub fn (q PetQuery) nodes(rows []models.Pet) ![]PetNode {
 		for configure in q.owner_fns {
 			sub = configure(sub)
 		}
-		mut keys := []int{}
+		mut keys := []string{}
 		for row in rows {
 			if key := row.owner_id {
-				keys << key
+				keys << key.str()
 			}
 		}
 		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
 			load.unique(keys),
 			query: sub.query
 		)!)!
-		mut by_key := map[int]&UserNode{}
+		mut by_key := map[string]&UserNode{}
 		for target in targets {
-			by_key[target.user.id] = &UserNode{
+			by_key[target.user.id.str()] = &UserNode{
 				...target
 			}
 		}
 		for mut node in nodes {
 			if key := node.pet.owner_id {
-				if target := by_key[key] {
+				if target := by_key[key.str()] {
 					node.owner = target
 				}
 			}

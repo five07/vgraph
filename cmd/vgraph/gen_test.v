@@ -13,8 +13,28 @@ import five07.vgraph
 @[table: 'users']
 pub struct User {
 pub:
-	id   int @[primary; sql: serial]
-	name string
+	id            int @[primary; sql: serial]
+	name          string
+	password_hash string @[graphql: '-']
+}
+
+// Audit is left out of GraphQL, and so is every edge to it.
+@[graphql: '-'; table: 'audits']
+pub struct Audit {
+pub:
+	id      int @[primary; sql: serial]
+	user_id int
+}
+
+pub fn (a Audit) edges() []vgraph.Edge {
+	return [
+		vgraph.Edge{
+			name:   'user'
+			kind:   .many_to_one
+			to:     'users'
+			column: 'user_id'
+		},
+	]
 }
 
 @[table: 'articles']
@@ -62,6 +82,12 @@ pub fn (u User) edges() []vgraph.Edge {
 			to:       'articles'
 			column:   'user_id'
 			soft_del: 'deleted_at'
+		},
+		vgraph.Edge{
+			name:   'audits'
+			kind:   .one_to_many
+			to:     'audits'
+			column: 'user_id'
 		},
 	]
 }
@@ -123,11 +149,12 @@ pub fn (c Comment) edges() []vgraph.Edge {
 }
 "
 
-const project_test = "module main
+const project_test = 'module main
 
 import db.sqlite
 import orm
 import time
+import five07.vgraph.graphql
 import graph
 import shop.models
 
@@ -177,15 +204,16 @@ fn (mut c Counting) execute(query string) ![]orm.Row {
 }
 
 fn setup() !(graph.Graph, &Log) {
-	mut db := sqlite.connect(':memory:')!
+	mut db := sqlite.connect(\':memory:\')!
 	sql db {
 		create table models.User
 		create table models.Article
 		create table models.Tag
 		create table models.ArticleTag
 		create table models.Comment
+		create table models.Audit
 	}!
-	for name in ['ada', 'bob'] {
+	for name in [\'ada\', \'bob\'] {
 		u := models.User{
 			name: name
 		}
@@ -193,18 +221,18 @@ fn setup() !(graph.Graph, &Log) {
 			insert u into models.User
 		}!
 	}
-	// 1 'V tips' by ada, 2 'SQL' by bob, 3 'Old' by ada and deleted
-	for a in [['1', 'V tips'], ['2', 'SQL'], ['1', 'Old']] {
+	// 1 \'V tips\' by ada, 2 \'SQL\' by bob, 3 \'Old\' by ada and deleted
+	for a in [[\'1\', \'V tips\'], [\'2\', \'SQL\'], [\'1\', \'Old\']] {
 		article := models.Article{
 			user_id:    a[0].int()
 			title:      a[1]
-			deleted_at: if a[1] == 'Old' { ?time.Time(time.now()) } else { none }
+			deleted_at: if a[1] == \'Old\' { ?time.Time(time.now()) } else { none }
 		}
 		sql db {
 			insert article into models.Article
 		}!
 	}
-	for name in ['v', 'db'] {
+	for name in [\'v\', \'db\'] {
 		t := models.Tag{
 			name: name
 		}
@@ -222,14 +250,14 @@ fn setup() !(graph.Graph, &Log) {
 		}!
 	}
 	// 1 on article 1; 2 answers 1; 3 on a Post 1; 4 on article 1, deleted
-	for c in [['Article', '1', '0', 'a'], ['Article', '1', '1', 'b'], ['Post', '1', '0', 'c'],
-		['Article', '1', '0', 'd']] {
+	for c in [[\'Article\', \'1\', \'0\', \'a\'], [\'Article\', \'1\', \'1\', \'b\'], [\'Post\', \'1\', \'0\', \'c\'],
+		[\'Article\', \'1\', \'0\', \'d\']] {
 		comment := models.Comment{
 			owner_type: c[0]
 			owner_id:   c[1].int()
-			parent_id:  if c[2] != '0' { ?int(c[2].int()) } else { none }
+			parent_id:  if c[2] != \'0\' { ?int(c[2].int()) } else { none }
 			body:       c[3]
-			deleted_at: if c[3] == 'd' { ?time.Time(time.now()) } else { none }
+			deleted_at: if c[3] == \'d\' { ?time.Time(time.now()) } else { none }
 		}
 		sql db {
 			insert comment into models.Comment
@@ -248,35 +276,35 @@ fn test_eager_loading_is_one_query_per_edge() {
 	articles := g.articles().where_deleted_at_is_null().order_by_id().with_author().with_tags().with_comments(fn (q graph.CommentQuery) graph.CommentQuery {
 		return q.with_replies().order_by_id_desc()
 	}).all()!
-	assert log.tables == ['articles', 'users', 'comments', 'comments', 'article_tags', 'tags']
-	assert articles.map(it.article.title) == ['V tips', 'SQL']
-	assert articles.map(if a := it.author { a.user.name } else { '' }) == ['ada', 'bob']
-	assert articles[0].tags.map(it.tag.name) == ['v', 'db']
-	assert articles[1].tags.map(it.tag.name) == ['db']
-	assert articles[0].comments.map(it.comment.body) == ['b', 'a'], 'deleted and Post comments are left out'
-	assert articles[0].comments[1].replies.map(it.comment.body) == ['b']
+	assert log.tables == [\'articles\', \'users\', \'comments\', \'comments\', \'article_tags\', \'tags\']
+	assert articles.map(it.article.title) == [\'V tips\', \'SQL\']
+	assert articles.map(if a := it.author { a.user.name } else { \'\' }) == [\'ada\', \'bob\']
+	assert articles[0].tags.map(it.tag.name) == [\'v\', \'db\']
+	assert articles[1].tags.map(it.tag.name) == [\'db\']
+	assert articles[0].comments.map(it.comment.body) == [\'b\', \'a\'], \'deleted and Post comments are left out\'
+	assert articles[0].comments[1].replies.map(it.comment.body) == [\'b\']
 	assert articles[1].comments.len == 0
 }
 
 fn test_polymorphic_and_nullable_edges() {
 	g, _ := setup()!
 	comments := g.comments().with_article().with_parent().order_by_id().all()!
-	assert comments.map(if a := it.article { a.article.title } else { '-' }) == ['V tips', 'V tips',
-		'-', 'V tips']
-	assert comments.map(if p := it.parent { p.comment.body } else { '-' }) == ['-', 'a', '-', '-']
+	assert comments.map(if a := it.article { a.article.title } else { \'-\' }) == [\'V tips\', \'V tips\',
+		\'-\', \'V tips\']
+	assert comments.map(if p := it.parent { p.comment.body } else { \'-\' }) == [\'-\', \'a\', \'-\', \'-\']
 }
 
 fn test_predicates() {
 	g, _ := setup()!
-	assert g.articles().where_title_like('SQ%').all()!.map(it.article.title) == ['SQL']
+	assert g.articles().where_title_like(\'SQ%\').all()!.map(it.article.title) == [\'SQL\']
 	assert g.articles().where_id_in([1, 3]).order_by_id_desc().all()!.map(it.article.id) == [3, 1]
 	assert g.articles().where_user_id(1).where_id_gt(1).all()!.map(it.article.id) == [3]
 	assert g.articles().where_deleted_at_is_not_null().all()!.len == 1
 	assert g.articles().order_by_id().limit(2).all()!.len == 2
-	assert g.users().where_name('bob').first()!.user.id == 2
-	g.users().where_name('cy').first() or {
+	assert g.users().where_name(\'bob\').first()!.user.id == 2
+	g.users().where_name(\'cy\').first() or {
 		assert err is graph.NotFoundError
-		assert err.msg() == 'no `users` row matches'
+		assert err.msg() == \'no `users` row matches\'
 		return
 	}
 	assert false
@@ -285,31 +313,50 @@ fn test_predicates() {
 fn test_traversal() {
 	g, _ := setup()!
 	article := g.articles().where_id(1).first()!
-	assert article.query_comments().order_by_id().all()!.map(it.comment.body) == ['a', 'b']
-	assert article.query_author().first()!.user.name == 'ada'
-	assert article.query_tags()!.all()!.map(it.tag.name) == ['v', 'db']
+	assert article.query_comments().order_by_id().all()!.map(it.comment.body) == [\'a\', \'b\']
+	assert article.query_author().first()!.user.name == \'ada\'
+	assert article.query_tags()!.all()!.map(it.tag.name) == [\'v\', \'db\']
 	ada := g.users().where_id(1).first()!
-	assert ada.query_articles().all()!.map(it.article.title) == ['V tips']
-	on_post := g.comments().where_body('c').first()!
-	assert on_post.query_article().all()!.len == 0, 'a Post comment has no article'
-	assert on_post.query_parent().all()!.len == 0, 'no parent'
+	assert ada.query_articles().all()!.map(it.article.title) == [\'V tips\']
+	on_post := g.comments().where_body(\'c\').first()!
+	assert on_post.query_article().all()!.len == 0, \'a Post comment has no article\'
+	assert on_post.query_parent().all()!.len == 0, \'no parent\'
 }
 
 fn test_nodes_on_rows_you_have() {
 	g, log := setup()!
 	rows := [models.Comment{
 		id:         2
-		owner_type: 'Article'
+		owner_type: \'Article\'
 		owner_id:   1
 		parent_id:  1
 	}]
 	log.tables.clear()
 	nodes := g.comments().with_parent().with_article().nodes(rows)!
 	// edges load in the order they are declared, not the order asked for
-	assert log.tables == ['articles', 'comments']
-	assert nodes[0].parent?.comment.body == 'a'
+	assert log.tables == [\'articles\', \'comments\']
+	assert nodes[0].parent?.comment.body == \'a\'
 }
-"
+
+fn test_graphql() {
+	g, log := setup()!
+	s := g.graphql(graph.Resolvers{})!
+	log.tables.clear()
+	res := s.execute(graphql.Request{
+		query: \'{ hello articles(where: {deletedAtIsNil: true}, orderBy: {field: ID}) { title url author { name } tags { name } comments(orderBy: {field: BODY, direction: DESC}) { body replies { body } } } }\'
+	}, unsafe { nil })
+	assert res.json() == \'{"data":{"hello":"hello world","articles":[{"title":"V tips","url":"/articles/1","author":{"name":"ada"},"tags":[{"name":"v"},{"name":"db"}],"comments":[{"body":"b","replies":[]},{"body":"a","replies":[{"body":"b"}]}]},{"title":"SQL","url":"/articles/2","author":{"name":"bob"},"tags":[{"name":"db"}],"comments":[]}]}}\'
+	// one select per edge per level
+	assert log.tables == [\'articles\', \'users\', \'article_tags\', \'tags\', \'comments\', \'comments\']
+	// hidden fields and tables are not in the schema
+	assert !graph.schema_sdl.contains(\'passwordHash\')
+	assert !graph.schema_sdl.contains(\'Audit\')
+	failed := s.execute(graphql.Request{
+		query: \'mutation { touch(id: "1") { title } }\'
+	}, unsafe { nil })
+	assert failed.errors.map(it.message) == [\'not now\']
+}
+'
 
 fn test_gen_writes_a_working_client() {
 	root := os.join_path(os.vtmp_dir(), 'vgraph_gen_test_${os.getpid()}')
@@ -322,9 +369,28 @@ fn test_gen_writes_a_working_client() {
 	os.write_file(os.join_path(root, 'shop', 'models', 'models.v'), models)!
 	os.write_file(os.join_path(root, 'main_test.v'), project_test)!
 
+	os.write_file(os.join_path(root, 'api.graphql'), api_sdl)!
 	run(root, 'graph')!
-	assert os.ls(os.join_path(root, 'graph'))!.sorted() == ['articles.v', 'comments.v', 'graph.v',
-		'tags.v', 'users.v']
+	assert os.ls(os.join_path(root, 'graph'))!.sorted() == ['articles.v', 'audits.v', 'comments.v',
+		'graph.v', 'graphql.v', 'resolvers.v', 'schema.graphql', 'tags.v', 'users.v']
+	// a stub for each field api.graphql adds
+	stubs := os.read_file(os.join_path(root, 'graph', 'resolvers.v'))!
+	for method in ['query_hello', 'article_url', 'mutation_touch'] {
+		assert stubs.contains(') ${method}('), method
+	}
+	// the stubs are the project's: written once, never overwritten
+	os.write_file(os.join_path(root, 'graph', 'resolvers.v'), resolvers)!
+	run(root, 'graph')!
+	assert os.read_file(os.join_path(root, 'graph', 'resolvers.v'))! == resolvers
+	// a new field gets a new stub, after what is there
+	os.write_file(os.join_path(root, 'api.graphql'), api_sdl + 'extend type Tag { slug: String! }\n')!
+	run(root, 'graph')!
+	with_stub := os.read_file(os.join_path(root, 'graph', 'resolvers.v'))!
+	assert with_stub.starts_with(resolvers.trim_right('\n'))
+	assert with_stub.contains(') tag_slug(')
+	os.write_file(os.join_path(root, 'api.graphql'), api_sdl)!
+	os.write_file(os.join_path(root, 'graph', 'resolvers.v'), resolvers)!
+	run(root, 'graph')!
 
 	// a stale generated file goes away; a hand-written one stays
 	os.write_file(os.join_path(root, 'graph', 'old.v'), '${header()}\nmodule graph\n')!
@@ -336,6 +402,38 @@ fn test_gen_writes_a_working_client() {
 	res := os.exec([@VEXE, '-stats', 'test', root])
 	assert res.exit_code == 0, res.output
 }
+
+const api_sdl = 'extend type Query {
+  hello(name: String = \"world\"): String!
+}
+
+extend type Article {
+  url: String!
+}
+
+type Mutation {
+  touch(id: ID!): Article
+}
+'
+
+const resolvers = "module graph
+
+import five07.vgraph.graphql
+
+pub struct Resolvers {}
+
+pub fn (r Resolvers) query_hello(_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	return parents.map(graphql.Resolved(graphql.Value('hello ' + info.arg('name').as_string())))
+}
+
+pub fn (r Resolvers) article_url(_ graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	return parents.map(graphql.Resolved(graphql.Value('/articles/' + (it as ArticleNode).article.id.str())))
+}
+
+pub fn (r Resolvers) mutation_touch(_ graphql.Context, _ graphql.FieldInfo, _ []graphql.Source) ![]graphql.Resolved {
+	return error('not now')
+}
+"
 
 fn header() string {
 	return '// Code generated by vgraph gen. DO NOT EDIT.'
@@ -375,6 +473,25 @@ pub fn (a A) edges() []vgraph.Edge {
 		assert err.msg() == 'the schema has problems:\nas.bs: no table `nowhere` is registered'
 		assert !os.exists(os.join_path(root, 'graph'))
 		assert !os.exists(os.join_path(root, '.vgraph-gen')), 'the loader is cleaned up'
+		return
+	}
+	assert false, 'gen should fail'
+}
+
+fn test_gen_reports_graphql_problems_where_they_are() {
+	root := os.join_path(os.vtmp_dir(), 'vgraph_gen_gql_${os.getpid()}')
+	os.rmdir_all(root) or {}
+	defer {
+		os.rmdir_all(root) or {}
+	}
+	os.mkdir_all(os.join_path(root, 'shop', 'models'))!
+	os.write_file(os.join_path(root, 'v.mod'), "Module {\n\tname: 'shop'\n\tversion: '0.0.0'\n}\n")!
+	os.write_file(os.join_path(root, 'shop', 'models', 'models.v'), models)!
+	os.mkdir_all(os.join_path(root, 'schema'))!
+	os.write_file(os.join_path(root, 'schema', 'bad.graphql'), '# a mistake\nextend type Query {\n  x: Nope\n}\n')!
+	run(root, 'graph') or {
+		// the file and line of the mistake, not of the merged schema
+		assert err.msg().starts_with('schema/bad.graphql:3:6: Unknown type "Nope".'), err.msg()
 		return
 	}
 	assert false, 'gen should fail'

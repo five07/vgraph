@@ -5,11 +5,17 @@ module main
 import os
 import gen
 
-const usage = 'usage: vgraph gen [project folder] [--out <module>]
+const usage = "usage: vgraph gen [project folder] [--out <module>]
 
 Finds the structs with an `edges() []vgraph.Edge` method in the project, checks
 their schema, and writes the typed client module `<module>` (default `graph`) into
-the project folder (default `.`), which must hold the `v.mod`.'
+the project folder (default `.`), which must hold the `v.mod`.
+
+It also writes the GraphQL schema of the tables, merged with the project's own
+`.graphql` files, as `<module>/schema.graphql`, and the server that resolves it,
+`Graph.graphql()`. The fields the files add are resolved by the methods of
+`Resolvers` in `<module>/resolvers.v`: a file vgraph gen creates, then only adds
+stubs to."
 
 fn main() {
 	args := os.args[1..]
@@ -44,10 +50,25 @@ fn run(root string, out string) ! {
 		return error('no struct in ${root} has an `edges() []vgraph.Edge` method')
 	}
 	tables := gen.decode_tables(run_loader(root, entities)!)!
-	files := gen.generate(out, entities, tables)!
+	mut files := gen.generate(out, entities, tables)!
 
 	dir := os.join_path(root, out)
 	os.mkdir_all(dir)!
+	// the GraphQL schema and server; resolvers.v is the project's, and only
+	// gains stubs for new fields
+	resolvers_path := os.join_path(dir, 'resolvers.v')
+	current := if os.exists(resolvers_path) { os.read_file(resolvers_path)! } else { '' }
+	mut defined := ''
+	for name in os.ls(dir)! {
+		path := os.join_path(dir, name)
+		if name.ends_with('.v') && name != 'resolvers.v'
+			&& !os.read_file(path)!.starts_with(gen.header) {
+			defined += os.read_file(path)!
+		}
+	}
+	graphql_files := gen.read_graphql_files(root, [out])!
+	g := gen.generate_graphql(out, entities, tables, graphql_files, current, defined)!
+	files['graphql.v'] = g.server
 	// remove generated files that are no longer generated
 	for name in os.ls(dir)! {
 		path := os.join_path(dir, name)
@@ -61,11 +82,18 @@ fn run(root string, out string) ! {
 	for name in names {
 		os.write_file(os.join_path(dir, name), files[name])!
 	}
+	os.write_file(os.join_path(dir, 'schema.graphql'), g.schema)!
+	if g.resolvers != '' {
+		os.write_file(resolvers_path, g.resolvers)!
+	}
 	res := os.exec([v_exe(), 'fmt', '-w', dir])
 	if res.exit_code != 0 {
 		return error('formatting the generated code failed:\n${res.output}')
 	}
-	println('vgraph gen: wrote ${names.len} files to ${dir} for ${entities.len} tables')
+	println('vgraph gen: wrote ${names.len} files and schema.graphql to ${dir} for ${entities.len} tables')
+	for stub in g.stubs {
+		println('vgraph gen: added a stub to ${out}/resolvers.v for ${stub}; implement it')
+	}
 }
 
 // run_loader compiles and runs a program that registers `entities` and prints

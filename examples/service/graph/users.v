@@ -63,6 +63,23 @@ pub fn (q UserQuery) limit(count int) UserQuery {
 	return next
 }
 
+// offset skips the first `count` rows. It applies to `all()` and `first()`, not
+// to the rows of an edge load.
+pub fn (q UserQuery) offset(count int) UserQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		offset: count
+	}
+	return next
+}
+
+// count returns how many rows match, in one query; order, limit and offset
+// do not apply.
+pub fn (q UserQuery) count() !int {
+	return load.count_where[users_models.User](q.graph.client.conn, q.query)
+}
+
 // where_id keeps the rows whose `id` is `value`.
 pub fn (q UserQuery) where_id(value int) UserQuery {
 	return q.where(load.eq('id', value))
@@ -435,16 +452,16 @@ pub fn (q UserQuery) nodes(rows []users_models.User) ![]UserNode {
 			sub = configure(sub)
 		}
 		children := sub.nodes(load.select_in[articles_models.Article](q.graph.client.conn,
-			'user_id', rows.map(it.id),
+			'user_id', rows.map(it.id.str()),
 			soft_del: 'deleted_at'
 			query:    sub.query
 		)!)!
-		mut by_parent := map[int][]ArticleNode{}
+		mut by_parent := map[string][]ArticleNode{}
 		for child in children {
-			by_parent[child.article.user_id] << child
+			by_parent[child.article.user_id.str()] << child
 		}
 		for mut node in nodes {
-			node.articles = by_parent[node.user.id] or { [] }
+			node.articles = by_parent[node.user.id.str()] or { [] }
 		}
 	}
 	if q.with_posts {
@@ -453,16 +470,16 @@ pub fn (q UserQuery) nodes(rows []users_models.User) ![]UserNode {
 			sub = configure(sub)
 		}
 		children := sub.nodes(load.select_in[posts_models.Post](q.graph.client.conn, 'user_id',
-			rows.map(it.id),
+			rows.map(it.id.str()),
 			soft_del: 'deleted_at'
 			query:    sub.query
 		)!)!
-		mut by_parent := map[int][]PostNode{}
+		mut by_parent := map[string][]PostNode{}
 		for child in children {
-			by_parent[child.post.user_id] << child
+			by_parent[child.post.user_id.str()] << child
 		}
 		for mut node in nodes {
-			node.posts = by_parent[node.user.id] or { [] }
+			node.posts = by_parent[node.user.id.str()] or { [] }
 		}
 	}
 	if q.with_comments {
@@ -471,16 +488,16 @@ pub fn (q UserQuery) nodes(rows []users_models.User) ![]UserNode {
 			sub = configure(sub)
 		}
 		children := sub.nodes(load.select_in[comments_models.Comment](q.graph.client.conn,
-			'user_id', rows.map(it.id),
+			'user_id', rows.map(it.id.str()),
 			soft_del: 'deleted_at'
 			query:    sub.query
 		)!)!
-		mut by_parent := map[int][]CommentNode{}
+		mut by_parent := map[string][]CommentNode{}
 		for child in children {
-			by_parent[child.comment.user_id] << child
+			by_parent[child.comment.user_id.str()] << child
 		}
 		for mut node in nodes {
-			node.comments = by_parent[node.user.id] or { [] }
+			node.comments = by_parent[node.user.id.str()] or { [] }
 		}
 	}
 	return nodes

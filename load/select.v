@@ -3,20 +3,21 @@ module load
 import orm
 import time
 
-// select_in returns the `T` records whose `column` is one of `ids`, in one query,
+// select_in returns the `T` records whose `column` is one of `ids`, keys in their
+// string form, in one query,
 // narrowed and ordered by `opts`. It calls
 // `orm.Connection.select` directly: `orm.new_query`, which could do this, leaves
 // the standard library after 2027-08-17 (PLAN.md, Q17). Fields may be `int`,
 // `i64`, `f64`, `bool`, `string` or `time.Time`, or options of those.
-pub fn select_in[T](conn orm.Connection, column string, ids []int, opts Options) ![]T {
-	mut conds := [in_ints(column, ids)]
+pub fn select_in[T](conn orm.Connection, column string, ids []string, opts Options) ![]T {
+	mut conds := [in_keys(column, ids, key_type[T](column)!)]
 	if opts.type_col != '' {
 		conds << eq(opts.type_col, opts.type_val)
 	}
 	if opts.soft_del != '' {
 		conds << is_null(opts.soft_del)
 	}
-	conds << opts.query.conds
+	conds << effective(opts.query.conds)
 	if matches_nothing(conds) {
 		return []T{}
 	}
@@ -53,9 +54,16 @@ fn run_select[T](conn orm.Connection, where orm.QueryData, q Query, limit bool) 
 		}
 	}
 	mut data := orm.QueryData{}
-	if limit && q.limit > 0 {
-		data.data << orm.Primitive(q.limit)
-		data.types << orm.type_idx['int']
+	has_offset := limit && q.offset > 0
+	// SQLite needs a LIMIT before an OFFSET: no limit is the largest one
+	has_limit := limit && (q.limit > 0 || has_offset)
+	if has_limit {
+		data.data << if q.limit > 0 { orm.Primitive(i64(q.limit)) } else { orm.Primitive(max_i64) }
+		data.types << orm.type_idx['i64']
+	}
+	if has_offset {
+		data.data << orm.Primitive(i64(q.offset))
+		data.types << orm.type_idx['i64']
 	}
 	config := orm.SelectConfig{
 		table:        orm.Table{
@@ -65,7 +73,8 @@ fn run_select[T](conn orm.Connection, where orm.QueryData, q Query, limit bool) 
 		has_order:    q.order != ''
 		order:        q.order
 		order_type:   if q.desc { .desc } else { .asc }
-		has_limit:    limit && q.limit > 0
+		has_limit:    has_limit
+		has_offset:   has_offset
 		primary:      primary_key[T]()
 		fields:       fields
 		select_exprs: fields
@@ -78,32 +87,6 @@ fn run_select[T](conn orm.Connection, where orm.QueryData, q Query, limit bool) 
 		result << map_row[T](row)!
 	}
 	return result
-}
-
-// link_pairs returns the `[from_col, to_col]` pairs of the join table `table`
-// whose `from_col` is one of `ids`, in one query, or none without a query when
-// `ids` is empty.
-pub fn link_pairs(conn orm.Connection, table string, from_col string, to_col string, ids []int) ![][]int {
-	if ids.len == 0 {
-		return [][]int{}
-	}
-	config := orm.SelectConfig{
-		table:        orm.Table{
-			name: table
-		}
-		has_where:    true
-		primary:      from_col
-		fields:       [from_col, to_col]
-		select_exprs: [from_col, to_col]
-		types:        [orm.type_idx['int'], orm.type_idx['int']]
-	}
-	mut c := conn
-	rows := c.select(config, orm.QueryData{}, where_of([in_ints(from_col, ids)]))!
-	mut pairs := [][]int{cap: rows.len}
-	for row in rows {
-		pairs << [cell_int(row[0], from_col)!, cell_int(row[1], to_col)!]
-	}
-	return pairs
 }
 
 // map_row builds a `T` from the cells of one selected row, in field order.

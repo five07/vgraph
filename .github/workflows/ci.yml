@@ -34,7 +34,7 @@ jobs:
       - name: Check formatting
         run: v fmt -verify vgraph
       - name: Check doc comments
-        run: v vet vgraph/edge.v vgraph/schema.v vgraph/client.v vgraph/migrate.v vgraph/load vgraph/gen vgraph/cmd/vgraph
+        run: v vet vgraph/edge.v vgraph/schema.v vgraph/client.v vgraph/migrate.v vgraph/load vgraph/gen vgraph/cmd/vgraph vgraph/graphql
       - name: Check that the examples' clients are generated from their current models
         run: |
           v run vgraph/cmd/vgraph gen vgraph/examples/service
@@ -43,6 +43,26 @@ jobs:
           test -z "$(git -C vgraph status --porcelain -- examples/service/graph examples/relations/graph)"
       - name: Test
         run: v test vgraph
+
+  # The schemas vgraph gen writes must read, and print, the same in graphql-js,
+  # which Apollo's tools build on (PLAN.md, Q30).
+  graphql-js:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: vgraph
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install graphql-js
+        run: npm install --prefix "$RUNNER_TEMP/graphql-js" --no-save --no-audit --no-fund graphql@16.11.0
+      - name: Check the generated schemas with graphql-js
+        run: |
+          NODE_PATH="$RUNNER_TEMP/graphql-js/node_modules" node vgraph/graphql/testdata/check_schema.js \
+            vgraph/examples/service/graph/schema.graphql vgraph/examples/relations/graph/schema.graphql
 
   postgres:
     runs-on: ubuntu-24.04

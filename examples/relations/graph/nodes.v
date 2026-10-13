@@ -56,6 +56,23 @@ pub fn (q NodeQuery) limit(count int) NodeQuery {
 	return next
 }
 
+// offset skips the first `count` rows. It applies to `all()` and `first()`, not
+// to the rows of an edge load.
+pub fn (q NodeQuery) offset(count int) NodeQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		offset: count
+	}
+	return next
+}
+
+// count returns how many rows match, in one query; order, limit and offset
+// do not apply.
+pub fn (q NodeQuery) count() !int {
+	return load.count_where[models.Node](q.graph.client.conn, q.query)
+}
+
 // where_id keeps the rows whose `id` is `value`.
 pub fn (q NodeQuery) where_id(value int) NodeQuery {
 	return q.where(load.eq('id', value))
@@ -270,25 +287,25 @@ pub fn (q NodeQuery) nodes(rows []models.Node) ![]NodeNode {
 		for configure in q.next_fns {
 			sub = configure(sub)
 		}
-		mut keys := []int{}
+		mut keys := []string{}
 		for row in rows {
 			if key := row.next_id {
-				keys << key
+				keys << key.str()
 			}
 		}
 		targets := sub.nodes(load.select_in[models.Node](q.graph.client.conn, 'id',
 			load.unique(keys),
 			query: sub.query
 		)!)!
-		mut by_key := map[int]&NodeNode{}
+		mut by_key := map[string]&NodeNode{}
 		for target in targets {
-			by_key[target.node.id] = &NodeNode{
+			by_key[target.node.id.str()] = &NodeNode{
 				...target
 			}
 		}
 		for mut node in nodes {
 			if key := node.node.next_id {
-				if target := by_key[key] {
+				if target := by_key[key.str()] {
 					node.next = target
 				}
 			}
@@ -300,18 +317,18 @@ pub fn (q NodeQuery) nodes(rows []models.Node) ![]NodeNode {
 			sub = configure(sub)
 		}
 		children := sub.nodes(load.select_in[models.Node](q.graph.client.conn, 'next_id',
-			rows.map(it.id),
+			rows.map(it.id.str()),
 			query: sub.query
 		)!)!
-		mut by_parent := map[int][]NodeNode{}
+		mut by_parent := map[string][]NodeNode{}
 		for child in children {
 			if parent := child.node.next_id {
-				by_parent[parent] << child
+				by_parent[parent.str()] << child
 			}
 		}
 		// at most one each: the first, in the order of the query
 		for mut node in nodes {
-			if found := by_parent[node.node.id] {
+			if found := by_parent[node.node.id.str()] {
 				node.prev = &NodeNode{
 					...found[0]
 				}

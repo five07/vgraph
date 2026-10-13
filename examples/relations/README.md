@@ -15,6 +15,18 @@ declared with vgraph and loaded through the client that `vgraph gen` wrote into
 | M2M same type | following and followers | `User.following` and `User.followers`: `many_to_many` through `follows`, columns swapped |
 | M2M bidirectional | friends | `User.friends`: `many_to_many` through `friendships`, each friendship stored both ways |
 
+Keys don't have to be ints. `Device` is keyed by a UUID (a `string`, stored as
+`uuid` on PostgreSQL) and has an edge of each kind: `Device.owner` (`many_to_one` to
+`users`) and `User.devices`, `Device.logins` (`one_to_many` on the string column
+`logins.device_id`) and `Login.device`, and `Device.groups` / `Group.devices`
+(`many_to_many` through `device_groups`, whose columns are a UUID and an int).
+`test_uuid_keys` checks them all, in the same number of queries as int keys.
+
+The same relationships are served over GraphQL by the server `vgraph gen` wrote
+(`graph/graphql.v`, schema in `graph/schema.graphql`). `check_graphql` queries each
+kind through it, with filters, ordering, per-parent limits, counts and UUID keys,
+and checks each query runs one select per edge per level.
+
 The rule behind the table: the side without the foreign key is `one_to_one` or
 `one_to_many`, the side with it is `many_to_one`, and a join table makes
 `many_to_many`.

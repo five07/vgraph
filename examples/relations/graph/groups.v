@@ -9,17 +9,20 @@ import models
 pub struct GroupQuery {
 	graph Graph
 mut:
-	query      load.Query
-	with_users bool
-	users_fns  []fn (UserQuery) UserQuery
+	query        load.Query
+	with_users   bool
+	users_fns    []fn (UserQuery) UserQuery
+	with_devices bool
+	devices_fns  []fn (DeviceQuery) DeviceQuery
 }
 
 // GroupNode is a `groups` row, with the edges its query loaded.
 pub struct GroupNode {
 	graph Graph
 pub mut:
-	group models.Group
-	users []UserNode // set by `with_users()`
+	group   models.Group
+	users   []UserNode   // set by `with_users()`
+	devices []DeviceNode // set by `with_devices()`
 }
 
 // groups starts a query of `groups`.
@@ -51,6 +54,23 @@ pub fn (q GroupQuery) limit(count int) GroupQuery {
 		limit: count
 	}
 	return next
+}
+
+// offset skips the first `count` rows. It applies to `all()` and `first()`, not
+// to the rows of an edge load.
+pub fn (q GroupQuery) offset(count int) GroupQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		offset: count
+	}
+	return next
+}
+
+// count returns how many rows match, in one query; order, limit and offset
+// do not apply.
+pub fn (q GroupQuery) count() !int {
+	return load.count_where[models.Group](q.graph.client.conn, q.query)
 }
 
 // where_id keeps the rows whose `id` is `value`.
@@ -151,6 +171,15 @@ pub fn (q GroupQuery) with_users(configure ...fn (UserQuery) UserQuery) GroupQue
 	return next
 }
 
+// with_devices loads each row's `devices` (many_to_many `devices`) with it, in one
+// query for all the rows. `configure` narrows them, and can load their edges.
+pub fn (q GroupQuery) with_devices(configure ...fn (DeviceQuery) DeviceQuery) GroupQuery {
+	mut next := q
+	next.with_devices = true
+	next.devices_fns = configure
+	return next
+}
+
 // all returns the matching rows, with the requested edges.
 pub fn (q GroupQuery) all() ![]GroupNode {
 	rows := load.select_where[models.Group](q.graph.client.conn, q.query)!
@@ -182,23 +211,50 @@ pub fn (q GroupQuery) nodes(rows []models.Group) ![]GroupNode {
 			sub = configure(sub)
 		}
 		pairs := load.link_pairs(q.graph.client.conn, 'group_users', 'group_id',
-			'user_id', rows.map(it.id))!
+			'user_id', rows.map(it.id.str()), .int, .int)!
 		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
 			load.unique(pairs.map(it[1])),
 			query: sub.query
 		)!)!
-		mut by_key := map[int]UserNode{}
-		for target in targets {
-			by_key[target.user.id] = target
-		}
-		mut linked := map[int][]UserNode{}
+		// each parent's targets in the order of the query
+		mut parents_of := map[string][]string{}
 		for pair in pairs {
-			if target := by_key[pair[1]] {
-				linked[pair[0]] << target
+			parents_of[pair[1]] << pair[0]
+		}
+		mut linked := map[string][]UserNode{}
+		for target in targets {
+			for parent in parents_of[target.user.id.str()] or { [] } {
+				linked[parent] << target
 			}
 		}
 		for mut node in nodes {
-			node.users = linked[node.group.id] or { [] }
+			node.users = linked[node.group.id.str()] or { [] }
+		}
+	}
+	if q.with_devices {
+		mut sub := q.graph.devices()
+		for configure in q.devices_fns {
+			sub = configure(sub)
+		}
+		pairs := load.link_pairs(q.graph.client.conn, 'device_groups', 'group_id',
+			'device_id', rows.map(it.id.str()), .int, .string)!
+		targets := sub.nodes(load.select_in[models.Device](q.graph.client.conn, 'id',
+			load.unique(pairs.map(it[1])),
+			query: sub.query
+		)!)!
+		// each parent's targets in the order of the query
+		mut parents_of := map[string][]string{}
+		for pair in pairs {
+			parents_of[pair[1]] << pair[0]
+		}
+		mut linked := map[string][]DeviceNode{}
+		for target in targets {
+			for parent in parents_of[target.device.id.str()] or { [] } {
+				linked[parent] << target
+			}
+		}
+		for mut node in nodes {
+			node.devices = linked[node.group.id.str()] or { [] }
 		}
 	}
 	return nodes
@@ -208,6 +264,14 @@ pub fn (q GroupQuery) nodes(rows []models.Group) ![]GroupNode {
 // table `group_users` first, so it can fail.
 pub fn (n GroupNode) query_users() !UserQuery {
 	pairs := load.link_pairs(n.graph.client.conn, 'group_users', 'group_id',
-		'user_id', [n.group.id])!
-	return n.graph.users().where(load.in_ints('id', pairs.map(it[1])))
+		'user_id', [n.group.id.str()], .int, .int)!
+	return n.graph.users().where(load.in_keys('id', pairs.map(it[1]), .int))
+}
+
+// query_devices starts a query of this row's `devices`. It reads the join
+// table `device_groups` first, so it can fail.
+pub fn (n GroupNode) query_devices() !DeviceQuery {
+	pairs := load.link_pairs(n.graph.client.conn, 'device_groups', 'group_id',
+		'device_id', [n.group.id.str()], .int, .string)!
+	return n.graph.devices().where(load.in_keys('id', pairs.map(it[1]), .string))
 }

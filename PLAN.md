@@ -398,6 +398,27 @@ PostgreSQL), as V has no UUID type.
 *Exit:* `examples/relations` gains a UUID-keyed table with edges in both directions,
 tested on SQLite and PostgreSQL, and everything else passes unchanged.
 
+*Result (2026-10-13, done):*
+- **`load`:** keys travel as strings (`load/keys.v`): `key_column` reads an `int`,
+  `i64` or `string` key (or an option of one) as its `str()`, `key_type` finds a
+  column's type, and `in_keys` turns string keys back into `[]int`, `[]i64` or
+  `[]string` for the `IN` query. `load_one` / `load_many` / `load_through`, and
+  `Client`'s, return `map[string]`. `link_pairs` takes both columns' key types.
+  `in_i64s` is new; `int_column` is gone.
+- **Validation:** an edge's column must have the type of the key it holds, and a key
+  must be an `int`, `i64` or `string`. `ColumnKind` gained `i64`.
+- **Generator:** the generated loads key their maps by `.str()`, join-table reads
+  pass both key types, and `i64` columns get `where_<field>_in`. The generated API is
+  unchanged for int keys; on a UUID table it is `where_id(value string)`.
+- **`examples/relations`:** `devices` is keyed by a UUID (`uuid` on PostgreSQL), with
+  edges of every kind to and from it (`test_uuid_keys`). `load_test.v` and
+  `vgraph_test.v` cover `i64` and string keys and the new validation.
+- **Tests:** all 16 test files pass, and both PostgreSQL tests against PostgreSQL 18.
+  `examples/service`'s query counts are unchanged.
+- **Compiler bug found:** a third, `regressions/generic_result_map_arg.vv`: a generic
+  function returning `![]T`, given an array literal of the wrong element type and
+  followed by `.map(...)`, compiles without the type error and segfaults.
+
 **Phase 4: GraphQL.** Without it, vgraph can't serve GraphQL to a client at all:
 it has no GraphQL schema, parser or executor, and V's standard library has none.
 So it is built here, in this repo, and moved to its own package (`five07.graphql`)
@@ -463,6 +484,65 @@ copy, and Apollo Sandbox and GraphiQL load the schema (by hand, once); SQLite an
 PostgreSQL pass in CI, which also checks the generated schema and resolvers are up to
 date.
 
+*Result (2026-10-13, done):*
+- **`graphql/`** (`five07.vgraph.graphql`; imports only V's standard library):
+  - lexer, parser and printer for the whole language, executable and SDL;
+  - schemas built from SDL with extensions, printed as graphql-js prints them, and
+    checked with graphql-js's schema validation (`validate_schema`);
+  - every validation rule of the spec, graphql-js's recommended
+    `MaxIntrospectionDepthRule`, its two custom rules (`NoDeprecatedCustomRule`,
+    `NoSchemaIntrospectionCustomRule`, as `no_introspection`), and vgraph's limits
+    `max_depth` and `max_selections` (Q31);
+  - variable and argument coercion with graphql-js's messages; the five scalars,
+    custom scalars (`Scalar`), enums, `@oneOf`;
+  - the executor: batched resolvers (`Resolver` gets every parent at a level),
+    abstract types, `@skip` / `@include`, null propagation with error paths,
+    serial mutations, an optional `Transaction` around a request's mutations;
+    subscriptions are refused;
+  - introspection, and `introspection_query`;
+  - `Server.handle`, GraphQL over HTTP for any framework: POST JSON, GET for
+    queries only (405 otherwise), `application/graphql-response+json` with 400 for
+    request errors when the client accepts it, else `application/json` and 200.
+- **Conformance with graphql-js** (`graphql/testdata/`): its own test suite was run
+  with a recorder, and every recorded case matches exactly, messages and locations
+  included: 166 lexer cases, 697 parse and print cases, 156 schemas built and
+  printed, 439 validation cases and 102 SDL validation cases. The introspection of
+  two schemas matches graphql-js's byte for byte. CI checks that graphql-js
+  (npm, 16.11.0) builds, validates and prints the generated schemas unchanged.
+- **Generator:** `vgraph gen` writes `graph/schema.graphql`, `graph/graphql.v`
+  (`Graph.graphql(r Resolvers)`) and, once, `graph/resolvers.v`:
+  - types per table with entgql's names; list edges are `[T!]`, as entgql writes
+    them without connections, not `[T!]!`;
+  - `WhereInput` with entgql's predicate names: `NEQ`, `In`, `NotIn`, `GT`/`GTE`/
+    `LT`/`LTE`, `Contains`/`HasPrefix`/`HasSuffix` on strings, `IsNil`/`NotNil`;
+  - `Order` / `OrderField` / `OrderDirection` as entgql's;
+  - edge resolvers reuse `with_<edge>`; nested `limit` / `offset` cut per parent;
+  - `.graphql` files anywhere in the project are merged; problems are reported at
+    their file and line;
+  - stubs for the fields they add to `Query`, `Mutation` or a generated type, as
+    methods of `Resolvers` (gqlgen's pattern: the struct holds what they need);
+    fields of the files' own object types use the default resolver.
+- **Client and `load`:** `offset()`, `count()`, `not_in_*`, and a fix: a
+  many_to_many load now keeps the order of the edge's query (it kept the join
+  table's).
+- **`examples/service`:** `POST /graphql` and `GET /graphql`; `api.graphql` has a
+  mutation for each of the 14 REST endpoints that write, resolved through the same
+  stores and comment service; mutations share a SQLite transaction. Tests: each of
+  the 15 REST reads has a GraphQL query running the same selects; every mutation,
+  with REST's messages; rollback; introspection over HTTP equals graphql-js's.
+- **`examples/relations`:** `check_graphql` on SQLite and PostgreSQL.
+- **Phase 3.2 and 4 together:** all 18 test files pass (20 with the 2 PostgreSQL
+  ones, against PostgreSQL 18).
+- **Compiler bugs found:** three more in `regressions/`: `smartcast_array_interpolation.vv`,
+  `map_nested_field_name.vv`, `const_loop_var/` (a `for` variable clashing with a
+  const of the main module).
+- **Not done here:** opening Apollo Sandbox and GraphiQL by hand (Q35). Both read
+  the schema through introspection, which matches graphql-js's.
+- **Left for Phase 6:** `Contains` / `HasPrefix` / `HasSuffix` are LIKE patterns, so
+  `%` and `_` in the value act as wildcards (the ORM has no `ESCAPE`); no
+  `EqualFold` / `ContainsFold`, and no `In` on floats and times; `i64` columns are
+  `Int`, as in entgql, so values past 32 bits fail.
+
 **Phase 5: migration helpers** for `v.migrations` (Q10): from the declared edges,
 produce the indexes, foreign keys and join tables as `migrations.Index` /
 `ForeignKey` / `Table` values, for migrations written by hand. `examples/service` moves its
@@ -525,7 +605,7 @@ that Ent doesn't.
 | | annotations (`entsql`, `entgql`) | `@[table]`; `@[graphql]` in Phase 4 (Q29) | 4 / 6d |
 | | views, multiple database schemas | none | 6d |
 | **Queries** | predicates `EQ`, `NEQ`, `In`, `NotIn`, `GT`/`GTE`/`LT`/`LTE`, `IsNil`, `NotNil` | all but `NEQ` and `NotIn` generated (`load` has `ne`) | 6b |
-| | `Contains`, `HasPrefix`, `HasSuffix`, `EqualFold`, `ContainsFold` | `_like` only | 6b |
+| | `Contains`, `HasPrefix`, `HasSuffix`, `EqualFold`, `ContainsFold` | `_like` in the client; GraphQL's `Contains` / `HasPrefix` / `HasSuffix` are LIKE patterns without escaping `%` and `_` | 6b: escaping, and the `Fold` forms |
 | | `And`, `Or`, `Not` | AND only | 6b |
 | | `Has<Edge>`, `Has<Edge>With` | none | 6b |
 | | custom SQL predicates | `where(load.Cond...)`, column conditions only | 6b |
@@ -561,7 +641,7 @@ that Ent doesn't.
 | **entgql** | schema generation | none | 4 |
 | | `Node` interface, global ids, `node` / `nodes` | none | 6d, with globally unique ids (Q42) |
 | | `CollectFields`: eager loads from the selection set | none | 4 (Q32) |
-| | `WhereInput`: every predicate, `and`/`or`/`not`, `has<Edge>` | none | 4 (generated predicates, ANDed); rest 6e |
+| | `WhereInput`: every predicate, `and`/`or`/`not`, `has<Edge>` | the predicates `load` can run, ANDed (Phase 4) | rest 6e |
 | | `OrderBy` inputs, multi-field ordering | none | 4 (one field); 6e |
 | | Relay connections, cursors, `totalCount`, per-parent pagination | none | 6e (Q22) |
 | | mutation inputs (`CreateXInput`, `UpdateXInput`, `SetInput`), generated mutations | none | 6e (needs 6a) |

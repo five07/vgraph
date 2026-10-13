@@ -35,6 +35,17 @@ pub fn fail(mut ctx Context, err IError) veb.Result {
 	return render_error(mut ctx, status, message)
 }
 
+// client_message returns the message a client may see for `err`: its own for
+// the app's errors, and `internal error` for any other, whose text can contain
+// SQL. GraphQL errors use it.
+pub fn client_message(err IError) string {
+	status, message := status_of(err)
+	if status == .internal_server_error {
+		log.error('graphql: ${err}')
+	}
+	return message
+}
+
 // status_of returns the status code and the client-facing message for `err`.
 fn status_of(err IError) (http.Status, string) {
 	return match err {

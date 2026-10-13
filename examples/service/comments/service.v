@@ -39,6 +39,11 @@ pub fn (s Service) list_on(owner_type string, owner_slug string) ![]comment_mode
 // create stores the comment `input`, and returns it. The owner is named in
 // the body, so a missing or deleted owner is a bad reference.
 pub fn (s Service) create(input comment_models.CommentInput) !comment_models.CommentView {
+	return s.view(s.create_row(input)!)
+}
+
+// create_row is `create`, returning the stored comment rather than its view.
+pub fn (s Service) create_row(input comment_models.CommentInput) !comment_models.Comment {
 	if input.user_slug == '' {
 		return missing_user()
 	}
@@ -63,6 +68,12 @@ pub fn (s Service) create(input comment_models.CommentInput) !comment_models.Com
 // `owner_type` with the slug `owner_slug`, and returns it. The owner is named
 // in the path, so a missing or deleted owner gives a `NotFoundError`.
 pub fn (s Service) create_on(owner_type string, owner_slug string, input comment_models.OwnedCommentInput) !comment_models.CommentView {
+	return s.view(s.create_on_row(owner_type, owner_slug, input)!)
+}
+
+// create_on_row is `create_on`, returning the stored comment rather than its
+// view.
+pub fn (s Service) create_on_row(owner_type string, owner_slug string, input comment_models.OwnedCommentInput) !comment_models.Comment {
 	owner := s.owner(owner_type)!
 	owner_id := owner.id_of(owner_slug)!
 	if input.user_slug == '' {
@@ -79,16 +90,15 @@ pub fn (s Service) list_by_user(user_id int) ![]comment_models.CommentView {
 
 // insert stores a comment by the user `user_slug` on the record of the type
 // `owner_type` with the id `owner_id`, which the caller has checked.
-fn (s Service) insert(owner_type string, owner_id int, user_slug string, parent_slug string, body string) !comment_models.CommentView {
+fn (s Service) insert(owner_type string, owner_id int, user_slug string, parent_slug string, body string) !comment_models.Comment {
 	user_id := s.users.reference_id(user_slug)!
-	comment := s.store.insert(
+	return s.store.insert(
 		user_id:     user_id
 		owner_type:  owner_type
 		owner_id:    owner_id
 		parent_slug: parent_slug
 		body:        body
-	)!
-	return s.view(comment)
+	)
 }
 
 // view returns `comment` as the API returns it.

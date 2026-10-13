@@ -21,8 +21,9 @@ pub fn Client.new(conn orm.Connection, schema Schema) !Client {
 }
 
 // load_one follows the many_to_one edge `edge` of `C` from each of `children`,
-// and returns the `P` records reached, keyed by their primary key, in one query.
-pub fn (c Client) load_one[C, P](children []C, edge string) !map[int]P {
+// and returns the `P` records reached, keyed by their primary key's string form
+// (`'3'`, or a UUID), in one query.
+pub fn (c Client) load_one[C, P](children []C, edge string) !map[string]P {
 	e := c.edge_between(load.table_name[C](), edge, load.table_name[P]())!
 	if e.kind != .many_to_one {
 		return error('`${load.table_name[C]()}.${edge}` is ${e.kind}; use `load_many`')
@@ -36,9 +37,9 @@ pub fn (c Client) load_one[C, P](children []C, edge string) !map[int]P {
 
 // load_many follows the one_to_many, one_to_one or many_to_many edge `edge` of
 // `P` from each of `parents`, and returns the `C` records reached, keyed by the
-// parent's primary key: one query, or two through a join table. A one_to_one
-// edge gives each parent at most one record.
-pub fn (c Client) load_many[P, C](parents []P, edge string) !map[int][]C {
+// parent's primary key's string form: one query, or two through a join table. A
+// one_to_one edge gives each parent at most one record.
+pub fn (c Client) load_many[P, C](parents []P, edge string) !map[string][]C {
 	e := c.edge_between(load.table_name[P](), edge, load.table_name[C]())!
 	opts := load.Options{
 		type_col: e.type_col

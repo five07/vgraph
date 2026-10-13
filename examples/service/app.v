@@ -2,7 +2,9 @@ module main
 
 import veb
 import db.sqlite
+import net.http
 import orm
+import five07.vgraph.graphql
 import graph
 // `app.Context` is written out in this module: importing `Context` by name
 // makes V 0.5.2 generate C for veb's generics against a `main.Context`.
@@ -18,7 +20,8 @@ import users.models as user_models
 
 pub struct App {
 	veb.Controller
-	db sqlite.DB
+	db  sqlite.DB
+	gql &graphql.Server = unsafe { nil }
 }
 
 // new_app opens the database named by `cfg`, creates any missing tables,
@@ -65,8 +68,29 @@ fn new_app_on(cfg app.Config, db sqlite.DB, conn orm.Connection) !&App {
 		seed(user_store, article_store, post_store, comment_store)!
 	}
 
-	mut api := &App{
+	// GraphQL: the schema vgraph gen wrote, with the mutations of api.graphql,
+	// which go through the same stores and services as the REST endpoints
+	mut server := g.graphql(graph.Resolvers{
+		graph:             g
+		users:             user_store
+		articles:          article_store
+		posts:             post_store
+		comments:          comment_store
+		create_comment:    fn [comment_service] (input comment_models.CommentInput) !comment_models.Comment {
+			return comment_service.create_row(input)
+		}
+		create_comment_on: fn [comment_service] (owner_type string, owner_slug string, input comment_models.OwnedCommentInput) !comment_models.Comment {
+			return comment_service.create_on_row(owner_type, owner_slug, input)
+		}
+	})!
+	// a request's mutations run in one transaction, rolled back if one fails
+	server.transaction = SqliteTransaction{
 		db: db
+	}
+
+	mut api := &App{
+		db:  db
+		gql: server
 	}
 	mut user_handler := users.Handler.new(user_store, article_store, post_store, comment_service)
 	api.register_controller[users.Handler, app.Context]('/users', mut user_handler)!
@@ -77,6 +101,43 @@ fn new_app_on(cfg app.Config, db sqlite.DB, conn orm.Connection) !&App {
 	mut comment_handler := comments.Handler.new(comment_service)
 	api.register_controller[comments.Handler, app.Context]('/comments', mut comment_handler)!
 	return api
+}
+
+// serve_graphql answers GraphQL requests: queries by GET or POST, mutations by
+// POST, as the GraphQL over HTTP spec describes.
+@['/graphql'; get; post]
+pub fn (a &App) serve_graphql(mut ctx app.Context) veb.Result {
+	res := a.gql.handle(graphql.HttpRequest{
+		method:       ctx.req.method.str()
+		content_type: ctx.req.header.get(.content_type) or { '' }
+		accept:       ctx.req.header.get(.accept) or { '' }
+		query_string: if ctx.req.url.contains('?') { ctx.req.url.all_after('?') } else { '' }
+		body:         ctx.req.data
+	}, unsafe { nil })
+	for key, value in res.headers {
+		ctx.set_custom_header(key, value) or {}
+	}
+	ctx.res.set_status(http.status_from_int(res.status))
+	return ctx.send_response_to_client(res.content_type, res.body)
+}
+
+// SqliteTransaction runs a GraphQL request's mutations in one SQLite
+// transaction.
+struct SqliteTransaction {
+mut:
+	db sqlite.DB
+}
+
+fn (mut t SqliteTransaction) begin() ! {
+	t.db.orm_begin()!
+}
+
+fn (mut t SqliteTransaction) commit() ! {
+	t.db.orm_commit()!
+}
+
+fn (mut t SqliteTransaction) rollback() ! {
+	t.db.orm_rollback()!
 }
 
 // HealthResponse is the body of `GET /health`.

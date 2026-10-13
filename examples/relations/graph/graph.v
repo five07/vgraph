@@ -18,7 +18,9 @@ pub fn Graph.new(conn orm.Connection) !Graph {
 	mut schema := vgraph.Schema{}
 	schema.add[models.Card]()!
 	schema.add[models.Category]()!
+	schema.add[models.Device]()!
 	schema.add[models.Group]()!
+	schema.add[models.Login]()!
 	schema.add[models.Node]()!
 	schema.add[models.Pet]()!
 	schema.add[models.User]()!

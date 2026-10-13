@@ -1,0 +1,127 @@
+# The writes of the API: one mutation for each REST endpoint that writes.
+# `vgraph gen` merges this file into the generated schema; the methods of
+# `graph.Resolvers` (graph/resolvers.v) resolve the mutations.
+
+"""A new user, or every field of one."""
+input UserInput {
+  name: String!
+  email: String!
+}
+
+"""The fields of a user to change."""
+input UserPatch {
+  name: String
+  email: String
+}
+
+"""A new article, by the user `userSlug`."""
+input ArticleInput {
+  userSlug: String!
+  title: String!
+  summary: String! = ""
+  body: String!
+  published: Boolean! = false
+}
+
+"""Every writable field of an article."""
+input ArticleUpdate {
+  title: String!
+  summary: String! = ""
+  body: String!
+  published: Boolean! = false
+}
+
+"""The fields of an article to change."""
+input ArticlePatch {
+  title: String
+  summary: String
+  body: String
+  published: Boolean
+}
+
+"""A new post, by the user `userSlug`."""
+input PostInput {
+  userSlug: String!
+  body: String!
+}
+
+"""Every writable field of a post."""
+input PostUpdate {
+  body: String!
+}
+
+"""The fields of a post to change."""
+input PostPatch {
+  body: String
+}
+
+"""
+A new comment on the record of the type `ownerType` (`Article` or `Post`) with
+the slug `ownerSlug`, answering the comment `parentSlug` when it is set.
+"""
+input CommentInput {
+  userSlug: String!
+  ownerType: String!
+  ownerSlug: String!
+  parentSlug: String
+  body: String!
+}
+
+"""A new comment on a record the mutation names."""
+input OwnedCommentInput {
+  userSlug: String!
+  parentSlug: String
+  body: String!
+}
+
+"""Every writable field of a comment."""
+input CommentUpdate {
+  body: String!
+}
+
+"""The fields of a comment to change."""
+input CommentPatch {
+  body: String
+}
+
+type Mutation {
+  """`POST /users`"""
+  createUser(input: UserInput!): User!
+  """`PUT /users/:slug`"""
+  replaceUser(slug: String!, input: UserInput!): User!
+  """`PATCH /users/:slug`"""
+  updateUser(slug: String!, input: UserPatch!): User!
+  """`DELETE /users/:slug`: marks the user deleted."""
+  deleteUser(slug: String!): Boolean!
+
+  """`POST /articles`"""
+  createArticle(input: ArticleInput!): Article!
+  """`PUT /articles/:slug`"""
+  replaceArticle(slug: String!, input: ArticleUpdate!): Article!
+  """`PATCH /articles/:slug`"""
+  updateArticle(slug: String!, input: ArticlePatch!): Article!
+  """`DELETE /articles/:slug`: marks the article deleted."""
+  deleteArticle(slug: String!): Boolean!
+  """`POST /articles/:slug/comments`"""
+  createArticleComment(slug: String!, input: OwnedCommentInput!): Comment!
+
+  """`POST /posts`"""
+  createPost(input: PostInput!): Post!
+  """`PUT /posts/:slug`"""
+  replacePost(slug: String!, input: PostUpdate!): Post!
+  """`PATCH /posts/:slug`"""
+  updatePost(slug: String!, input: PostPatch!): Post!
+  """`DELETE /posts/:slug`: marks the post deleted."""
+  deletePost(slug: String!): Boolean!
+  """`POST /posts/:slug/comments`"""
+  createPostComment(slug: String!, input: OwnedCommentInput!): Comment!
+
+  """`POST /comments`"""
+  createComment(input: CommentInput!): Comment!
+  """`PUT /comments/:slug`"""
+  replaceComment(slug: String!, input: CommentUpdate!): Comment!
+  """`PATCH /comments/:slug`"""
+  updateComment(slug: String!, input: CommentPatch!): Comment!
+  """`DELETE /comments/:slug`: marks the comment deleted."""
+  deleteComment(slug: String!): Boolean!
+}

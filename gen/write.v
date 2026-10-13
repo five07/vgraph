@@ -30,6 +30,11 @@ fn (i Info) key_field() !string {
 	return i.table.column(i.table.key)!.field
 }
 
+// key_type is the `load.KeyType` of the table's key: `int`, `i64` or `string`.
+fn (i Info) key_type() !string {
+	return i.table.column(i.table.key)!.typ.trim_left('?')
+}
+
 // generate returns the files of the client module `out_module`, keyed by file
 // name: `graph.v`, and one file per table.
 pub fn generate(out_module string, entities []Entity, tables []Table) !map[string]string {
@@ -205,6 +210,23 @@ pub fn (q ${q}) limit(count int) ${q} {
 		limit: count
 	}
 	return next
+}
+
+// offset skips the first `count` rows. It applies to `all()` and `first()`, not
+// to the rows of an edge load.
+pub fn (q ${q}) offset(count int) ${q} {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		offset: count
+	}
+	return next
+}
+
+// count returns how many rows match, in one query; order, limit and offset
+// do not apply.
+pub fn (q ${q}) count() !int {
+	return load.count_where[${info.typ()}](q.graph.client.conn, q.query)
 }')
 	write_predicates(mut b, t, q)
 	for i, edge in t.edges {
@@ -280,8 +302,12 @@ pub fn (q ${q}) where_${c.field}_${op}(value ${base}) ${q} {
 }')
 			}
 		}
-		if base in ['int', 'string'] {
-			fn_name := if base == 'int' { 'in_ints' } else { 'in_strings' }
+		if base in ['int', 'i64', 'string'] {
+			fn_name := match base {
+				'int' { 'in_ints' }
+				'i64' { 'in_i64s' }
+				else { 'in_strings' }
+			}
 			b.writeln('
 // where_${c.field}_in keeps the rows whose `${c.name}` is one of `values`.
 pub fn (q ${q}) where_${c.field}_in(values []${base}) ${q} {
@@ -368,21 +394,21 @@ fn write_edge_load(mut b strings.Builder, info Info, edge Edge, target Info) ! {
 		'one_to_many', 'one_to_one' {
 			fk := target.table.column(edge.column)!
 			b.writeln("		children := sub.nodes(load.select_in[${target.typ()}](q.graph.client.conn, '${edge.column}',
-			rows.map(it.${key}), ${filters(edge, true)})!)!
-		mut by_parent := map[int][]${target.node()}{}
+			rows.map(it.${key}.str()), ${filters(edge, true)})!)!
+		mut by_parent := map[string][]${target.node()}{}
 		for child in children {")
 			if fk.nullable {
 				b.writeln('			if parent := child.${target.field()}.${fk.field} {
-				by_parent[parent] << child
+				by_parent[parent.str()] << child
 			}')
 			} else {
-				b.writeln('			by_parent[child.${target.field()}.${fk.field}] << child')
+				b.writeln('			by_parent[child.${target.field()}.${fk.field}.str()] << child')
 			}
 			if edge.kind == 'one_to_one' {
 				b.writeln('		}
 		// at most one each: the first, in the order of the query
 		for mut node in nodes {
-			if found := by_parent[node.${info.field()}.${key}] {
+			if found := by_parent[node.${info.field()}.${key}.str()] {
 				node.${edge.name} = &${target.node()}{
 					...found[0]
 				}
@@ -391,7 +417,7 @@ fn write_edge_load(mut b strings.Builder, info Info, edge Edge, target Info) ! {
 			} else {
 				b.writeln('		}
 		for mut node in nodes {
-			node.${edge.name} = by_parent[node.${info.field()}.${key}] or { [] }
+			node.${edge.name} = by_parent[node.${info.field()}.${key}.str()] or { [] }
 		}')
 			}
 		}
@@ -399,7 +425,7 @@ fn write_edge_load(mut b strings.Builder, info Info, edge Edge, target Info) ! {
 			fk := t.column(edge.column)!
 			target_key := target.key_field()!
 			check := type_check('row', info, edge)!
-			b.writeln('		mut keys := []int{}
+			b.writeln('		mut keys := []string{}
 		for row in rows {')
 			if check != '' {
 				b.writeln('			if !(${check}) {
@@ -408,17 +434,17 @@ fn write_edge_load(mut b strings.Builder, info Info, edge Edge, target Info) ! {
 			}
 			if fk.nullable {
 				b.writeln('			if key := row.${fk.field} {
-				keys << key
+				keys << key.str()
 			}')
 			} else {
-				b.writeln('			keys << row.${fk.field}')
+				b.writeln('			keys << row.${fk.field}.str()')
 			}
 			b.writeln("		}
 		targets := sub.nodes(load.select_in[${target.typ()}](q.graph.client.conn, '${target.table.key}',
 			load.unique(keys), ${filters(edge, false)})!)!
-		mut by_key := map[int]&${target.node()}{}
+		mut by_key := map[string]&${target.node()}{}
 		for target in targets {
-			by_key[target.${target.field()}.${target_key}] = &${target.node()}{
+			by_key[target.${target.field()}.${target_key}.str()] = &${target.node()}{
 				...target
 			}
 		}
@@ -431,12 +457,12 @@ fn write_edge_load(mut b strings.Builder, info Info, edge Edge, target Info) ! {
 			}
 			if fk.nullable {
 				b.writeln('			if key := node.${info.field()}.${fk.field} {
-				if target := by_key[key] {
+				if target := by_key[key.str()] {
 					node.${edge.name} = target
 				}
 			}')
 			} else {
-				b.writeln('			if target := by_key[node.${info.field()}.${fk.field}] {
+				b.writeln('			if target := by_key[node.${info.field()}.${fk.field}.str()] {
 				node.${edge.name} = target
 			}')
 			}
@@ -445,21 +471,22 @@ fn write_edge_load(mut b strings.Builder, info Info, edge Edge, target Info) ! {
 		'many_to_many' {
 			target_key := target.key_field()!
 			b.writeln("		pairs := load.link_pairs(q.graph.client.conn, '${edge.through}', '${edge.column}',
-			'${edge.through_to}', rows.map(it.${key}))!
+			'${edge.through_to}', rows.map(it.${key}.str()), .${info.key_type()!}, .${target.key_type()!})!
 		targets := sub.nodes(load.select_in[${target.typ()}](q.graph.client.conn, '${target.table.key}',
 			load.unique(pairs.map(it[1])), ${filters(edge, true)})!)!
-		mut by_key := map[int]${target.node()}{}
-		for target in targets {
-			by_key[target.${target.field()}.${target_key}] = target
-		}
-		mut linked := map[int][]${target.node()}{}
+		// each parent's targets in the order of the query
+		mut parents_of := map[string][]string{}
 		for pair in pairs {
-			if target := by_key[pair[1]] {
-				linked[pair[0]] << target
+			parents_of[pair[1]] << pair[0]
+		}
+		mut linked := map[string][]${target.node()}{}
+		for target in targets {
+			for parent in parents_of[target.${target.field()}.${target_key}.str()] or { [] } {
+				linked[parent] << target
 			}
 		}
 		for mut node in nodes {
-			node.${edge.name} = linked[node.${info.field()}.${key}] or { [] }
+			node.${edge.name} = linked[node.${info.field()}.${key}.str()] or { [] }
 		}")
 		}
 		else {
@@ -514,7 +541,7 @@ pub fn (n ${n}) query_${edge.name}() ${tq} {')
 }')
 		}
 		'many_to_many' {
-			mut conds := ["load.in_ints('${target.table.key}', pairs.map(it[1]))"]
+			mut conds := ["load.in_keys('${target.table.key}', pairs.map(it[1]), .${target.key_type()!})"]
 			if edge.type_col != '' {
 				conds << "load.eq('${edge.type_col}', '${edge.type_val}')"
 			}
@@ -524,7 +551,7 @@ pub fn (n ${n}) query_${edge.name}() ${tq} {')
 // table `${edge.through}` first, so it can fail.
 pub fn (n ${n}) query_${edge.name}() !${tq} {
 	pairs := load.link_pairs(n.graph.client.conn, '${edge.through}', '${edge.column}',
-		'${edge.through_to}', [${row}.${info.key_field()!}])!
+		'${edge.through_to}', [${row}.${info.key_field()!}.str()], .${info.key_type()!}, .${target.key_type()!})!
 	return n.graph.${target.table.name}().where(${conds.join(", ")})
 }")
 		}

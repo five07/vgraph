@@ -53,6 +53,24 @@ pub fn in_ints(column string, values []int) Cond {
 	return Cond{column, .in, values}
 }
 
+// in_i64s returns the condition `column IN (values)`. An empty `values` matches
+// no row.
+pub fn in_i64s(column string, values []i64) Cond {
+	return Cond{column, .in, values}
+}
+
+// not_in_ints returns the condition `column NOT IN (values)`. An empty `values`
+// matches every row.
+pub fn not_in_ints(column string, values []int) Cond {
+	return Cond{column, .not_in, values}
+}
+
+// not_in_strings returns the condition `column NOT IN (values)`. An empty
+// `values` matches every row.
+pub fn not_in_strings(column string, values []string) Cond {
+	return Cond{column, .not_in, values}
+}
+
 // in_strings returns the condition `column IN (values)`. An empty `values`
 // matches no row.
 pub fn in_strings(column string, values []string) Cond {
@@ -78,18 +96,60 @@ pub fn is_not_null(column string) Cond {
 // Query narrows, orders and limits a select.
 pub struct Query {
 pub:
-	conds []Cond
-	order string // a column to order by; none when empty
-	desc  bool
-	limit int // at most this many rows; no limit when 0. Edge loads ignore it.
+	conds  []Cond
+	order  string // a column to order by; none when empty
+	desc   bool
+	limit  int // at most this many rows; no limit when 0. Edge loads ignore it.
+	offset int // skip this many rows first. Edge loads ignore it.
 }
 
 // select_where returns the `T` records that match `q`, in one query.
 pub fn select_where[T](conn orm.Connection, q Query) ![]T {
-	if matches_nothing(q.conds) {
+	conds := effective(q.conds)
+	if matches_nothing(conds) {
 		return []T{}
 	}
-	return run_select[T](conn, where_of(q.conds), q, true)
+	return run_select[T](conn, where_of(conds), q, true)
+}
+
+// count_where returns how many `T` records match the conditions of `q`, in one
+// query. Its order, limit and offset don't apply.
+pub fn count_where[T](conn orm.Connection, q Query) !int {
+	conds := effective(q.conds)
+	if matches_nothing(conds) {
+		return 0
+	}
+	where := where_of(conds)
+	config := orm.SelectConfig{
+		table:          orm.Table{
+			name: table_name[T]()
+		}
+		aggregate_kind: .count
+		has_where:      where.fields.len > 0
+		primary:        primary_key[T]()
+		types:          [orm.type_idx['int']]
+	}
+	mut c := conn
+	rows := c.select(config, orm.QueryData{}, where)!
+	if rows.len == 0 || rows[0].len == 0 {
+		return 0
+	}
+	return int(cell_i64(rows[0][0], 'count')!)
+}
+
+// effective drops the conditions that hold for every row: `NOT IN` an empty
+// list, which isn't valid SQL.
+fn effective(conds []Cond) []Cond {
+	return conds.filter(!(it.kind == .not_in && is_empty_list(it.value)))
+}
+
+fn is_empty_list(value orm.Primitive) bool {
+	return match value {
+		[]int { value.len == 0 }
+		[]i64 { value.len == 0 }
+		[]string { value.len == 0 }
+		else { false }
+	}
 }
 
 // matches_nothing reports whether `conds` has an `IN ()` with no values, which
@@ -99,6 +159,7 @@ fn matches_nothing(conds []Cond) bool {
 		if cond.kind in [.in, .not_in] {
 			empty := match cond.value {
 				[]int { cond.value.len == 0 }
+				[]i64 { cond.value.len == 0 }
 				[]string { cond.value.len == 0 }
 				else { false }
 			}
@@ -131,6 +192,7 @@ fn where_of(conds []Cond) orm.QueryData {
 fn primitive_type(value orm.Primitive) int {
 	return match value {
 		[]int { typeof[[]int]().idx }
+		[]i64 { typeof[[]i64]().idx }
 		[]string { typeof[[]string]().idx }
 		int { orm.type_idx['int'] }
 		i64 { orm.type_idx['i64'] }

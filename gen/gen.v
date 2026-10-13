@@ -26,11 +26,12 @@ pub fn (e Entity) alias() string {
 // Column mirrors `vgraph.Column`, as the loader prints it.
 pub struct Column {
 pub:
-	name     string
-	field    string
-	typ      string
-	kind     string
-	nullable bool
+	name         string
+	field        string
+	typ          string
+	kind         string
+	nullable     bool
+	graphql_skip bool
 }
 
 // Edge mirrors `vgraph.Edge`, as the loader prints it.
@@ -50,11 +51,12 @@ pub:
 // Table mirrors `vgraph.Table`, as the loader prints it.
 pub struct Table {
 pub:
-	name    string
-	struct_ string
-	key     string
-	columns []Column
-	edges   []Edge
+	name         string
+	struct_      string
+	key          string
+	columns      []Column
+	edges        []Edge
+	graphql_skip bool
 }
 
 fn (t Table) column(name string) !Column {

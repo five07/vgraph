@@ -56,6 +56,23 @@ pub fn (q CategoryQuery) limit(count int) CategoryQuery {
 	return next
 }
 
+// offset skips the first `count` rows. It applies to `all()` and `first()`, not
+// to the rows of an edge load.
+pub fn (q CategoryQuery) offset(count int) CategoryQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		offset: count
+	}
+	return next
+}
+
+// count returns how many rows match, in one query; order, limit and offset
+// do not apply.
+pub fn (q CategoryQuery) count() !int {
+	return load.count_where[models.Category](q.graph.client.conn, q.query)
+}
+
 // where_id keeps the rows whose `id` is `value`.
 pub fn (q CategoryQuery) where_id(value int) CategoryQuery {
 	return q.where(load.eq('id', value))
@@ -255,25 +272,25 @@ pub fn (q CategoryQuery) nodes(rows []models.Category) ![]CategoryNode {
 		for configure in q.parent_fns {
 			sub = configure(sub)
 		}
-		mut keys := []int{}
+		mut keys := []string{}
 		for row in rows {
 			if key := row.parent_id {
-				keys << key
+				keys << key.str()
 			}
 		}
 		targets := sub.nodes(load.select_in[models.Category](q.graph.client.conn, 'id',
 			load.unique(keys),
 			query: sub.query
 		)!)!
-		mut by_key := map[int]&CategoryNode{}
+		mut by_key := map[string]&CategoryNode{}
 		for target in targets {
-			by_key[target.category.id] = &CategoryNode{
+			by_key[target.category.id.str()] = &CategoryNode{
 				...target
 			}
 		}
 		for mut node in nodes {
 			if key := node.category.parent_id {
-				if target := by_key[key] {
+				if target := by_key[key.str()] {
 					node.parent = target
 				}
 			}
@@ -285,17 +302,17 @@ pub fn (q CategoryQuery) nodes(rows []models.Category) ![]CategoryNode {
 			sub = configure(sub)
 		}
 		children := sub.nodes(load.select_in[models.Category](q.graph.client.conn, 'parent_id',
-			rows.map(it.id),
+			rows.map(it.id.str()),
 			query: sub.query
 		)!)!
-		mut by_parent := map[int][]CategoryNode{}
+		mut by_parent := map[string][]CategoryNode{}
 		for child in children {
 			if parent := child.category.parent_id {
-				by_parent[parent] << child
+				by_parent[parent.str()] << child
 			}
 		}
 		for mut node in nodes {
-			node.children = by_parent[node.category.id] or { [] }
+			node.children = by_parent[node.category.id.str()] or { [] }
 		}
 	}
 	return nodes

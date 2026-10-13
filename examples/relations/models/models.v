@@ -15,7 +15,7 @@ pub:
 
 // edges declares a user's card (O2O two types), spouse (O2O bidirectional),
 // pets (O2M two types), groups (M2M two types), following and followers (M2M
-// same type) and friends (M2M bidirectional).
+// same type), friends (M2M bidirectional), and devices, which have UUID keys.
 pub fn (u User) edges() []vgraph.Edge {
 	return [
 		// O2O two types: the card holds the user's id
@@ -74,6 +74,13 @@ pub fn (u User) edges() []vgraph.Edge {
 			through:    'friendships'
 			through_to: 'friend_id'
 		},
+		// O2M to a table with UUID keys
+		vgraph.Edge{
+			name:   'devices'
+			kind:   .one_to_many
+			to:     'devices'
+			column: 'owner_id'
+		},
 	]
 }
 
@@ -127,7 +134,8 @@ pub:
 	name string
 }
 
-// edges declares a group's users, the other side of `User.groups`.
+// edges declares a group's users, the other side of `User.groups`, and its
+// devices, the other side of `Device.groups`.
 pub fn (g Group) edges() []vgraph.Edge {
 	return [
 		vgraph.Edge{
@@ -137,6 +145,14 @@ pub fn (g Group) edges() []vgraph.Edge {
 			column:     'group_id'
 			through:    'group_users'
 			through_to: 'user_id'
+		},
+		vgraph.Edge{
+			name:       'devices'
+			kind:       .many_to_many
+			to:         'devices'
+			column:     'group_id'
+			through:    'device_groups'
+			through_to: 'device_id'
 		},
 	]
 }
@@ -222,4 +238,72 @@ pub fn (c Category) edges() []vgraph.Edge {
 			column: 'parent_id'
 		},
 	]
+}
+
+// Device is keyed by a UUID: a string, stored as `uuid` on PostgreSQL. It has
+// edges of every kind, so each runs on a string key.
+@[table: 'devices']
+pub struct Device {
+pub:
+	id       string @[primary; sql_type: 'uuid']
+	name     string
+	owner_id int
+}
+
+// edges declares a device's owner (the other side of `User.devices`), its logins,
+// which hold its UUID, and its groups, through a join table with a UUID column
+// and an int column.
+pub fn (d Device) edges() []vgraph.Edge {
+	return [
+		vgraph.Edge{
+			name:   'owner'
+			kind:   .many_to_one
+			to:     'users'
+			column: 'owner_id'
+		},
+		vgraph.Edge{
+			name:   'logins'
+			kind:   .one_to_many
+			to:     'logins'
+			column: 'device_id'
+		},
+		vgraph.Edge{
+			name:       'groups'
+			kind:       .many_to_many
+			to:         'groups'
+			column:     'device_id'
+			through:    'device_groups'
+			through_to: 'group_id'
+		},
+	]
+}
+
+// Login is one sign-in from a device.
+@[table: 'logins']
+pub struct Login {
+pub:
+	id        int    @[primary; sql: serial]
+	device_id string @[sql_type: 'uuid']
+	at        int
+}
+
+// edges declares a login's device, the other side of `Device.logins`.
+pub fn (l Login) edges() []vgraph.Edge {
+	return [
+		vgraph.Edge{
+			name:   'device'
+			kind:   .many_to_one
+			to:     'devices'
+			column: 'device_id'
+		},
+	]
+}
+
+// DeviceGroup links a device and a group.
+@[table: 'device_groups']
+pub struct DeviceGroup {
+pub:
+	id        int    @[primary; sql: serial]
+	device_id string @[sql_type: 'uuid']
+	group_id  int
 }

@@ -24,6 +24,8 @@ mut:
 	followers_fns  []fn (UserQuery) UserQuery
 	with_friends   bool
 	friends_fns    []fn (UserQuery) UserQuery
+	with_devices   bool
+	devices_fns    []fn (DeviceQuery) DeviceQuery
 }
 
 // UserNode is a `users` row, with the edges its query loaded.
@@ -31,13 +33,14 @@ pub struct UserNode {
 	graph Graph
 pub mut:
 	user      models.User
-	card      ?&CardNode  // set by `with_card()`
-	spouse    ?&UserNode  // set by `with_spouse()`
-	pets      []PetNode   // set by `with_pets()`
-	groups    []GroupNode // set by `with_groups()`
-	following []UserNode  // set by `with_following()`
-	followers []UserNode  // set by `with_followers()`
-	friends   []UserNode  // set by `with_friends()`
+	card      ?&CardNode   // set by `with_card()`
+	spouse    ?&UserNode   // set by `with_spouse()`
+	pets      []PetNode    // set by `with_pets()`
+	groups    []GroupNode  // set by `with_groups()`
+	following []UserNode   // set by `with_following()`
+	followers []UserNode   // set by `with_followers()`
+	friends   []UserNode   // set by `with_friends()`
+	devices   []DeviceNode // set by `with_devices()`
 }
 
 // users starts a query of `users`.
@@ -69,6 +72,23 @@ pub fn (q UserQuery) limit(count int) UserQuery {
 		limit: count
 	}
 	return next
+}
+
+// offset skips the first `count` rows. It applies to `all()` and `first()`, not
+// to the rows of an edge load.
+pub fn (q UserQuery) offset(count int) UserQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		offset: count
+	}
+	return next
+}
+
+// count returns how many rows match, in one query; order, limit and offset
+// do not apply.
+pub fn (q UserQuery) count() !int {
+	return load.count_where[models.User](q.graph.client.conn, q.query)
 }
 
 // where_id keeps the rows whose `id` is `value`.
@@ -285,6 +305,15 @@ pub fn (q UserQuery) with_friends(configure ...fn (UserQuery) UserQuery) UserQue
 	return next
 }
 
+// with_devices loads each row's `devices` (one_to_many `devices`) with it, in one
+// query for all the rows. `configure` narrows them, and can load their edges.
+pub fn (q UserQuery) with_devices(configure ...fn (DeviceQuery) DeviceQuery) UserQuery {
+	mut next := q
+	next.with_devices = true
+	next.devices_fns = configure
+	return next
+}
+
 // all returns the matching rows, with the requested edges.
 pub fn (q UserQuery) all() ![]UserNode {
 	rows := load.select_where[models.User](q.graph.client.conn, q.query)!
@@ -316,16 +345,16 @@ pub fn (q UserQuery) nodes(rows []models.User) ![]UserNode {
 			sub = configure(sub)
 		}
 		children := sub.nodes(load.select_in[models.Card](q.graph.client.conn, 'owner_id',
-			rows.map(it.id),
+			rows.map(it.id.str()),
 			query: sub.query
 		)!)!
-		mut by_parent := map[int][]CardNode{}
+		mut by_parent := map[string][]CardNode{}
 		for child in children {
-			by_parent[child.card.owner_id] << child
+			by_parent[child.card.owner_id.str()] << child
 		}
 		// at most one each: the first, in the order of the query
 		for mut node in nodes {
-			if found := by_parent[node.user.id] {
+			if found := by_parent[node.user.id.str()] {
 				node.card = &CardNode{
 					...found[0]
 				}
@@ -337,25 +366,25 @@ pub fn (q UserQuery) nodes(rows []models.User) ![]UserNode {
 		for configure in q.spouse_fns {
 			sub = configure(sub)
 		}
-		mut keys := []int{}
+		mut keys := []string{}
 		for row in rows {
 			if key := row.spouse_id {
-				keys << key
+				keys << key.str()
 			}
 		}
 		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
 			load.unique(keys),
 			query: sub.query
 		)!)!
-		mut by_key := map[int]&UserNode{}
+		mut by_key := map[string]&UserNode{}
 		for target in targets {
-			by_key[target.user.id] = &UserNode{
+			by_key[target.user.id.str()] = &UserNode{
 				...target
 			}
 		}
 		for mut node in nodes {
 			if key := node.user.spouse_id {
-				if target := by_key[key] {
+				if target := by_key[key.str()] {
 					node.spouse = target
 				}
 			}
@@ -367,17 +396,17 @@ pub fn (q UserQuery) nodes(rows []models.User) ![]UserNode {
 			sub = configure(sub)
 		}
 		children := sub.nodes(load.select_in[models.Pet](q.graph.client.conn, 'owner_id',
-			rows.map(it.id),
+			rows.map(it.id.str()),
 			query: sub.query
 		)!)!
-		mut by_parent := map[int][]PetNode{}
+		mut by_parent := map[string][]PetNode{}
 		for child in children {
 			if parent := child.pet.owner_id {
-				by_parent[parent] << child
+				by_parent[parent.str()] << child
 			}
 		}
 		for mut node in nodes {
-			node.pets = by_parent[node.user.id] or { [] }
+			node.pets = by_parent[node.user.id.str()] or { [] }
 		}
 	}
 	if q.with_groups {
@@ -386,23 +415,24 @@ pub fn (q UserQuery) nodes(rows []models.User) ![]UserNode {
 			sub = configure(sub)
 		}
 		pairs := load.link_pairs(q.graph.client.conn, 'group_users', 'user_id',
-			'group_id', rows.map(it.id))!
+			'group_id', rows.map(it.id.str()), .int, .int)!
 		targets := sub.nodes(load.select_in[models.Group](q.graph.client.conn, 'id',
 			load.unique(pairs.map(it[1])),
 			query: sub.query
 		)!)!
-		mut by_key := map[int]GroupNode{}
-		for target in targets {
-			by_key[target.group.id] = target
-		}
-		mut linked := map[int][]GroupNode{}
+		// each parent's targets in the order of the query
+		mut parents_of := map[string][]string{}
 		for pair in pairs {
-			if target := by_key[pair[1]] {
-				linked[pair[0]] << target
+			parents_of[pair[1]] << pair[0]
+		}
+		mut linked := map[string][]GroupNode{}
+		for target in targets {
+			for parent in parents_of[target.group.id.str()] or { [] } {
+				linked[parent] << target
 			}
 		}
 		for mut node in nodes {
-			node.groups = linked[node.user.id] or { [] }
+			node.groups = linked[node.user.id.str()] or { [] }
 		}
 	}
 	if q.with_following {
@@ -411,23 +441,24 @@ pub fn (q UserQuery) nodes(rows []models.User) ![]UserNode {
 			sub = configure(sub)
 		}
 		pairs := load.link_pairs(q.graph.client.conn, 'follows', 'follower_id',
-			'followee_id', rows.map(it.id))!
+			'followee_id', rows.map(it.id.str()), .int, .int)!
 		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
 			load.unique(pairs.map(it[1])),
 			query: sub.query
 		)!)!
-		mut by_key := map[int]UserNode{}
-		for target in targets {
-			by_key[target.user.id] = target
-		}
-		mut linked := map[int][]UserNode{}
+		// each parent's targets in the order of the query
+		mut parents_of := map[string][]string{}
 		for pair in pairs {
-			if target := by_key[pair[1]] {
-				linked[pair[0]] << target
+			parents_of[pair[1]] << pair[0]
+		}
+		mut linked := map[string][]UserNode{}
+		for target in targets {
+			for parent in parents_of[target.user.id.str()] or { [] } {
+				linked[parent] << target
 			}
 		}
 		for mut node in nodes {
-			node.following = linked[node.user.id] or { [] }
+			node.following = linked[node.user.id.str()] or { [] }
 		}
 	}
 	if q.with_followers {
@@ -436,23 +467,24 @@ pub fn (q UserQuery) nodes(rows []models.User) ![]UserNode {
 			sub = configure(sub)
 		}
 		pairs := load.link_pairs(q.graph.client.conn, 'follows', 'followee_id',
-			'follower_id', rows.map(it.id))!
+			'follower_id', rows.map(it.id.str()), .int, .int)!
 		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
 			load.unique(pairs.map(it[1])),
 			query: sub.query
 		)!)!
-		mut by_key := map[int]UserNode{}
-		for target in targets {
-			by_key[target.user.id] = target
-		}
-		mut linked := map[int][]UserNode{}
+		// each parent's targets in the order of the query
+		mut parents_of := map[string][]string{}
 		for pair in pairs {
-			if target := by_key[pair[1]] {
-				linked[pair[0]] << target
+			parents_of[pair[1]] << pair[0]
+		}
+		mut linked := map[string][]UserNode{}
+		for target in targets {
+			for parent in parents_of[target.user.id.str()] or { [] } {
+				linked[parent] << target
 			}
 		}
 		for mut node in nodes {
-			node.followers = linked[node.user.id] or { [] }
+			node.followers = linked[node.user.id.str()] or { [] }
 		}
 	}
 	if q.with_friends {
@@ -461,23 +493,41 @@ pub fn (q UserQuery) nodes(rows []models.User) ![]UserNode {
 			sub = configure(sub)
 		}
 		pairs := load.link_pairs(q.graph.client.conn, 'friendships', 'user_id',
-			'friend_id', rows.map(it.id))!
+			'friend_id', rows.map(it.id.str()), .int, .int)!
 		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
 			load.unique(pairs.map(it[1])),
 			query: sub.query
 		)!)!
-		mut by_key := map[int]UserNode{}
-		for target in targets {
-			by_key[target.user.id] = target
-		}
-		mut linked := map[int][]UserNode{}
+		// each parent's targets in the order of the query
+		mut parents_of := map[string][]string{}
 		for pair in pairs {
-			if target := by_key[pair[1]] {
-				linked[pair[0]] << target
+			parents_of[pair[1]] << pair[0]
+		}
+		mut linked := map[string][]UserNode{}
+		for target in targets {
+			for parent in parents_of[target.user.id.str()] or { [] } {
+				linked[parent] << target
 			}
 		}
 		for mut node in nodes {
-			node.friends = linked[node.user.id] or { [] }
+			node.friends = linked[node.user.id.str()] or { [] }
+		}
+	}
+	if q.with_devices {
+		mut sub := q.graph.devices()
+		for configure in q.devices_fns {
+			sub = configure(sub)
+		}
+		children := sub.nodes(load.select_in[models.Device](q.graph.client.conn, 'owner_id',
+			rows.map(it.id.str()),
+			query: sub.query
+		)!)!
+		mut by_parent := map[string][]DeviceNode{}
+		for child in children {
+			by_parent[child.device.owner_id.str()] << child
+		}
+		for mut node in nodes {
+			node.devices = by_parent[node.user.id.str()] or { [] }
 		}
 	}
 	return nodes
@@ -504,30 +554,35 @@ pub fn (n UserNode) query_pets() PetQuery {
 // table `group_users` first, so it can fail.
 pub fn (n UserNode) query_groups() !GroupQuery {
 	pairs := load.link_pairs(n.graph.client.conn, 'group_users', 'user_id',
-		'group_id', [n.user.id])!
-	return n.graph.groups().where(load.in_ints('id', pairs.map(it[1])))
+		'group_id', [n.user.id.str()], .int, .int)!
+	return n.graph.groups().where(load.in_keys('id', pairs.map(it[1]), .int))
 }
 
 // query_following starts a query of this row's `following`. It reads the join
 // table `follows` first, so it can fail.
 pub fn (n UserNode) query_following() !UserQuery {
 	pairs := load.link_pairs(n.graph.client.conn, 'follows', 'follower_id',
-		'followee_id', [n.user.id])!
-	return n.graph.users().where(load.in_ints('id', pairs.map(it[1])))
+		'followee_id', [n.user.id.str()], .int, .int)!
+	return n.graph.users().where(load.in_keys('id', pairs.map(it[1]), .int))
 }
 
 // query_followers starts a query of this row's `followers`. It reads the join
 // table `follows` first, so it can fail.
 pub fn (n UserNode) query_followers() !UserQuery {
 	pairs := load.link_pairs(n.graph.client.conn, 'follows', 'followee_id',
-		'follower_id', [n.user.id])!
-	return n.graph.users().where(load.in_ints('id', pairs.map(it[1])))
+		'follower_id', [n.user.id.str()], .int, .int)!
+	return n.graph.users().where(load.in_keys('id', pairs.map(it[1]), .int))
 }
 
 // query_friends starts a query of this row's `friends`. It reads the join
 // table `friendships` first, so it can fail.
 pub fn (n UserNode) query_friends() !UserQuery {
 	pairs := load.link_pairs(n.graph.client.conn, 'friendships', 'user_id',
-		'friend_id', [n.user.id])!
-	return n.graph.users().where(load.in_ints('id', pairs.map(it[1])))
+		'friend_id', [n.user.id.str()], .int, .int)!
+	return n.graph.users().where(load.in_keys('id', pairs.map(it[1]), .int))
+}
+
+// query_devices starts a query of this row's `devices`.
+pub fn (n UserNode) query_devices() DeviceQuery {
+	return n.graph.devices().where(load.eq('owner_id', n.user.id))
 }

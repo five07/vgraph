@@ -69,6 +69,23 @@ pub fn (q CommentQuery) limit(count int) CommentQuery {
 	return next
 }
 
+// offset skips the first `count` rows. It applies to `all()` and `first()`, not
+// to the rows of an edge load.
+pub fn (q CommentQuery) offset(count int) CommentQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		offset: count
+	}
+	return next
+}
+
+// count returns how many rows match, in one query; order, limit and offset
+// do not apply.
+pub fn (q CommentQuery) count() !int {
+	return load.count_where[comments_models.Comment](q.graph.client.conn, q.query)
+}
+
 // where_id keeps the rows whose `id` is `value`.
 pub fn (q CommentQuery) where_id(value int) CommentQuery {
 	return q.where(load.eq('id', value))
@@ -624,22 +641,22 @@ pub fn (q CommentQuery) nodes(rows []comments_models.Comment) ![]CommentNode {
 		for configure in q.author_fns {
 			sub = configure(sub)
 		}
-		mut keys := []int{}
+		mut keys := []string{}
 		for row in rows {
-			keys << row.user_id
+			keys << row.user_id.str()
 		}
 		targets := sub.nodes(load.select_in[users_models.User](q.graph.client.conn, 'id',
 			load.unique(keys),
 			query: sub.query
 		)!)!
-		mut by_key := map[int]&UserNode{}
+		mut by_key := map[string]&UserNode{}
 		for target in targets {
-			by_key[target.user.id] = &UserNode{
+			by_key[target.user.id.str()] = &UserNode{
 				...target
 			}
 		}
 		for mut node in nodes {
-			if target := by_key[node.comment.user_id] {
+			if target := by_key[node.comment.user_id.str()] {
 				node.author = target
 			}
 		}
@@ -649,25 +666,25 @@ pub fn (q CommentQuery) nodes(rows []comments_models.Comment) ![]CommentNode {
 		for configure in q.parent_fns {
 			sub = configure(sub)
 		}
-		mut keys := []int{}
+		mut keys := []string{}
 		for row in rows {
 			if key := row.parent_id {
-				keys << key
+				keys << key.str()
 			}
 		}
 		targets := sub.nodes(load.select_in[comments_models.Comment](q.graph.client.conn, 'id',
 			load.unique(keys),
 			query: sub.query
 		)!)!
-		mut by_key := map[int]&CommentNode{}
+		mut by_key := map[string]&CommentNode{}
 		for target in targets {
-			by_key[target.comment.id] = &CommentNode{
+			by_key[target.comment.id.str()] = &CommentNode{
 				...target
 			}
 		}
 		for mut node in nodes {
 			if key := node.comment.parent_id {
-				if target := by_key[key] {
+				if target := by_key[key.str()] {
 					node.parent = target
 				}
 			}
@@ -678,20 +695,20 @@ pub fn (q CommentQuery) nodes(rows []comments_models.Comment) ![]CommentNode {
 		for configure in q.article_fns {
 			sub = configure(sub)
 		}
-		mut keys := []int{}
+		mut keys := []string{}
 		for row in rows {
 			if !(row.owner_type == 'Article') {
 				continue
 			}
-			keys << row.owner_id
+			keys << row.owner_id.str()
 		}
 		targets := sub.nodes(load.select_in[articles_models.Article](q.graph.client.conn, 'id',
 			load.unique(keys),
 			query: sub.query
 		)!)!
-		mut by_key := map[int]&ArticleNode{}
+		mut by_key := map[string]&ArticleNode{}
 		for target in targets {
-			by_key[target.article.id] = &ArticleNode{
+			by_key[target.article.id.str()] = &ArticleNode{
 				...target
 			}
 		}
@@ -699,7 +716,7 @@ pub fn (q CommentQuery) nodes(rows []comments_models.Comment) ![]CommentNode {
 			if !(node.comment.owner_type == 'Article') {
 				continue
 			}
-			if target := by_key[node.comment.owner_id] {
+			if target := by_key[node.comment.owner_id.str()] {
 				node.article = target
 			}
 		}
@@ -709,20 +726,20 @@ pub fn (q CommentQuery) nodes(rows []comments_models.Comment) ![]CommentNode {
 		for configure in q.post_fns {
 			sub = configure(sub)
 		}
-		mut keys := []int{}
+		mut keys := []string{}
 		for row in rows {
 			if !(row.owner_type == 'Post') {
 				continue
 			}
-			keys << row.owner_id
+			keys << row.owner_id.str()
 		}
 		targets := sub.nodes(load.select_in[posts_models.Post](q.graph.client.conn, 'id',
 			load.unique(keys),
 			query: sub.query
 		)!)!
-		mut by_key := map[int]&PostNode{}
+		mut by_key := map[string]&PostNode{}
 		for target in targets {
-			by_key[target.post.id] = &PostNode{
+			by_key[target.post.id.str()] = &PostNode{
 				...target
 			}
 		}
@@ -730,7 +747,7 @@ pub fn (q CommentQuery) nodes(rows []comments_models.Comment) ![]CommentNode {
 			if !(node.comment.owner_type == 'Post') {
 				continue
 			}
-			if target := by_key[node.comment.owner_id] {
+			if target := by_key[node.comment.owner_id.str()] {
 				node.post = target
 			}
 		}
@@ -741,18 +758,18 @@ pub fn (q CommentQuery) nodes(rows []comments_models.Comment) ![]CommentNode {
 			sub = configure(sub)
 		}
 		children := sub.nodes(load.select_in[comments_models.Comment](q.graph.client.conn,
-			'parent_id', rows.map(it.id),
+			'parent_id', rows.map(it.id.str()),
 			soft_del: 'deleted_at'
 			query:    sub.query
 		)!)!
-		mut by_parent := map[int][]CommentNode{}
+		mut by_parent := map[string][]CommentNode{}
 		for child in children {
 			if parent := child.comment.parent_id {
-				by_parent[parent] << child
+				by_parent[parent.str()] << child
 			}
 		}
 		for mut node in nodes {
-			node.replies = by_parent[node.comment.id] or { [] }
+			node.replies = by_parent[node.comment.id.str()] or { [] }
 		}
 	}
 	return nodes

@@ -195,26 +195,26 @@ fn test_postgres_edges() {
 	}!
 
 	by_user := c.load_many[PgUser, PgArticle](users, 'articles')!
-	assert by_user[1].map(it.title) == ['by 1', 'by 1']
-	assert 2 !in by_user, 'soft-deleted articles are skipped'
+	assert by_user['1'].map(it.title) == ['by 1', 'by 1']
+	assert '2' !in by_user, 'soft-deleted articles are skipped'
 
 	authors := c.load_one[PgArticle, PgUser](articles, 'author')!
-	assert authors.keys().sorted() == [1, 2]
+	assert authors.keys().sorted() == ['1', '2']
 
 	on_article := c.load_many[PgArticle, PgComment](articles, 'comments')!
-	assert on_article[1].map(it.body) == ['Article 1']
-	assert on_article[2].map(it.body) == ['Article 2']
-	assert on_article[2][0].parent_id or { 0 } == 1
-	assert on_article[2][0].created_at.year >= 2026
+	assert on_article['1'].map(it.body) == ['Article 1']
+	assert on_article['2'].map(it.body) == ['Article 2']
+	assert on_article['2'][0].parent_id or { 0 } == 1
+	assert on_article['2'][0].created_at.year >= 2026
 
 	owners := c.load_one[PgComment, PgArticle](comments, 'article')!
-	assert owners.keys().sorted() == [1, 2], 'the Post comment is not followed'
+	assert owners.keys().sorted() == ['1', '2'], 'the Post comment is not followed'
 	parents := c.load_one[PgComment, PgComment](comments, 'parent')!
-	assert parents.keys() == [1]
+	assert parents.keys() == ['1']
 
 	tags := c.load_many[PgArticle, PgTag](articles, 'tags')!
-	assert tags[1].map(it.name) == ['v', 'sql']
-	assert tags[2].map(it.name) == ['sql']
+	assert tags['1'].map(it.name) == ['v', 'sql']
+	assert tags['2'].map(it.name) == ['sql']
 }
 
 fn test_postgres_ensure_indexes() {

@@ -1,8 +1,9 @@
 # service
 
-A small JSON REST API in [V](https://vlang.io), backed by SQLite through V's ORM. It
-has users, articles, posts, and comments that can be on either an article or a post,
-with threaded replies. There is no authentication.
+A small JSON REST API in [V](https://vlang.io), backed by SQLite through V's ORM, that
+also serves the same data over GraphQL. It has users, articles, posts, and comments
+that can be on either an article or a post, with threaded replies. There is no
+authentication.
 
 It started as a copy of `rest-api` (commit `9d802d6`) and is the test bed and,
 later, the published example for vgraph. See `../../PLAN.md` for the plan.
@@ -40,7 +41,9 @@ that holds the struct, its validation and its store:
 ```
 main.v, app.v, seed.v      startup, wiring, example data
 app/                       Context, config, database, errors, JSON in and out, slugs
-graph/                     the typed vgraph client, generated from the models' edges()
+graph/                     the typed vgraph client and GraphQL server, generated from the
+                           models' edges() and api.graphql; resolvers.v is written by hand
+api.graphql                the GraphQL mutations, one per REST endpoint that writes
 users/  articles/  posts/  comments/
     <name>.v               the routes
     models/<name>.v        the struct, its edges, request and response shapes, validation
@@ -166,3 +169,34 @@ Things in V 0.5.2 this project works around; section 5 of `../../PLAN.md` lists 
   creates its index with raw SQL.
 - The ORM leaves `@[references]` columns nullable; `sql_type: 'INTEGER NOT NULL'`
   adds the `NOT NULL`.
+
+## GraphQL
+
+`POST /graphql` (or `GET /graphql?query=…` for queries) serves the schema in
+`graph/schema.graphql`, which `vgraph gen` writes from the models and `api.graphql`.
+
+- **Reads** come from the generated root fields, one per table, with `where`,
+  `orderBy`, `limit` and `offset`, and the edges as fields. Every REST read has a
+  GraphQL query that runs the same selects (`test_graphql_runs_the_same_selects_as_rest`):
+
+  ```graphql
+  {
+    articles(where: {deletedAtIsNil: true}, orderBy: {field: CREATED_AT, direction: DESC}, limit: 10) {
+      slug title author { slug name }
+      comments(orderBy: {field: ID}) { body author { name } parent { slug } }
+    }
+    articlesCount(where: {deletedAtIsNil: true})
+  }
+  ```
+
+- **Writes** are the mutations of `api.graphql`, one per REST endpoint that writes
+  (`createArticle`, `updateArticle`, `deleteArticle`, `createArticleComment`, …).
+  `graph/resolvers.v` resolves them through the same stores and comment service as
+  the routes, so they check and fail the same way. A request's mutations run in one
+  transaction, rolled back if one fails.
+- **Introspection** answers as graphql-js does (`testdata/introspection.json`), so
+  GraphiQL, Apollo Sandbox and code generators can read the schema.
+
+After changing `api.graphql`, run `vgraph gen` again: it adds a stub to
+`graph/resolvers.v` for each new field, and leaves the rest of that file alone.
+

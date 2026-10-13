@@ -11,6 +11,7 @@ import articles.models as article_models
 import comments.models as comment_models
 import posts.models as post_models
 import users.models as user_models
+import five07.vgraph.graphql
 
 // start runs a new app with an empty in-memory database on a free port, and
 // returns its base URL once it answers.
@@ -822,4 +823,154 @@ fn test_startup_creates_edge_indexes() {
 		'comments_user_id_idx',
 		'posts_user_id_idx',
 	]
+}
+
+// gql posts a GraphQL request to the app, and returns the response, parsed.
+fn gql(base string, query string) !graphql.Value {
+	res := call(.post, '${base}/graphql', graphql.Value({
+		'query': graphql.Value(query)
+	}).json())!
+	assert res.status_code == 200, res.body
+	return graphql.parse_json(res.body)!
+}
+
+// at returns the value at `path` in a response, such as `data.users.0.slug`.
+fn at(v graphql.Value, path string) graphql.Value {
+	mut cur := v
+	for key in path.split('.') {
+		cur = match cur {
+			map[string]graphql.Value { cur[key] or { graphql.null } }
+			[]graphql.Value { cur[key.int()] or { graphql.null } }
+			else { graphql.null }
+		}
+	}
+	return cur
+}
+
+// tables returns the tables of `selects`, in order.
+fn tables(selects []string) []string {
+	return selects.map(it.all_before(' where'))
+}
+
+// Each REST read has a GraphQL query that reads the same, and it runs the same
+// selects: one per table, never one per row.
+fn test_graphql_runs_the_same_selects_as_rest() {
+	base, mut log := start_counting()!
+	ada := create_user(base, 'Ada', 'ada@example.com')!
+	bob := create_user(base, 'Bob', 'bob@example.com')!
+	article := create_article(base, ada, 'One')!
+	create_article(base, bob, 'Two')!
+	post := create_post(base, bob, 'hi')!
+	on_article := create_comment(base, bob, 'Article', article.slug, '', 'nice')!
+	create_comment(base, ada, 'Article', article.slug, on_article.slug, 'thanks')!
+	on_post := create_comment(base, ada, 'Post', post.slug, '', 'hey')!
+	reply := create_comment(base, bob, 'Post', post.slug, on_post.slug, 'ho')!
+
+	live := 'deletedAtIsNil: true'
+	comment := 'slug body author { slug } parent { slug }'
+	cases := {
+		'/users':                                            '{ users(where: {${live}}) { slug name email } }'
+		'/users/${ada.slug}':                                '{ users(where: {slug: "${ada.slug}", ${live}}) { slug } }'
+		'/users/${ada.slug}/articles':                       '{ users(where: {slug: "${ada.slug}", ${live}}) { articles { slug title } } }'
+		'/users/${ada.slug}/posts':                          '{ users(where: {slug: "${ada.slug}", ${live}}) { posts { slug body } } }'
+		'/users/${ada.slug}/comments':                       '{ users(where: {slug: "${ada.slug}", ${live}}) { comments { ${comment} article { slug } post { slug } } } }'
+		'/articles':                                         '{ articles(where: {${live}}) { slug author { slug } } }'
+		'/articles/${article.slug}':                         '{ articles(where: {slug: "${article.slug}", ${live}}) { slug author { slug } } }'
+		'/articles/${article.slug}/comments':                '{ articles(where: {slug: "${article.slug}", ${live}}) { comments { ${comment} article { slug } } } }'
+		'/posts':                                            '{ posts(where: {${live}}) { slug author { slug } } }'
+		'/posts/${post.slug}':                               '{ posts(where: {slug: "${post.slug}", ${live}}) { slug author { slug } } }'
+		'/posts/${post.slug}/comments':                      '{ posts(where: {slug: "${post.slug}", ${live}}) { comments { ${comment} post { slug } } } }'
+		'/comments':                                         '{ comments(where: {${live}}) { ${comment} article { slug } post { slug } } }'
+		'/comments/${on_post.slug}':                         '{ comments(where: {slug: "${on_post.slug}", ${live}}) { ${comment} article { slug } post { slug } } }'
+		'/comments/${reply.slug}':                           '{ comments(where: {slug: "${reply.slug}", ${live}}) { ${comment} article { slug } post { slug } } }'
+		'/comments?owner_type=Post&owner_slug=${post.slug}': '{ posts(where: {slug: "${post.slug}", ${live}}) { comments { ${comment} post { slug } } } }'
+	}
+	for path, query in cases {
+		rest := tables(selects_for(base, mut log, path)!)
+		log.clear()
+		res := gql(base, query)!
+		assert at(res, 'errors') is graphql.Null, '${path}: ${res}'
+		assert tables(log.selects()) == rest, path
+	}
+	// the same data: the replies to a post's comment, with their authors
+	res := gql(base, '{ posts(where: {slug: "${post.slug}"}) { comments(orderBy: {field: ID}) { body author { name } parent { body } } } }')!
+	assert at(res, 'data.posts.0.comments').json() == '[{"body":"hey","author":{"name":"Ada"},"parent":null},{"body":"ho","author":{"name":"Bob"},"parent":{"body":"hey"}}]'
+}
+
+// Every write of the REST API is a mutation, through the same stores, so it
+// checks and stores the same way and fails with the same messages.
+fn test_graphql_mutations() {
+	base := start()!
+	mut res := gql(base, 'mutation { createUser(input: {name: "Ada", email: "Ada@Example.com"}) { slug name email } }')!
+	assert at(res, 'data.createUser.email').as_string() == 'ada@example.com', res.str()
+	ada := at(res, 'data.createUser.slug').as_string()
+	res = gql(base, 'mutation { updateUser(slug: "${ada}", input: {name: "Ada L"}) { name email } }')!
+	assert at(res, 'data.updateUser').json() == '{"name":"Ada L","email":"ada@example.com"}'
+	res = gql(base, 'mutation { replaceUser(slug: "${ada}", input: {name: "Ada", email: "ada@example.org"}) { email } }')!
+	assert at(res, 'data.replaceUser.email').as_string() == 'ada@example.org'
+
+	res = gql(base, 'mutation { createArticle(input: {userSlug: "${ada}", title: " One ", body: "text"}) { slug title publishedAt author { slug } } }')!
+	assert at(res, 'data.createArticle.title').as_string() == 'One', res.str()
+	assert at(res, 'data.createArticle.publishedAt') is graphql.Null
+	assert at(res, 'data.createArticle.author.slug').as_string() == ada
+	article := at(res, 'data.createArticle.slug').as_string()
+	res = gql(base, 'mutation { updateArticle(slug: "${article}", input: {published: true}) { title publishedAt } }')!
+	assert at(res, 'data.updateArticle.publishedAt').as_string().ends_with('Z'), res.str()
+	res = gql(base, 'mutation { replaceArticle(slug: "${article}", input: {title: "Uno", body: "texto"}) { title body summary } }')!
+	assert at(res, 'data.replaceArticle').json() == '{"title":"Uno","body":"texto","summary":""}'
+
+	res = gql(base, 'mutation { createPost(input: {userSlug: "${ada}", body: "hi"}) { slug } }')!
+	post := at(res, 'data.createPost.slug').as_string()
+	res = gql(base, 'mutation { updatePost(slug: "${post}", input: {body: "hey"}) { body } replacePost(slug: "${post}", input: {body: "ho"}) { body } }')!
+	assert at(res, 'data').json() == '{"updatePost":{"body":"hey"},"replacePost":{"body":"ho"}}'
+
+	res = gql(base, 'mutation { createArticleComment(slug: "${article}", input: {userSlug: "${ada}", body: "first"}) { slug article { slug } } }')!
+	assert at(res, 'data.createArticleComment.article.slug').as_string() == article, res.str()
+	first := at(res, 'data.createArticleComment.slug').as_string()
+	res = gql(base, 'mutation { createComment(input: {userSlug: "${ada}", ownerType: "Article", ownerSlug: "${article}", parentSlug: "${first}", body: "second"}) { slug parent { body } } }')!
+	assert at(res, 'data.createComment.parent.body').as_string() == 'first', res.str()
+	second := at(res, 'data.createComment.slug').as_string()
+	res = gql(base, 'mutation { createPostComment(slug: "${post}", input: {userSlug: "${ada}", body: "on a post"}) { post { body } } }')!
+	assert at(res, 'data.createPostComment.post.body').as_string() == 'ho', res.str()
+	res = gql(base, 'mutation { updateComment(slug: "${second}", input: {body: "2nd"}) { body } replaceComment(slug: "${first}", input: {body: "1st"}) { body } }')!
+	assert at(res, 'data').json() == '{"updateComment":{"body":"2nd"},"replaceComment":{"body":"1st"}}'
+
+	res = gql(base, 'mutation { deleteComment(slug: "${second}") deletePost(slug: "${post}") }')!
+	assert at(res, 'data').json() == '{"deleteComment":true,"deletePost":true}'
+	res = gql(base, '{ articles(where: {slug: "${article}"}) { comments { body } } postsCount(where: {deletedAtIsNil: true}) }')!
+	assert at(res, 'data').json() == '{"articles":[{"comments":[{"body":"1st"}]}],"postsCount":0}'
+	res = gql(base, 'mutation { deleteArticle(slug: "${article}") deleteUser(slug: "${ada}") }')!
+	assert at(res, 'data').json() == '{"deleteArticle":true,"deleteUser":true}'
+
+	// the REST API's messages, and nothing internal
+	res = gql(base, 'mutation { createArticle(input: {userSlug: "nobody", title: "x", body: "y"}) { slug } }')!
+	assert at(res, 'errors.0.message').as_string() == 'user `nobody` not found', res.str()
+	assert at(res, 'data') is graphql.Null
+	res = gql(base, 'mutation { createUser(input: {name: "", email: "x@example.com"}) { slug } }')!
+	assert at(res, 'errors.0.message').as_string() == 'a user needs a name', res.str()
+}
+
+// A request's mutations run in one transaction: when one fails, the ones
+// before it are rolled back.
+fn test_graphql_mutations_roll_back_together() {
+	base := start()!
+	res := gql(base, 'mutation { a: createUser(input: {name: "Cy", email: "cy@example.com"}) { slug } b: createArticle(input: {userSlug: "nobody", title: "x", body: "y"}) { slug } }')!
+	assert at(res, 'errors.0.message').as_string() == 'user `nobody` not found', res.str()
+	assert at(gql(base, '{ usersCount }')!, 'data.usersCount').as_int() == 0, 'the user was rolled back'
+	// a mutation can't be sent with GET
+	get := http.get('${base}/graphql?query=mutation%7BdeleteUser(slug%3A%22x%22)%7D')!
+	assert get.status_code == 405
+}
+
+// The app answers the introspection query, which GraphiQL and Apollo's tools
+// ask, exactly as graphql-js answers it for the same schema:
+// testdata/introspection.json, which CI checks against graphql-js.
+fn test_graphql_introspection_matches_graphql_js() {
+	base := start()!
+	res := call(.post, '${base}/graphql', graphql.Value({
+		'query': graphql.Value(graphql.introspection_query)
+	}).json())!
+	assert res.status_code == 200
+	want := os.read_file(os.join_path(@DIR, 'testdata', 'introspection.json'))!
+	assert res.body + '\n' == want
 }

@@ -59,6 +59,23 @@ pub fn (q ArticleQuery) limit(count int) ArticleQuery {
 	return next
 }
 
+// offset skips the first `count` rows. It applies to `all()` and `first()`, not
+// to the rows of an edge load.
+pub fn (q ArticleQuery) offset(count int) ArticleQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		offset: count
+	}
+	return next
+}
+
+// count returns how many rows match, in one query; order, limit and offset
+// do not apply.
+pub fn (q ArticleQuery) count() !int {
+	return load.count_where[articles_models.Article](q.graph.client.conn, q.query)
+}
+
 // where_id keeps the rows whose `id` is `value`.
 pub fn (q ArticleQuery) where_id(value int) ArticleQuery {
 	return q.where(load.eq('id', value))
@@ -567,22 +584,22 @@ pub fn (q ArticleQuery) nodes(rows []articles_models.Article) ![]ArticleNode {
 		for configure in q.author_fns {
 			sub = configure(sub)
 		}
-		mut keys := []int{}
+		mut keys := []string{}
 		for row in rows {
-			keys << row.user_id
+			keys << row.user_id.str()
 		}
 		targets := sub.nodes(load.select_in[users_models.User](q.graph.client.conn, 'id',
 			load.unique(keys),
 			query: sub.query
 		)!)!
-		mut by_key := map[int]&UserNode{}
+		mut by_key := map[string]&UserNode{}
 		for target in targets {
-			by_key[target.user.id] = &UserNode{
+			by_key[target.user.id.str()] = &UserNode{
 				...target
 			}
 		}
 		for mut node in nodes {
-			if target := by_key[node.article.user_id] {
+			if target := by_key[node.article.user_id.str()] {
 				node.author = target
 			}
 		}
@@ -593,18 +610,18 @@ pub fn (q ArticleQuery) nodes(rows []articles_models.Article) ![]ArticleNode {
 			sub = configure(sub)
 		}
 		children := sub.nodes(load.select_in[comments_models.Comment](q.graph.client.conn,
-			'owner_id', rows.map(it.id),
+			'owner_id', rows.map(it.id.str()),
 			type_col: 'owner_type'
 			type_val: 'Article'
 			soft_del: 'deleted_at'
 			query:    sub.query
 		)!)!
-		mut by_parent := map[int][]CommentNode{}
+		mut by_parent := map[string][]CommentNode{}
 		for child in children {
-			by_parent[child.comment.owner_id] << child
+			by_parent[child.comment.owner_id.str()] << child
 		}
 		for mut node in nodes {
-			node.comments = by_parent[node.article.id] or { [] }
+			node.comments = by_parent[node.article.id.str()] or { [] }
 		}
 	}
 	return nodes

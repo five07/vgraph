@@ -110,3 +110,12 @@ fn test_generate_rejects_names_it_needs() {
 		assert err.msg() == '`as.a`: `ANode.a` is taken; rename the edge'
 	}
 }
+
+fn test_camel_follows_entgql() {
+	assert camel('created_at') == 'createdAt'
+	assert camel('user_id') == 'userID'
+	assert camel('id') == 'id'
+	assert camel('owner_type') == 'ownerType'
+	assert camel('api_url') == 'apiURL'
+	assert camel('group_users') == 'groupUsers'
+}

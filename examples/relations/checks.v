@@ -4,6 +4,7 @@ module main
 // on PostgreSQL by `pg_test.v`, through the client `vgraph gen` wrote into
 // `graph/`.
 import orm
+import five07.vgraph.graphql
 import graph
 import models
 
@@ -81,6 +82,9 @@ fn seed(db orm.Connection) !Fixture {
 		create table models.Friendship
 		create table models.Node
 		create table models.Category
+		create table models.Device
+		create table models.Login
+		create table models.DeviceGroup
 	}!
 	for name in ['ada', 'bob', 'cy', 'dee'] {
 		user := models.User{
@@ -177,6 +181,36 @@ fn seed(db orm.Connection) !Fixture {
 			insert category into models.Category
 		}!
 	}
+	// ada has a phone and a laptop, bob a tablet; cy and dee have none
+	for d in [[phone, 'phone', '1'], [laptop, 'laptop', '1'], [tablet, 'tablet', '2']] {
+		device := models.Device{
+			id:       d[0]
+			name:     d[1]
+			owner_id: d[2].int()
+		}
+		sql db {
+			insert device into models.Device
+		}!
+	}
+	for i, device_id in [phone, phone, tablet] {
+		login := models.Login{
+			device_id: device_id
+			at:        i + 1
+		}
+		sql db {
+			insert login into models.Login
+		}!
+	}
+	// the phone is in admins and devs, the tablet in devs
+	for pair in [[phone, '1'], [phone, '2'], [tablet, '2']] {
+		link := models.DeviceGroup{
+			device_id: pair[0]
+			group_id:  pair[1].int()
+		}
+		sql db {
+			insert link into models.DeviceGroup
+		}!
+	}
 	log := &Log{}
 	g := graph.Graph.new(Counting{
 		inner: db
@@ -189,6 +223,10 @@ fn seed(db orm.Connection) !Fixture {
 		log: log
 	}
 }
+
+const phone = '6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b'
+const laptop = '0a1b2c3d-4e5f-4061-8273-94a5b6c7d8e9'
+const tablet = 'f0e1d2c3-b4a5-4697-8879-6a5b4c3d2e1f'
 
 fn names(users []graph.UserNode) []string {
 	return users.map(it.user.name)
@@ -331,4 +369,77 @@ fn check_one_to_one_indexes_are_unique(f Fixture) ! {
 		return
 	}
 	return error('a second card for ada should be rejected')
+}
+
+// UUID keys: devices are keyed by strings, and every kind of edge works on them,
+// in the same number of queries as on int keys.
+fn check_uuid_keys(f Fixture) ! {
+	f.queries()
+	devices := f.g.devices().with_owner().with_logins().with_groups().order_by_name().all()!
+	assert f.queries() == ['devices', 'users', 'logins', 'device_groups', 'groups']
+	assert devices.map(it.device.name) == ['laptop', 'phone', 'tablet']
+	assert devices.map(if o := it.owner { o.user.name } else { '-' }) == ['ada', 'ada', 'bob']
+	assert devices.map(it.logins.map(it.login.at)) == [[], [1, 2], [3]]
+	assert devices.map(it.groups.map(it.group.name)) == [[], ['admins', 'devs'], ['devs']]
+	// the other direction of each
+	users := f.g.users().with_devices(fn (q graph.DeviceQuery) graph.DeviceQuery {
+		return q.order_by_name()
+	}).order_by_id().all()!
+	assert users.map(it.devices.map(it.device.name)) == [['laptop', 'phone'], ['tablet'], [], []]
+	logins := f.g.logins().with_device().order_by_at().all()!
+	assert logins.map(if d := it.device { d.device.id } else { '-' }) == [phone, phone, tablet]
+	groups := f.g.groups().with_devices().order_by_id().all()!
+	assert groups.map(it.devices.map(it.device.name).sorted()) == [['phone'], ['phone', 'tablet']]
+	// traversals, and predicates on the key
+	phone_node := f.g.devices().where_id(phone).first()!
+	assert phone_node.query_logins().all()!.len == 2
+	assert phone_node.query_owner().first()!.user.name == 'ada'
+	assert phone_node.query_groups()!.order_by_id().all()!.map(it.group.name) == [
+		'admins',
+		'devs',
+	]
+	assert groups[1].query_devices()!.order_by_name().all()!.map(it.device.id) == [
+		phone,
+		tablet,
+	]
+	assert logins[2].query_device().first()!.device.name == 'tablet'
+	assert f.g.devices().where_id_in([tablet, laptop]).order_by_name().all()!.map(it.device.name) == [
+		'laptop',
+		'tablet',
+	]
+}
+
+// gql runs a GraphQL query on the client's server, and returns the response
+// as JSON.
+fn gql(f Fixture, query string) !string {
+	mut s := f.g.graphql(graph.Resolvers{})!
+	return s.execute(graphql.Request{
+		query: query
+	}, unsafe { nil }).json()
+}
+
+// GraphQL: every relationship kind, one select per edge per level, and the
+// arguments of lists.
+fn check_graphql(f Fixture) ! {
+	f.queries()
+	// O2O two types, both directions
+	assert gql(f, '{ users(orderBy: {field: ID}) { name card { number owner { name } } } }')! == '{"data":{"users":[{"name":"ada","card":{"number":"4242","owner":{"name":"ada"}}},{"name":"bob","card":{"number":"5555","owner":{"name":"bob"}}},{"name":"cy","card":null},{"name":"dee","card":null}]}}'
+	assert f.queries() == ['users', 'cards', 'users']
+	// O2M same type, three levels in three selects
+	assert gql(f, '{ categories(where: {parentIDIsNil: true}) { name children(orderBy: {field: NAME}) { name children { name } } } }')! == '{"data":{"categories":[{"name":"root","children":[{"name":"a","children":[{"name":"a1"}]},{"name":"b","children":[]}]}]}}'
+	assert f.queries() == ['categories', 'categories', 'categories']
+	// M2M through a join table, and its other side
+	assert gql(f, '{ groups(orderBy: {field: ID}) { name users(orderBy: {field: NAME, direction: DESC}) { name groups { name } } } }')! == '{"data":{"groups":[{"name":"admins","users":[{"name":"ada","groups":[{"name":"admins"},{"name":"devs"}]}]},{"name":"devs","users":[{"name":"bob","groups":[{"name":"devs"}]},{"name":"ada","groups":[{"name":"admins"},{"name":"devs"}]}]}]}}'
+	assert f.queries() == ['groups', 'group_users', 'users', 'group_users', 'groups']
+	// O2M two types with a per-parent limit, filters, counts and pagination
+	assert gql(f, '{ usersCount petsCount(where: {ownerIDIsNil: false, nameHasPrefix: "r"}) users(orderBy: {field: ID}, limit: 2) { name pets(orderBy: {field: NAME}, limit: 1) { name } } strays: pets(where: {ownerIDIsNil: true}) { name owner { name } } page: users(orderBy: {field: NAME, direction: DESC}, limit: 2, offset: 1) { id name } }')! == '{"data":{"usersCount":4,"petsCount":1,"users":[{"name":"ada","pets":[{"name":"rex"}]},{"name":"bob","pets":[]}],"strays":[{"name":"stray","owner":null}],"page":[{"id":"3","name":"cy"},{"id":"2","name":"bob"}]}}'
+	assert f.queries() == ['users', 'pets', 'users', 'pets', 'pets', 'users']
+	// O2O same type and bidirectional, M2M same type and bidirectional
+	assert gql(f, '{ nodes(where: {idIn: ["1", "2"]}, orderBy: {field: ID}) { value next { value } prev { value } } users(where: {idNotIn: ["3", "4"]}, orderBy: {field: ID}) { spouse { name } following { name } followers { name } friends { name } } }')! == '{"data":{"nodes":[{"value":1,"next":{"value":2},"prev":null},{"value":2,"next":{"value":3},"prev":{"value":1}}],"users":[{"spouse":{"name":"bob"},"following":[{"name":"bob"},{"name":"cy"}],"followers":[],"friends":[{"name":"bob"}]},{"spouse":{"name":"ada"},"following":[{"name":"cy"}],"followers":[{"name":"ada"}],"friends":[{"name":"ada"}]}]}}'
+	// UUID keys
+	assert gql(f, '{ devices(orderBy: {field: NAME}) { id name owner { name } logins(orderBy: {field: AT, direction: DESC}) { at } groups { name } } }')! == '{"data":{"devices":[{"id":"${laptop}","name":"laptop","owner":{"name":"ada"},"logins":[],"groups":[]},{"id":"${phone}","name":"phone","owner":{"name":"ada"},"logins":[{"at":2},{"at":1}],"groups":[{"name":"admins"},{"name":"devs"}]},{"id":"${tablet}","name":"tablet","owner":{"name":"bob"},"logins":[{"at":3}],"groups":[{"name":"devs"}]}]}}'
+	assert gql(f, '{ devices(where: {id: "${tablet}"}) { name } }')! == '{"data":{"devices":[{"name":"tablet"}]}}'
+	// errors
+	assert gql(f, '{ users(where: {id: "abc"}) { name } }')! == '{"errors":[{"message":"invalid ID \\"abc\\"","locations":[{"line":1,"column":3}],"path":["users"]}],"data":null}'
+	assert gql(f, '{ users { nope } }')! == '{"errors":[{"message":"Cannot query field \\"nope\\" on type \\"User\\". Did you mean \\"name\\"?","locations":[{"line":1,"column":11}]}]}'
 }

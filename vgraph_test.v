@@ -289,9 +289,9 @@ fn test_load_one() {
 		select from Comment order by id
 	}!
 	articles := c.load_one[Comment, Article](comments, 'article')!
-	assert articles.keys().sorted() == [1, 2], 'the Post comment is not followed'
+	assert articles.keys().sorted() == ['1', '2'], 'the Post comment is not followed'
 	authors := c.load_one[Article, User](articles.values(), 'author')!
-	assert authors[1].name == 'ada'
+	assert authors['1'].name == 'ada'
 }
 
 fn test_load_many() {
@@ -300,18 +300,18 @@ fn test_load_many() {
 		select from User order by id
 	}!
 	articles := c.load_many[User, Article](users, 'articles')!
-	assert articles[1].map(it.title) == ['by 1', 'by 1']
-	assert 2 !in articles, 'soft-deleted articles are skipped'
+	assert articles['1'].map(it.title) == ['by 1', 'by 1']
+	assert '2' !in articles, 'soft-deleted articles are skipped'
 	all := sql c.conn {
 		select from Article order by id
 	}!
 	comments := c.load_many[Article, Comment](all, 'comments')!
-	assert comments[1].map(it.body) == ['Article 1'], 'only comments on articles'
-	assert comments[2].map(it.body) == ['Article 2']
+	assert comments['1'].map(it.body) == ['Article 1'], 'only comments on articles'
+	assert comments['2'].map(it.body) == ['Article 2']
 	tags := c.load_many[Article, Tag](all, 'tags')!
-	assert tags[1].map(it.name) == ['v', 'sql']
-	assert tags[2].map(it.name) == ['sql']
-	assert 3 !in tags
+	assert tags['1'].map(it.name) == ['v', 'sql']
+	assert tags['2'].map(it.name) == ['sql']
+	assert '3' !in tags
 }
 
 fn test_load_errors() {
@@ -369,8 +369,8 @@ fn test_load_one_to_one() {
 		select from User order by id
 	}!
 	profiles := c.load_many[User, Profile](users, 'profile')!
-	assert profiles[1].map(it.bio) == ['hi']
-	assert 2 !in profiles
+	assert profiles['1'].map(it.bio) == ['hi']
+	assert '2' !in profiles
 }
 
 fn test_a_one_to_one_index_is_unique_only_alone() {
@@ -401,4 +401,149 @@ fn (o ProfileOwner) edges() []Edge {
 			column: 'user_id'
 		},
 	]
+}
+
+// Person is a table with no edges of its own.
+@[table: 'people']
+struct Person {
+	id   int @[primary; sql: serial]
+	name string
+}
+
+// Device is keyed by a UUID string, and its sessions refer to it by that key.
+@[table: 'devices']
+struct Device {
+	id      string @[primary]
+	user_id int
+	name    string
+}
+
+fn (d Device) edges() []Edge {
+	return [
+		Edge{
+			name:   'sessions'
+			kind:   .one_to_many
+			to:     'sessions'
+			column: 'device_id'
+		},
+		Edge{
+			name:   'owner'
+			kind:   .many_to_one
+			to:     'people'
+			column: 'user_id'
+		},
+	]
+}
+
+@[table: 'sessions']
+struct Session {
+	id        i64 @[primary; sql: serial]
+	device_id string
+	started   time.Time
+}
+
+fn (s Session) edges() []Edge {
+	return [
+		Edge{
+			name:   'device'
+			kind:   .many_to_one
+			to:     'devices'
+			column: 'device_id'
+		},
+	]
+}
+
+fn test_string_keys() {
+	mut s := Schema{}
+	s.add[Person]()!
+	s.add[Device]()!
+	s.add[Session]()!
+	assert s.table('devices')!.column('id')?.kind == .string
+	assert s.table('sessions')!.column('id')?.kind == .i64
+	mut db := sqlite.connect(':memory:')!
+	sql db {
+		create table Person
+		create table Device
+		create table Session
+	}!
+	person := Person{
+		name: 'ada'
+	}
+	device := Device{
+		id:      'a3c1f0e2-5b7d-4e8a-9c6f-2d1b0a9e8f73'
+		user_id: 1
+		name:    'phone'
+	}
+	session := Session{
+		device_id: device.id
+		started:   time.now()
+	}
+	sql db {
+		insert person into Person
+		insert device into Device
+		insert session into Session
+		insert session into Session
+	}!
+	c := Client.new(db, s)!
+	devices := c.load_one[Session, Device]([session], 'device')!
+	assert devices[device.id].name == 'phone'
+	sessions := c.load_many[Device, Session]([device], 'sessions')!
+	assert sessions[device.id].map(it.id) == [i64(1), 2]
+	owners := c.load_one[Device, Person]([device], 'owner')!
+	assert owners['1'].name == 'ada'
+}
+
+fn test_validate_checks_key_types() {
+	mut s := Schema{}
+	s.add[Person]()!
+	s.add[Device]()!
+	s.add[BadKeys]()!
+	s.add[TimeKeyed]()!
+	s.validate() or {
+		assert err.msg().split('\n') == [
+			'devices.sessions: no table `sessions` is registered',
+			'bad_keys.device: `column` names `bad_keys.device_id`, which is not a string column',
+			'bad_keys.user: `column` names `bad_keys.user_name`, which is not an int column',
+			'bad_keys.timed: the key `time_keyed.id` is time.Time; edges need an int, i64 or string key',
+		]
+		return
+	}
+	assert false, 'the schema should be rejected'
+}
+
+@[table: 'bad_keys']
+struct BadKeys {
+	id        int @[primary; sql: serial]
+	device_id int
+	user_name string
+}
+
+fn (b BadKeys) edges() []Edge {
+	return [
+		// devices are keyed by strings
+		Edge{
+			name:   'device'
+			kind:   .many_to_one
+			to:     'devices'
+			column: 'device_id'
+		},
+		// users are keyed by ints
+		Edge{
+			name:   'user'
+			kind:   .many_to_one
+			to:     'people'
+			column: 'user_name'
+		},
+		Edge{
+			name:   'timed'
+			kind:   .many_to_one
+			to:     'time_keyed'
+			column: 'device_id'
+		},
+	]
+}
+
+@[table: 'time_keyed']
+struct TimeKeyed {
+	id time.Time @[primary]
 }

@@ -4,8 +4,10 @@ import load
 import time
 
 // ColumnKind is what vgraph needs to know about a column's type to check edges.
+// Keys, and the columns that hold them, are `int`, `i64` or `string`.
 pub enum ColumnKind {
 	int
+	i64
 	string
 	other
 }
@@ -18,6 +20,9 @@ pub:
 	typ      string // the field's V type, such as `?time.Time`, or `other`
 	kind     ColumnKind
 	nullable bool
+	// graphql_skip leaves the column out of the GraphQL schema: the field has
+	// `@[graphql: '-']`.
+	graphql_skip bool
 }
 
 // Table is a registered struct: its table, key, columns (in field order) and
@@ -29,6 +34,9 @@ pub:
 	key     string
 	columns []Column
 	edges   []Edge
+	// graphql_skip leaves the table out of the GraphQL schema: the struct has
+	// `@[graphql: '-']`.
+	graphql_skip bool
 }
 
 // column returns the column `name`, or `none` when the table has none.
@@ -95,15 +103,17 @@ pub fn (mut s Schema) add[T]() ! {
 				typ = '?time.Time'
 			}
 			columns << Column{
-				name:     load.column_name(field.name, field.attrs)
-				field:    field.name
-				typ:      typ
-				kind:     match typ.trim_left('?') {
+				name:         load.column_name(field.name, field.attrs)
+				field:        field.name
+				typ:          typ
+				kind:         match typ.trim_left('?') {
 					'int' { ColumnKind.int }
+					'i64' { ColumnKind.i64 }
 					'string' { ColumnKind.string }
 					else { ColumnKind.other }
 				}
-				nullable: typ.starts_with('?')
+				nullable:     typ.starts_with('?')
+				graphql_skip: is_graphql_skip(field.attrs)
 			}
 		}
 	}
@@ -114,14 +124,32 @@ pub fn (mut s Schema) add[T]() ! {
 			edges = record.$method()
 		}
 	}
+	mut skip := false
+	$for attr in T.attributes {
+		if attr.name == 'graphql' && attr.has_arg && attr.arg.trim(" '") == '-' {
+			skip = true
+		}
+	}
 	s.order << name
 	s.tables[name] = Table{
-		name:    name
-		struct_: T.name
-		key:     load.primary_key[T]()
-		columns: columns
-		edges:   edges
+		name:         name
+		struct_:      T.name
+		key:          load.primary_key[T]()
+		columns:      columns
+		edges:        edges
+		graphql_skip: skip
 	}
+}
+
+// is_graphql_skip reports whether a field's attributes include
+// `@[graphql: '-']`.
+fn is_graphql_skip(attrs []string) bool {
+	for attr in attrs {
+		if attr.starts_with('graphql:') && attr.all_after('graphql:').trim(" '") == '-' {
+			return true
+		}
+	}
+	return false
 }
 
 // table returns the registered table `name`.
@@ -158,12 +186,14 @@ pub fn (s Schema) validate() ! {
 				problems << '${at}: no table `${edge.to}` is registered'
 				continue
 			}
-			// the table whose rows hold `column`, and the one `type_col` filters
-			holder := match edge.kind {
-				.one_to_many, .one_to_one { target }
-				.many_to_one { table }
-				.many_to_many { Table{} }
+			// the table whose rows hold `column`, the one `type_col` filters, and
+			// the one whose key `column` holds
+			holder, keyed := match edge.kind {
+				.one_to_many, .one_to_one { target, table }
+				.many_to_one { table, target }
+				.many_to_many { Table{}, table }
 			}
+			key_kind := key_kind_of(mut problems, at, keyed) or { continue }
 			if edge.kind == .many_to_many {
 				if edge.through == '' || edge.through_to == '' {
 					problems << '${at}: a many_to_many edge needs `through` and `through_to`'
@@ -172,7 +202,7 @@ pub fn (s Schema) validate() ! {
 					check_column(mut problems, at, target, edge.type_col, .string, 'type_col')
 				}
 			} else {
-				check_column(mut problems, at, holder, edge.column, .int, 'column')
+				check_column(mut problems, at, holder, edge.column, key_kind, 'column')
 				if edge.type_col != '' {
 					check_column(mut problems, at, holder, edge.type_col, .string, 'type_col')
 				}
@@ -196,12 +226,27 @@ pub fn (s Schema) validate() ! {
 	}
 }
 
+// key_kind_of returns the kind of `table`'s key, and reports a key that edges
+// can't use.
+fn key_kind_of(mut problems []string, at string, table Table) ?ColumnKind {
+	key := table.column(table.key) or {
+		problems << '${at}: `${table.name}` has no key column `${table.key}`'
+		return none
+	}
+	if key.kind == .other {
+		problems << '${at}: the key `${table.name}.${key.name}` is ${key.typ}; edges need an int, i64 or string key'
+		return none
+	}
+	return key.kind
+}
+
 fn check_column(mut problems []string, at string, table Table, name string, kind ColumnKind, role string) {
 	column := table.column(name) or {
 		problems << '${at}: `${role}` names `${table.name}.${name}`, which does not exist'
 		return
 	}
 	if column.kind != kind {
-		problems << '${at}: `${role}` names `${table.name}.${name}`, which is not an ${kind} column'
+		article := if kind == .int || kind == .i64 { 'an' } else { 'a' }
+		problems << '${at}: `${role}` names `${table.name}.${name}`, which is not ${article} ${kind} column'
 	}
 }

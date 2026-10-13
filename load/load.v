@@ -24,12 +24,12 @@ pub:
 }
 
 // load_one returns the `P` records that `children` refer to through their `fk`
-// column, keyed by the `P` primary key, in one query. Children whose `fk` is
-// null, and repeated keys, are skipped, and there is no query when no key is
-// left.
-pub fn load_one[C, P](conn orm.Connection, children []C, fk string, opts Options) !map[int]P {
-	mut ids := []int{}
-	mut seen := map[int]bool{}
+// column, keyed by the `P` primary key's string form (`'3'`, or a UUID), in one
+// query. Children whose `fk` is null, and repeated keys, are skipped, and there
+// is no query when no key is left.
+pub fn load_one[C, P](conn orm.Connection, children []C, fk string, opts Options) !map[string]P {
+	mut ids := []string{}
+	mut seen := map[string]bool{}
 	for child in children {
 		if opts.type_col != '' {
 			type_val := string_column[C](child, opts.type_col) or {
@@ -39,75 +39,72 @@ pub fn load_one[C, P](conn orm.Connection, children []C, fk string, opts Options
 				continue
 			}
 		}
-		id := int_column[C](child, fk) or { continue }
+		id := key_column[C](child, fk) or { continue }
 		if id !in seen {
 			seen[id] = true
 			ids << id
 		}
 	}
-	mut found := map[int]P{}
+	mut found := map[string]P{}
 	if ids.len == 0 {
 		return found
 	}
 	key := primary_key[P]()
 	for row in select_in[P](conn, key, ids, soft_del: opts.soft_del, query: opts.query)! {
-		found[int_column[P](row, key) or { 0 }] = row
+		found[key_column[P](row, key) or { '' }] = row
 	}
 	return found
 }
 
 // load_many returns the `C` records whose `fk` column holds the primary key of one
-// of `parents`, keyed by that key, in one query. Parents with none have no entry.
-pub fn load_many[P, C](conn orm.Connection, parents []P, fk string, opts Options) !map[int][]C {
+// of `parents`, keyed by that key's string form, in one query. Parents with none
+// have no entry.
+pub fn load_many[P, C](conn orm.Connection, parents []P, fk string, opts Options) !map[string][]C {
 	ids := keys_of[P](parents)!
-	mut grouped := map[int][]C{}
+	mut grouped := map[string][]C{}
 	if ids.len == 0 {
 		return grouped
 	}
 	for row in select_in[C](conn, fk, ids, opts)! {
-		grouped[int_column[C](row, fk) or { continue }] << row
+		grouped[key_column[C](row, fk) or { continue }] << row
 	}
 	return grouped
 }
 
 // load_through returns the `C` records linked to each of `parents` through the
 // join table `through`, whose `from_col` holds a parent's key and `to_col` a `C`
-// key, keyed by the parent's key, in two queries: the join table, then `C`.
-pub fn load_through[P, C](conn orm.Connection, parents []P, through string, from_col string, to_col string, opts Options) !map[int][]C {
+// key, keyed by the parent key's string form, in two queries: the join table,
+// then `C`.
+pub fn load_through[P, C](conn orm.Connection, parents []P, through string, from_col string, to_col string, opts Options) !map[string][]C {
 	ids := keys_of[P](parents)!
-	mut grouped := map[int][]C{}
+	mut grouped := map[string][]C{}
 	if ids.len == 0 {
 		return grouped
 	}
-	pairs := link_pairs(conn, through, from_col, to_col, ids)!
-	mut targets := []int{}
-	mut seen := map[int]bool{}
-	for pair in pairs {
-		if pair[1] !in seen {
-			seen[pair[1]] = true
-			targets << pair[1]
-		}
-	}
+	key := primary_key[C]()
+	pairs := link_pairs(conn, through, from_col, to_col, ids, key_type[P](primary_key[P]())!,
+		key_type[C](key)!)!
+	targets := unique(pairs.map(it[1]))
 	if targets.len == 0 {
 		return grouped
 	}
-	key := primary_key[C]()
-	mut by_key := map[int]C{}
-	for row in select_in[C](conn, key, targets, opts)! {
-		by_key[int_column[C](row, key) or { 0 }] = row
-	}
+	// each parent's rows in the order of the query
+	mut parents_of := map[string][]string{}
 	for pair in pairs {
-		if row := by_key[pair[1]] {
-			grouped[pair[0]] << row
+		parents_of[pair[1]] << pair[0]
+	}
+	for row in select_in[C](conn, key, targets, opts)! {
+		for parent in parents_of[key_column[C](row, key) or { '' }] or { [] } {
+			grouped[parent] << row
 		}
 	}
 	return grouped
 }
 
 // unique returns `ids` without repeats, in the order each first appears.
-pub fn unique(ids []int) []int {
-	mut seen := map[int]bool{}
-	mut out := []int{cap: ids.len}
+pub fn unique(ids []string) []string {
+	mut seen := map[string]bool{}
+	mut out := []string{cap: ids.len}
 	for id in ids {
 		if id !in seen {
 			seen[id] = true
@@ -117,14 +114,16 @@ pub fn unique(ids []int) []int {
 	return out
 }
 
-// keys_of returns the distinct primary keys of `rows`, in the order each first
-// appears.
-pub fn keys_of[T](rows []T) ![]int {
+// keys_of returns the distinct primary keys of `rows`, as strings, in the order
+// each first appears.
+pub fn keys_of[T](rows []T) ![]string {
 	key := primary_key[T]()
-	mut seen := map[int]bool{}
-	mut ids := []int{cap: rows.len}
+	mut seen := map[string]bool{}
+	mut ids := []string{cap: rows.len}
 	for row in rows {
-		id := int_column[T](row, key) or { return error('`${key}` is not an int column') }
+		id := key_column[T](row, key) or {
+			return error('`${key}` is not an int, i64 or string column')
+		}
 		if id !in seen {
 			seen[id] = true
 			ids << id
@@ -141,23 +140,6 @@ pub fn primary_key[T]() string {
 		}
 	}
 	return 'id'
-}
-
-// int_column returns the value of the `int` or `?int` field of `row` stored in
-// `column`, or `none` when there is no such field or it is null.
-pub fn int_column[T](row T, column string) ?int {
-	$for field in T.fields {
-		$if field.typ is int {
-			if column_name(field.name, field.attrs) == column {
-				return row.$(field.name)
-			}
-		} $else $if field.typ is ?int {
-			if column_name(field.name, field.attrs) == column {
-				return row.$(field.name)
-			}
-		}
-	}
-	return none
 }
 
 // string_column returns the value of the `string` field of `row` stored in

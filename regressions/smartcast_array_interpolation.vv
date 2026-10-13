@@ -1,0 +1,26 @@
+// Interpolating an array field of an interface value smartcast to a struct
+// (`'${e.lines}'` after `if e is MyError`) generates C that casts the value twice
+// and doesn't compile: `no member named '_object' in 'struct main__MyError'`.
+// A string or int field interpolates fine, and so does the array once copied to
+// a local variable.
+// Run: `v run smartcast_array_interpolation.vv`. Expect `at [1, 2]`.
+// Worked around in `graphql/fixtures_test.v` (`describe`) with a local variable.
+module main
+
+struct MyError {
+	Error
+	lines []int
+}
+
+fn describe(e IError) string {
+	if e is MyError {
+		return 'at ${e.lines}'
+	}
+	return e.msg()
+}
+
+fn main() {
+	println(describe(MyError{
+		lines: [1, 2]
+	}))
+}
