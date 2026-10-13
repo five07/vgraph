@@ -4,6 +4,7 @@ module graph
 import five07.vgraph.graphql
 import five07.vgraph.load
 import models
+import time
 
 // schema_sdl is the GraphQL schema: the tables, with entgql's conventions, and
 // the project's own .graphql files. schema.graphql holds the same.
@@ -355,6 +356,7 @@ type Pet {
   id: ID!
   name: String!
   ownerID: ID
+  deletedAt: Time
   owner: User
 }
 
@@ -390,6 +392,16 @@ input PetWhereInput {
   ownerIDNotIn: [ID!]
   ownerIDIsNil: Boolean
   ownerIDNotNil: Boolean
+
+  """deletedAt field predicates"""
+  deletedAt: Time
+  deletedAtNEQ: Time
+  deletedAtGT: Time
+  deletedAtGTE: Time
+  deletedAtLT: Time
+  deletedAtLTE: Time
+  deletedAtIsNil: Boolean
+  deletedAtNotNil: Boolean
 }
 
 """Ordering options for Pet lists"""
@@ -406,6 +418,7 @@ enum PetOrderField {
   ID
   NAME
   OWNER_ID
+  DELETED_AT
 }
 
 type User {
@@ -481,13 +494,17 @@ enum OrderDirection {
 
   """Specifies a descending order for a given `orderBy` argument."""
   DESC
-}'
+}
+
+"""An RFC 3339 date and time, such as `2026-10-13T07:30:00Z`."""
+scalar Time @specifiedBy(url: "https://scalars.graphql.org/chillicream/date-time.html")'
 
 // graphql returns a GraphQL server for the graph. Its resolvers load through the
 // client, one query per edge per level of a request; `r` resolves the fields the
 // project's .graphql files add.
 pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	mut s := graphql.Server.new(schema_sdl)!
+	s.scalar('Time', time_scalar)
 
 	// Card
 	s.resolve('Query', 'cards', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
@@ -697,7 +714,7 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		n := g.with_ctx(ctx).pets().graphql_args(info.args)!.count()!
 		return parents.map(graphql.Resolved(graphql.Value(n)))
 	})
-	for name in ['id', 'name', 'ownerID'] {
+	for name in ['id', 'name', 'ownerID', 'deletedAt'] {
 		s.resolve('Pet', name, resolve_pet_field)
 	}
 	s.resolve('Pet', 'owner', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
@@ -1366,6 +1383,9 @@ fn pet_value(row models.Pet, field string) graphql.Value {
 		'ownerID' {
 			if v := row.owner_id { graphql.Value(v.str()) } else { graphql.null }
 		}
+		'deletedAt' {
+			if v := row.deleted_at { graphql.Value(v.format_rfc3339()) } else { graphql.null }
+		}
 		else { graphql.null }
 	}
 }
@@ -1386,6 +1406,7 @@ fn (q PetQuery) graphql_args(args map[string]graphql.Value) !PetQuery {
 				'ID' { 'id' }
 				'NAME' { 'name' }
 				'OWNER_ID' { 'owner_id' }
+				'DELETED_AT' { 'deleted_at' }
 				else { '' }
 			}
 			next.query = load.Query{
@@ -1444,6 +1465,18 @@ fn pet_where(w map[string]graphql.Value) ![]load.Cond {
 			}
 			'ownerIDNotNil' {
 				if v.as_bool() { conds << load.is_not_null('owner_id') }
+			}
+			'deletedAt' { conds << load.eq('deleted_at', gql_time(v)!) }
+			'deletedAtNEQ' { conds << load.ne('deleted_at', gql_time(v)!) }
+			'deletedAtGT' { conds << load.gt('deleted_at', gql_time(v)!) }
+			'deletedAtGTE' { conds << load.ge('deleted_at', gql_time(v)!) }
+			'deletedAtLT' { conds << load.lt('deleted_at', gql_time(v)!) }
+			'deletedAtLTE' { conds << load.le('deleted_at', gql_time(v)!) }
+			'deletedAtIsNil' {
+				if v.as_bool() { conds << load.is_null('deleted_at') }
+			}
+			'deletedAtNotNil' {
+				if v.as_bool() { conds << load.is_not_null('deleted_at') }
 			}
 			else {}
 		}
@@ -1585,4 +1618,29 @@ fn gql_ints(v graphql.Value) []int {
 
 fn gql_strings(v graphql.Value) []string {
 	return v.as_list().map(it.as_string())
+}
+
+// gql_time reads a Time.
+fn gql_time(v graphql.Value) !time.Time {
+	return time.parse_rfc3339(v.as_string()) or {
+		return error('invalid Time "${v.as_string()}": use RFC 3339, such as 2026-10-13T07:30:00Z')
+	}
+}
+
+// time_scalar checks Time values: RFC 3339 strings.
+const time_scalar = graphql.Scalar{
+	parse_value:   fn (v graphql.Value) !graphql.Value {
+		if v !is string {
+			return error('Time must be an RFC 3339 string')
+		}
+		gql_time(v)!
+		return v
+	}
+	parse_literal: fn (node graphql.ValueNode, _ map[string]graphql.Value) !graphql.Value {
+		if node is graphql.StringValue {
+			gql_time(graphql.Value(node.value))!
+			return graphql.Value(node.value)
+		}
+		return error('Time must be an RFC 3339 string')
+	}
 }

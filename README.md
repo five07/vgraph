@@ -149,9 +149,9 @@ g.tx(fn (tx graph.Graph) ! {
 - **Transactions:** a write and its edge writes run in one transaction when the
   connection can run one; `g.tx` runs several, and writes inside it join it.
   `save()` and `exec()` on one row return `graph.NotFoundError` when it is missing.
-- **Context:** `g.with_ctx(ctx)` carries an app value (its user, its request) for
-  hooks and privacy rules (Phase 6c). The generated GraphQL server passes each
-  request's context on.
+- **Context:** `g.with_ctx(ctx)` carries an app value (its user, its request) to
+  hooks, interceptors and privacy rules. It is a `graphql.Context`, and the
+  generated GraphQL server passes each request's context on.
 
 Fields that need options list them in a `fields()` method beside `edges()`; the
 others are inferred: an option type is optional, a `@[sql: serial]` key is set by the
@@ -185,6 +185,74 @@ only, so a string key must be set or have a default), upserts are refused, and
 without `orm.TransactionalConnection` statements run one by one. On a pool,
 `pg.pool(db)` holds one connection for each transaction. The adapters pass values
 as text, stored the way V's ORM stores them (on SQLite, times as Unix seconds).
+
+## Hooks, interceptors and privacy
+
+As in Ent, a model declares them beside `edges()`, and an app registers more on
+its graph at startup:
+
+```v ignore
+// on the model: untyped, as the model can't import the generated module
+pub fn (a Article) hooks() []vgraph.Hook {
+	return [vgraph.on(vgraph.Hook{
+		run: fn (next vgraph.Mutate) vgraph.Mutate {
+			return fn [next] (ctx graphql.Context, mut m vgraph.Mutation) ! {
+				if _ := m.field_value('slug') {} else {
+					m.set_field_value('slug', new_slug())
+				}
+				next(ctx, mut m)!
+			}
+		}
+	}, .create), vgraph.soft_delete_hook('deleted_at')]
+}
+
+pub fn (a Article) interceptors() []vgraph.Interceptor {
+	return [vgraph.soft_delete_query('deleted_at')]
+}
+
+pub fn (a Article) policy() vgraph.Policy {
+	return vgraph.Policy{
+		mutation: [allow_if_owner, vgraph.always_deny]
+	}
+}
+
+// on the graph: typed
+g.articles().use(fn (next graph.ArticleMutate) graph.ArticleMutate {
+	return fn [next] (ctx graphql.Context, mut m graph.ArticleMutation) ! {
+		if title := m.title() {
+			m.set_title(title.trim_space())
+		}
+		next(ctx, mut m)!
+	}
+})
+g.users().intercept(fn (ctx graphql.Context, q graph.UserQuery) !graph.UserQuery {
+	return q.where_tenant_id((ctx as Request).tenant)
+})
+```
+
+- **Hooks** run around every write, outermost first: privacy, the graph's
+  (`g.use`), the table's (`g.articles().use`, `use_hook`), the model's; then the
+  field checks and the SQL, all in the write's transaction. Defaults are set before
+  the hooks run. `vgraph.on`, `only_if` and `unless` limit a hook. A hook can change
+  values, edges (`add_ids`, `remove_ids`, `clear_edge`) and conditions (`where`), turn
+  a delete into an update (`set_op`), read `key()`, `keys()` and `old_field()` (or a
+  typed `old_<field>()`), and register `on_commit` / `on_rollback` callbacks; an error
+  stops the write. A bulk create runs them per row.
+- **Interceptors** run before every select of their table: root queries, counts,
+  edge loads, traversals and the GraphQL resolvers. They narrow the query or fail
+  it; they can't change its results.
+- **Privacy:** query and mutation rules return `.allow`, `.deny` or `.skip`; the
+  first to allow or deny decides, and when all skip the operation runs. A query rule
+  can narrow the query and skip, as a filter. A deny is a `vgraph.PrivacyError`; in
+  GraphQL it is an error at its field. `g.privileged()` skips privacy.
+- **Soft delete:** `soft_delete_query` and `soft_delete_hook`, both named
+  `soft_delete`; `g.skip('soft_delete')` reads, changes and purges deleted rows.
+- **Transactions:** `g.on_commit(f)` and `g.on_rollback(f)` inside `g.tx`.
+
+**Tracing.** `vgraph.trace(conn, fn (e vgraph.TraceEvent) { ... })` wraps a
+connection, driver or not, and reports each statement: its kind, table, duration,
+and whether it failed, plus the SQL vgraph writes itself, with its placeholders.
+Events carry no values: no parameters, and no error messages, which can quote them.
 
 ## GraphQL
 
@@ -276,7 +344,7 @@ SQLite and PostgreSQL.
 ## Layout
 
 - `edge.v`, `schema.v`, `field.v`, `client.v`, `driver.v`, `mutation.v`, `write.v`,
-  `migrate.v`: the `vgraph` module.
+  `hooks.v`, `trace.v`, `migrate.v`: the `vgraph` module.
 - `sqlite/`, `pg/`: the drivers, `five07.vgraph.sqlite` and `five07.vgraph.pg`.
 - `gen/`, `cmd/vgraph/`: the generator and the `vgraph` command.
 - `load/`: `vgraph.load`, the batched loads that `Client` runs.

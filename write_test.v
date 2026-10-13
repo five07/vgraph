@@ -317,13 +317,13 @@ fn test_update_one() {
 		first := writers(c)![0]
 		time.sleep(1100 * time.millisecond)
 		assert c.update_one(MutationData{
-			op:     .update_one
-			table:  'writers'
-			key:    key
-			values: {
+			op:      .update_one
+			table:   'writers'
+			row_key: key
+			values:  {
 				'name': orm.Primitive('ada l')
 			}
-			adds:   {
+			adds:    {
 				'score': orm.Primitive(5)
 			}
 		})!
@@ -334,10 +334,10 @@ fn test_update_one() {
 		assert row.updated_at.unix() > first.updated_at.unix()
 		// no such row
 		assert !c.update_one(MutationData{
-			op:     .update_one
-			table:  'writers'
-			key:    '99'
-			values: {
+			op:      .update_one
+			table:   'writers'
+			row_key: '99'
+			values:  {
 				'name': orm.Primitive('x')
 			}
 		})!
@@ -353,10 +353,10 @@ fn test_update_one() {
 			}, '`writers.name`: is empty'},
 		] {
 			c.update_one(MutationData{
-				op:     .update_one
-				table:  'writers'
-				key:    key
-				values: case.values
+				op:      .update_one
+				table:   'writers'
+				row_key: key
+				values:  case.values
 			}) or {
 				assert err.msg() == case.message
 				continue
@@ -397,14 +397,14 @@ fn test_update_and_delete_count_rows() {
 		})! == 2
 		assert writers(c)!.map(it.name) == ['cy']
 		assert c.delete_one(MutationData{
-			op:    .delete_one
-			table: 'writers'
-			key:   '3'
+			op:      .delete_one
+			table:   'writers'
+			row_key: '3'
 		})!
 		assert !c.delete_one(MutationData{
-			op:    .delete_one
-			table: 'writers'
-			key:   '3'
+			op:      .delete_one
+			table:   'writers'
+			row_key: '3'
 		})!
 	}
 }
@@ -459,7 +459,7 @@ fn test_edges_of_every_kind() {
 		assert c.update_one(MutationData{
 			op:      .update_one
 			table:   'writers'
-			key:     bob
+			row_key: bob
 			removed: {
 				'stories': [other]
 			}
@@ -471,7 +471,7 @@ fn test_edges_of_every_kind() {
 		assert c.update_one(MutationData{
 			op:      .update_one
 			table:   'writers'
-			key:     bob
+			row_key: bob
 			cleared: ['stories', 'badge']
 		})!
 		assert stories(c)!.map(it.writer_id or { 0 }) == [0, 0]
@@ -480,7 +480,7 @@ fn test_edges_of_every_kind() {
 		assert c.update_one(MutationData{
 			op:      .update_one
 			table:   'stories'
-			key:     story
+			row_key: story
 			cleared: ['labels']
 			added:   {
 				'labels': ['l3', 'l2']
@@ -490,7 +490,7 @@ fn test_edges_of_every_kind() {
 		assert c.update_one(MutationData{
 			op:      .update_one
 			table:   'stories'
-			key:     story
+			row_key: story
 			removed: {
 				'labels': ['l3']
 			}
@@ -498,10 +498,10 @@ fn test_edges_of_every_kind() {
 		assert labels_of(c, story)! == ['l2']
 		// many_to_one cleared
 		assert c.update_one(MutationData{
-			op:    .update_one
-			table: 'stories'
-			key:   story
-			added: {
+			op:      .update_one
+			table:   'stories'
+			row_key: story
+			added:   {
 				'writer': [ada]
 			}
 		})!
@@ -509,15 +509,15 @@ fn test_edges_of_every_kind() {
 		assert c.update_one(MutationData{
 			op:      .update_one
 			table:   'stories'
-			key:     story
+			row_key: story
 			cleared: ['writer']
 		})!
 		assert stories(c)![0].writer_id == none
 		// deleting a story deletes its join rows
 		assert c.delete_one(MutationData{
-			op:    .delete_one
-			table: 'stories'
-			key:   story
+			op:      .delete_one
+			table:   'stories'
+			row_key: story
 		})!
 		assert load.select_where[StoryLabel](c.conn, load.Query{})!.len == 0
 	}

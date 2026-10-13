@@ -67,7 +67,7 @@ pub fn (q CardQuery) offset(count int) CardQuery {
 // count returns how many rows match, in one query; order, limit and offset
 // do not apply.
 pub fn (q CardQuery) count() !int {
-	return load.count_where[models.Card](q.graph.client.conn, q.query)
+	return load.count_where[models.Card](q.graph.client.conn, q.graph.client.prepare_query('cards', q.query)!)
 }
 
 // where_id keeps the rows whose `id` is `value`.
@@ -222,7 +222,7 @@ pub fn (q CardQuery) with_owner(configure ...fn (UserQuery) UserQuery) CardQuery
 
 // all returns the matching rows, with the requested edges.
 pub fn (q CardQuery) all() ![]CardNode {
-	rows := load.select_where[models.Card](q.graph.client.conn, q.query)!
+	rows := load.select_where[models.Card](q.graph.client.conn, q.graph.client.prepare_query('cards', q.query)!)!
 	return q.nodes(rows)
 }
 
@@ -256,7 +256,7 @@ pub fn (q CardQuery) nodes(rows []models.Card) ![]CardNode {
 		}
 		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
 			load.unique(keys),
-			query: sub.query
+			query: q.graph.client.prepare_query('users', sub.query)!
 		)!)!
 		mut by_key := map[string]&UserNode{}
 		for target in targets {

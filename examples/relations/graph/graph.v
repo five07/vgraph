@@ -63,6 +63,50 @@ pub fn (g Graph) tx(f fn (tx Graph) !) ! {
 	client.commit()!
 }
 
+// use registers hooks for the writes of every table, before each table's own.
+// Register them at startup, before the graph serves requests.
+pub fn (g Graph) use(hooks ...vgraph.Hook) {
+	g.client.use(...hooks)
+}
+
+// intercept registers interceptors for the queries of every table, before
+// each table's own.
+pub fn (g Graph) intercept(interceptors ...vgraph.Interceptor) {
+	g.client.intercept(...interceptors)
+}
+
+// policy registers privacy rules for every table, before each table's own.
+pub fn (g Graph) policy(policies ...vgraph.Policy) {
+	g.client.policy(...policies)
+}
+
+// skip returns a graph that leaves out the hooks and interceptors named
+// `names`, such as `soft_delete`.
+pub fn (g Graph) skip(names ...string) Graph {
+	return Graph{
+		client: g.client.skip(...names)
+	}
+}
+
+// privileged returns a graph that skips privacy rules, for seeds, migrations
+// and system jobs.
+pub fn (g Graph) privileged() Graph {
+	return Graph{
+		client: g.client.privileged()
+	}
+}
+
+// on_commit runs `f` once the transaction of `g` (in `tx`) commits; outside
+// one, at once.
+pub fn (g Graph) on_commit(f fn ()) {
+	g.client.on_commit(f)
+}
+
+// on_rollback runs `f` if the transaction of `g` (in `tx`) rolls back.
+pub fn (g Graph) on_rollback(f fn ()) {
+	g.client.on_rollback(f)
+}
+
 // NotFoundError is the error of `first()` when no row matches, and of a write
 // to one row that doesn't exist.
 pub struct NotFoundError {

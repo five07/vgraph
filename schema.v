@@ -70,9 +70,13 @@ pub struct Schema {
 mut:
 	tables map[string]Table
 	order  []string
-	// the options each table's `fields()` gave, kept apart from `tables`,
-	// which `vgraph gen` prints as JSON: functions can't be printed
-	options map[string][]Field
+	// the options each table's `fields()` gave, and its hooks, interceptors
+	// and policy, kept apart from `tables`, which `vgraph gen` prints as JSON:
+	// functions can't be printed
+	options      map[string][]Field
+	hooks        map[string][]Hook
+	interceptors map[string][]Interceptor
+	policies     map[string]Policy
 }
 
 // tables returns the registered tables, in the order they were added.
@@ -149,6 +153,15 @@ pub fn (mut s Schema) add[T]() ! {
 		} $else $if method.name == 'fields' {
 			record := T{}
 			options = record.$method()
+		} $else $if method.name == 'hooks' {
+			record := T{}
+			s.hooks[name] = record.$method()
+		} $else $if method.name == 'interceptors' {
+			record := T{}
+			s.interceptors[name] = record.$method()
+		} $else $if method.name == 'policy' {
+			record := T{}
+			s.policies[name] = record.$method()
 		}
 	}
 	for i, column in columns {

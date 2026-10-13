@@ -2,6 +2,7 @@
 module graph
 
 import five07.vgraph.load
+import time
 import models
 
 // PetQuery selects `pets` rows, and the edges to load with them. Start one with
@@ -67,7 +68,7 @@ pub fn (q PetQuery) offset(count int) PetQuery {
 // count returns how many rows match, in one query; order, limit and offset
 // do not apply.
 pub fn (q PetQuery) count() !int {
-	return load.count_where[models.Pet](q.graph.client.conn, q.query)
+	return load.count_where[models.Pet](q.graph.client.conn, q.graph.client.prepare_query('pets', q.query)!)
 }
 
 // where_id keeps the rows whose `id` is `value`.
@@ -221,6 +222,63 @@ pub fn (q PetQuery) order_by_owner_id_desc() PetQuery {
 	return next
 }
 
+// where_deleted_at keeps the rows whose `deleted_at` is `value`.
+pub fn (q PetQuery) where_deleted_at(value time.Time) PetQuery {
+	return q.where(load.eq('deleted_at', value))
+}
+
+// where_deleted_at_lt keeps the rows whose `deleted_at` comes before `value`.
+pub fn (q PetQuery) where_deleted_at_lt(value time.Time) PetQuery {
+	return q.where(load.lt('deleted_at', value))
+}
+
+// where_deleted_at_le keeps the rows whose `deleted_at` comes at or before `value`.
+pub fn (q PetQuery) where_deleted_at_le(value time.Time) PetQuery {
+	return q.where(load.le('deleted_at', value))
+}
+
+// where_deleted_at_gt keeps the rows whose `deleted_at` comes after `value`.
+pub fn (q PetQuery) where_deleted_at_gt(value time.Time) PetQuery {
+	return q.where(load.gt('deleted_at', value))
+}
+
+// where_deleted_at_ge keeps the rows whose `deleted_at` comes at or after `value`.
+pub fn (q PetQuery) where_deleted_at_ge(value time.Time) PetQuery {
+	return q.where(load.ge('deleted_at', value))
+}
+
+// where_deleted_at_is_null keeps the rows whose `deleted_at` is null.
+pub fn (q PetQuery) where_deleted_at_is_null() PetQuery {
+	return q.where(load.is_null('deleted_at'))
+}
+
+// where_deleted_at_is_not_null keeps the rows whose `deleted_at` is not null.
+pub fn (q PetQuery) where_deleted_at_is_not_null() PetQuery {
+	return q.where(load.is_not_null('deleted_at'))
+}
+
+// order_by_deleted_at orders the rows by `deleted_at`, ascending.
+pub fn (q PetQuery) order_by_deleted_at() PetQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		order: 'deleted_at'
+		desc:  false
+	}
+	return next
+}
+
+// order_by_deleted_at_desc orders the rows by `deleted_at`, descending.
+pub fn (q PetQuery) order_by_deleted_at_desc() PetQuery {
+	mut next := q
+	next.query = load.Query{
+		...q.query
+		order: 'deleted_at'
+		desc:  true
+	}
+	return next
+}
+
 // with_owner loads each row's `owner` (many_to_one `users`) with it, in one
 // query for all the rows. `configure` narrows them, and can load their edges.
 pub fn (q PetQuery) with_owner(configure ...fn (UserQuery) UserQuery) PetQuery {
@@ -232,7 +290,7 @@ pub fn (q PetQuery) with_owner(configure ...fn (UserQuery) UserQuery) PetQuery {
 
 // all returns the matching rows, with the requested edges.
 pub fn (q PetQuery) all() ![]PetNode {
-	rows := load.select_where[models.Pet](q.graph.client.conn, q.query)!
+	rows := load.select_where[models.Pet](q.graph.client.conn, q.graph.client.prepare_query('pets', q.query)!)!
 	return q.nodes(rows)
 }
 
@@ -268,7 +326,7 @@ pub fn (q PetQuery) nodes(rows []models.Pet) ![]PetNode {
 		}
 		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
 			load.unique(keys),
-			query: sub.query
+			query: q.graph.client.prepare_query('users', sub.query)!
 		)!)!
 		mut by_key := map[string]&UserNode{}
 		for target in targets {

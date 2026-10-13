@@ -342,9 +342,9 @@ fn test_postgres_writes_on_a_pool() {
 	})! == 0
 	// a delete takes the article's join rows
 	assert c.delete_one(MutationData{
-		op:    .delete_one
-		table: 'vg_articles'
-		key:   article
+		op:      .delete_one
+		table:   'vg_articles'
+		row_key: article
 	})!
 	assert load.count_where[PgArticleTag](c.conn, load.Query{
 		conds: [load.eq('article_id', 4)]

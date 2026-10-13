@@ -9,6 +9,14 @@ const models = "module models
 
 import time
 import five07.vgraph
+import five07.vgraph.graphql
+import five07.vgraph.load
+
+// Viewer is the context of a request.
+pub struct Viewer {
+pub:
+	banned bool
+}
 
 @[table: 'users']
 pub struct User {
@@ -44,6 +52,39 @@ pub:
 	user_id    int
 	title      string
 	deleted_at ?time.Time
+}
+
+// hooks gives an article without a title one.
+pub fn (a Article) hooks() []vgraph.Hook {
+	return [
+		vgraph.on(vgraph.Hook{
+			run: fn (next vgraph.Mutate) vgraph.Mutate {
+				return fn [next] (ctx graphql.Context, mut m vgraph.Mutation) ! {
+					if _ := m.field_value('title') {
+					} else {
+						m.set_field_value('title', 'Untitled')
+					}
+					next(ctx, mut m)!
+				}
+			}
+		}, .create),
+	]
+}
+
+// policy keeps articles from banned viewers.
+pub fn (a Article) policy() vgraph.Policy {
+	return vgraph.Policy{
+		query: [
+			fn (ctx graphql.Context, _ string, mut _ load.Query) !vgraph.Decision {
+				if ctx is Viewer {
+					if ctx.banned {
+						return .deny
+					}
+				}
+				return .skip
+			},
+		]
+	}
 }
 
 pub fn (a Article) edges() []vgraph.Edge {
@@ -154,6 +195,7 @@ const project_test = 'module main
 import db.sqlite
 import orm
 import time
+import five07.vgraph
 import five07.vgraph.graphql
 import graph
 import shop.models
@@ -376,6 +418,57 @@ fn test_polymorphic_writes() {
 		return
 	}
 	assert false
+}
+
+// Typed hooks and interceptors on the graph, the model\'s hook and policy, and
+// privacy through GraphQL.
+fn test_hooks_and_privacy() {
+	g, _ := setup()!
+	mut old := []string{}
+	log := &old
+	g.articles().use(fn [log] (next graph.ArticleMutate) graph.ArticleMutate {
+		return fn [log, next] (ctx graphql.Context, mut m graph.ArticleMutation) ! {
+			if title := m.title() {
+				m.set_title(title.to_upper())
+			}
+			if m.operation() == .update_one {
+				mut l := unsafe { log }
+				l << m.old_title()!
+			}
+			next(ctx, mut m)!
+		}
+	})
+	// the graph\'s hook runs before the model\'s, which sets a missing title
+	assert g.articles().create().set_user_id(1).save()!.article.title == \'Untitled\'
+	art := g.articles().create().set_user_id(1).set_title(\'hi\').save()!
+	assert art.article.title == \'HI\'
+	art.update().set_title(\'again\').exec()!
+	assert old == [\'HI\']
+	assert g.articles().where_id(art.article.id).first()!.article.title == \'AGAIN\'
+	// a typed interceptor narrows every query of users, edge loads included
+	g.users().intercept(fn (_ graphql.Context, q graph.UserQuery) !graph.UserQuery {
+		return q.where_name(\'bob\')
+	})
+	assert g.users().all()!.map(it.user.name) == [\'bob\']
+	assert g.articles().where_id_in([1, 2]).with_author().order_by_id().all()!.map(if a := it.author { a.user.name } else { \'-\' }) == [
+		\'-\',
+		\'bob\',
+	]
+	// privacy: the policy denies a banned viewer; GraphQL reports it at the field
+	s := g.graphql(graph.Resolvers{})!
+	res := s.execute(graphql.Request{
+		query: \'{ articles { title } users { name } }\'
+	}, models.Viewer{
+		banned: true
+	})
+	assert res.errors.map(it.message) == [\'privacy: query of `articles` denied\']
+	assert res.json().contains(\'"path":["articles"]\')
+	assert g.with_ctx(models.Viewer{}).articles().count()! == 5
+	if _ := g.with_ctx(models.Viewer{ banned: true }).articles().count() {
+		assert false
+	} else {
+		assert err is vgraph.PrivacyError
+	}
 }
 '
 

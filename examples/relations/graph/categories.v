@@ -70,7 +70,7 @@ pub fn (q CategoryQuery) offset(count int) CategoryQuery {
 // count returns how many rows match, in one query; order, limit and offset
 // do not apply.
 pub fn (q CategoryQuery) count() !int {
-	return load.count_where[models.Category](q.graph.client.conn, q.query)
+	return load.count_where[models.Category](q.graph.client.conn, q.graph.client.prepare_query('categories', q.query)!)
 }
 
 // where_id keeps the rows whose `id` is `value`.
@@ -244,7 +244,7 @@ pub fn (q CategoryQuery) with_children(configure ...fn (CategoryQuery) CategoryQ
 
 // all returns the matching rows, with the requested edges.
 pub fn (q CategoryQuery) all() ![]CategoryNode {
-	rows := load.select_where[models.Category](q.graph.client.conn, q.query)!
+	rows := load.select_where[models.Category](q.graph.client.conn, q.graph.client.prepare_query('categories', q.query)!)!
 	return q.nodes(rows)
 }
 
@@ -280,7 +280,7 @@ pub fn (q CategoryQuery) nodes(rows []models.Category) ![]CategoryNode {
 		}
 		targets := sub.nodes(load.select_in[models.Category](q.graph.client.conn, 'id',
 			load.unique(keys),
-			query: sub.query
+			query: q.graph.client.prepare_query('categories', sub.query)!
 		)!)!
 		mut by_key := map[string]&CategoryNode{}
 		for target in targets {
@@ -303,7 +303,7 @@ pub fn (q CategoryQuery) nodes(rows []models.Category) ![]CategoryNode {
 		}
 		children := sub.nodes(load.select_in[models.Category](q.graph.client.conn, 'parent_id',
 			rows.map(it.id.str()),
-			query: sub.query
+			query: q.graph.client.prepare_query('categories', sub.query)!
 		)!)!
 		mut by_parent := map[string][]CategoryNode{}
 		for child in children {

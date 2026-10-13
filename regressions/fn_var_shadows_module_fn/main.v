@@ -3,9 +3,12 @@
 // generates `validate(&value)`, taking `helper.validate`'s `&Doc` parameter,
 // and the C doesn't compile (`passing 'orm__Primitive *' to parameter of
 // incompatible type`). The module's function is only reachable as
-// `helper.validate`, so the variable should win.
+// `helper.validate`, so the variable should win. The module needn't be imported
+// where the variable is: in vgraph, a closure named `fail` in `field.v` was
+// called as `fail` of `examples/service`'s `app` module, which only the app
+// imports.
 // Run: `v run .` in this folder. Expect `checked x`.
-// Worked around in `field.v` by naming the variable `custom`.
+// Worked around in `field.v` by naming the variables `custom` and `invalid`.
 module main
 
 import helper

@@ -5,10 +5,41 @@ import strings
 // The write API of each table: its typed mutation, and the builders for
 // creates, updates and deletes, generated into `<table>_mutation.v`.
 
+// Delegate is a method of `vgraph.Mutation` that a typed mutation passes on.
+struct Delegate {
+	name    string
+	params  string
+	args    string
+	ret     string
+	mutable bool
+	doc     string
+}
+
+const delegates = [
+	Delegate{'operation', '', '', 'vgraph.Op', false, 'returns what the write does.'},
+	Delegate{'table_name', '', '', 'string', false, 'returns the table the write is to.'},
+	Delegate{'changed_columns', '', '', '[]string', false, 'returns the columns the write sets, null included.'},
+	Delegate{'field_value', 'column string', 'column', '?orm.Primitive', false, 'returns the value the write sets `column` to, or `none`.'},
+	Delegate{'added_ids', 'edge string', 'edge', '[]string', false, 'returns the keys the write adds to `edge`.'},
+	Delegate{'removed_ids', 'edge string', 'edge', '[]string', false, 'returns the keys the write removes from `edge`.'},
+	Delegate{'edge_cleared', 'edge string', 'edge', 'bool', false, 'reports whether the write removes every target of `edge`.'},
+	Delegate{'key', '', '', 'string', false, 'returns the key of the row a `*_one` write is to, or that a create stored.'},
+	Delegate{'keys', '', '', '![]string', false, 'returns the keys of the rows the write reaches.'},
+	Delegate{'old_field', 'column string', 'column', '!orm.Primitive', true, 'returns the stored value of `column`, before an update_one or delete_one.'},
+	Delegate{'set_field_value', 'column string, value orm.Primitive', 'column, value', '', true, 'makes the write set `column` to `value`.'},
+	Delegate{'clear_field_value', 'column string', 'column', '', true, 'makes the write set `column` to null.'},
+	Delegate{'add_ids', 'edge string, ids ...string', 'edge, ...ids', '', true, 'adds the targets with the keys `ids` to `edge`.'},
+	Delegate{'remove_ids', 'edge string, ids ...string', 'edge, ...ids', '', true, 'removes the targets with the keys `ids` from `edge`.'},
+	Delegate{'clear_edge', 'edge string', 'edge', '', true, 'removes every target of `edge`.'},
+	Delegate{'where', 'conds ...load.Cond', '...conds', '', true, 'narrows the rows an update or delete reaches.'},
+	Delegate{'set_op', 'op vgraph.Op', 'op', '', true, 'changes what the write does.'},
+	Delegate{'on_commit', 'f fn ()', 'f', '', true, "runs `f` once the write's transaction commits."},
+	Delegate{'on_rollback', 'f fn ()', 'f', '', true, "runs `f` if the write's transaction rolls back."},
+]
+
 // reserved_getters are the methods of a generated mutation that its typed
-// getters, named after the fields, must not take.
-const reserved_getters = ['data', 'operation', 'table_name', 'changed_columns', 'field_value',
-	'added_ids', 'removed_ids', 'edge_cleared', 'set_field_value', 'clear_field_value']
+// getters and setters, named after the fields, must not take.
+const reserved_getters = delegates.map(it.name)
 
 // Setter is one method of a builder, as `name(params) body`.
 struct Setter {
@@ -252,7 +283,7 @@ fn mutation_file(out_module string, info Info, infos map[string]Info) !string {
 	mut b := strings.new_builder(16384)
 	b.writeln(header)
 	b.writeln('module ${out_module}\n')
-	mut imports := ['orm', 'five07.vgraph', 'five07.vgraph.load']
+	mut imports := ['orm', 'five07.vgraph', 'five07.vgraph.graphql', 'five07.vgraph.load']
 	if t.columns.any(it.typ.trim_left('?') == 'time.Time') {
 		imports << 'time'
 	}
@@ -260,75 +291,115 @@ fn mutation_file(out_module string, info Info, infos map[string]Info) !string {
 		b.writeln('import ${line}')
 	}
 
-	// the typed mutation
+	// the typed mutation, its hooks and interceptors
 	mt := info.mutation()
 	b.writeln('
-// ${mt} is a write to `${t.name}` before it runs, with a typed getter for each
-// column. It implements `vgraph.Mutation`.
+// ${mt} is a write to `${t.name}` while its hooks run, with a typed getter and
+// setter for each column. It implements `vgraph.Mutation`, through `inner`.
 pub struct ${mt} {
 pub mut:
-	data vgraph.MutationData
+	inner vgraph.Mutation
 }
 
-// operation returns what the write does.
-pub fn (m ${mt}) operation() vgraph.Op {
-	return m.data.operation()
+// ${info.entity.struct_name}Mutate runs a write to `${t.name}`, or the rest of its hooks.
+pub type ${info.entity.struct_name}Mutate = fn (ctx graphql.Context, mut m ${mt}) !
+
+// ${info.entity.struct_name}Hook wraps the writes to `${t.name}`, as a `vgraph.Hook` does.
+pub type ${info.entity.struct_name}Hook = fn (next ${info.entity.struct_name}Mutate) ${info.entity.struct_name}Mutate
+
+// use registers typed hooks for the writes to `${t.name}`, after the graph\'s.
+pub fn (q ${q}) use(hooks ...${info.entity.struct_name}Hook) {
+	for h in hooks {
+		q.graph.client.use_on(\'${t.name}\', vgraph.Hook{
+			run: fn [h] (next vgraph.Mutate) vgraph.Mutate {
+				typed := h(fn [next] (ctx graphql.Context, mut m ${mt}) ! {
+					next(ctx, mut m.inner)!
+				})
+				return fn [typed] (ctx graphql.Context, mut m vgraph.Mutation) ! {
+					mut tm := ${mt}{
+						inner: m
+					}
+					typed(ctx, mut tm)!
+				}
+			}
+		})
+	}
 }
 
-// table_name returns the table the write is to.
-pub fn (m ${mt}) table_name() string {
-	return m.data.table_name()
+// use_hook registers hooks for the writes to `${t.name}`, with `on` and
+// conditions, after the graph\'s.
+pub fn (q ${q}) use_hook(hooks ...vgraph.Hook) {
+	q.graph.client.use_on(\'${t.name}\', ...hooks)
 }
 
-// changed_columns returns the columns the write sets, null included.
-pub fn (m ${mt}) changed_columns() []string {
-	return m.data.changed_columns()
+// intercept registers typed interceptors for the queries of `${t.name}`: each
+// gets a query, and returns it, narrowed, or an error.
+pub fn (q ${q}) intercept(interceptors ...fn (ctx graphql.Context, q ${q}) !${q}) {
+	g := q.graph
+	for f in interceptors {
+		q.graph.client.intercept_on(\'${t.name}\', vgraph.Interceptor{
+			run: fn [f, g] (ctx graphql.Context, _ string, mut query load.Query) ! {
+				next := f(ctx, ${q}{
+					graph: g
+					query: query
+				})!
+				query = next.query
+			}
+		})
+	}
 }
 
-// field_value returns the value the write sets `column` to, or `none`.
-pub fn (m ${mt}) field_value(column string) ?orm.Primitive {
-	return m.data.field_value(column)
-}
-
-// added_ids returns the keys the write adds to `edge`.
-pub fn (m ${mt}) added_ids(edge string) []string {
-	return m.data.added_ids(edge)
-}
-
-// removed_ids returns the keys the write removes from `edge`.
-pub fn (m ${mt}) removed_ids(edge string) []string {
-	return m.data.removed_ids(edge)
-}
-
-// edge_cleared reports whether the write removes every target of `edge`.
-pub fn (m ${mt}) edge_cleared(edge string) bool {
-	return m.data.edge_cleared(edge)
-}
-
-// set_field_value makes the write set `column` to `value`.
-pub fn (mut m ${mt}) set_field_value(column string, value orm.Primitive) {
-	m.data.set_field_value(column, value)
-}
-
-// clear_field_value makes the write set `column` to null.
-pub fn (mut m ${mt}) clear_field_value(column string) {
-	m.data.clear_field_value(column)
+// policy registers privacy rules for `${t.name}`, after the graph\'s.
+pub fn (q ${q}) policy(policies ...vgraph.Policy) {
+	q.graph.client.policy_on(\'${t.name}\', ...policies)
 }')
+	for d in delegates {
+		recv := if d.mutable { 'mut m' } else { 'm' }
+		ret := if d.ret == '' { '' } else { ' ${d.ret}' }
+		ret_kw := if d.ret == '' { '' } else { 'return ' }
+		b.writeln('
+// ${d.name} ${d.doc}
+pub fn (${recv} ${mt}) ${d.name}(${d.params})${ret} {
+	${ret_kw}m.inner.${d.name}(${d.args})
+}')
+	}
 	for c in t.columns {
 		base := c.typ.trim_left('?')
 		if base !in ['int', 'i64', 'f64', 'bool', 'string', 'time.Time'] {
 			continue
 		}
-		if c.field in reserved_getters {
-			return error('`${t.name}.${c.field}`: `${mt}.${c.field}` is taken; rename the field')
+		for name in [c.field, 'set_${c.field}', 'clear_${c.field}', 'old_${c.field}'] {
+			if name in reserved_getters {
+				return error('`${t.name}.${c.field}`: `${mt}.${name}` is taken; rename the field')
+			}
 		}
 		b.writeln('
 // ${c.field} returns the value the write sets `${c.name}` to, or `none` when it
 // doesn\'t set it, or sets it to null.
 pub fn (m ${mt}) ${c.field}() ?${base} {
-	value := m.data.values[\'${c.name}\'] or { return none }
+	value := m.inner.field_value(\'${c.name}\') or { return none }
 	return if value is ${base} { value } else { none }
+}
+
+// set_${c.field} makes the write set `${c.name}` to `value`.
+pub fn (mut m ${mt}) set_${c.field}(value ${base}) {
+	m.inner.set_field_value(\'${c.name}\', value)
 }')
+		if c.nullable {
+			b.writeln('
+// clear_${c.field} makes the write set `${c.name}` to null.
+pub fn (mut m ${mt}) clear_${c.field}() {
+	m.inner.clear_field_value(\'${c.name}\')
+}')
+		} else {
+			b.writeln('
+// old_${c.field} returns the stored `${c.name}` of the row an update_one or
+// delete_one is to.
+pub fn (mut m ${mt}) old_${c.field}() !${base} {
+	value := m.inner.old_field(\'${c.name}\')!
+	return if value is ${base} { value } else { error(\'`${t.name}.${c.name}` is not a ${base}\') }
+}')
+		}
 	}
 
 	// create
@@ -432,7 +503,7 @@ pub fn (q ${q}) update_one_id(id ${key}) ${uo} {
 		data:  vgraph.MutationData{
 			op:    .update_one
 			table: \'${t.name}\'
-			key:   id.str()
+			row_key: id.str()
 		}
 	}
 }
@@ -448,7 +519,7 @@ pub fn (n ${n}) update() ${uo} {
 // back, or a `NotFoundError`.
 pub fn (b ${uo}) save() !${n} {
 	b.exec()!
-	return b.graph.${t.name}_by_keys([b.data.key])![0]
+	return b.graph.${t.name}_by_keys([b.data.row_key])![0]
 }
 
 // exec updates the row and its edges, in one transaction, or returns a
@@ -525,7 +596,7 @@ pub fn (q ${q}) delete_one_id(id ${key}) ${do} {
 		data:  vgraph.MutationData{
 			op:    .delete_one
 			table: \'${t.name}\'
-			key:   id.str()
+			row_key: id.str()
 		}
 	}
 }
@@ -578,7 +649,10 @@ pub fn (b ${de}) exec() !int {
 
 // ${t.name}_by_keys returns the rows with the keys `keys`, in their order.
 fn (g Graph) ${t.name}_by_keys(keys []string) ![]${n} {
-	rows := g.${t.name}().where(load.in_keys(\'${t.key}\', keys, .${key})).all()!
+	// as stored: no privacy rule or interceptor hides a row just written
+	rows := Graph{
+		client: g.client.bypass()
+	}.${t.name}().where(load.in_keys(\'${t.key}\', keys, .${key})).all()!
 	mut by_key := map[string]${n}{}
 	for row in rows {
 		by_key[row.${info.field()}.${key_field}.str()] = row

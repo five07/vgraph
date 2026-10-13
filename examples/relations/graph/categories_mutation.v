@@ -3,79 +3,217 @@ module graph
 
 import orm
 import five07.vgraph
+import five07.vgraph.graphql
 import five07.vgraph.load
 
-// CategoryMutation is a write to `categories` before it runs, with a typed getter for each
-// column. It implements `vgraph.Mutation`.
+// CategoryMutation is a write to `categories` while its hooks run, with a typed getter and
+// setter for each column. It implements `vgraph.Mutation`, through `inner`.
 pub struct CategoryMutation {
 pub mut:
-	data vgraph.MutationData
+	inner vgraph.Mutation
+}
+
+// CategoryMutate runs a write to `categories`, or the rest of its hooks.
+pub type CategoryMutate = fn (ctx graphql.Context, mut m CategoryMutation) !
+
+// CategoryHook wraps the writes to `categories`, as a `vgraph.Hook` does.
+pub type CategoryHook = fn (next CategoryMutate) CategoryMutate
+
+// use registers typed hooks for the writes to `categories`, after the graph's.
+pub fn (q CategoryQuery) use(hooks ...CategoryHook) {
+	for h in hooks {
+		q.graph.client.use_on('categories', vgraph.Hook{
+			run: fn [h] (next vgraph.Mutate) vgraph.Mutate {
+				typed := h(fn [next] (ctx graphql.Context, mut m CategoryMutation) ! {
+					next(ctx, mut m.inner)!
+				})
+				return fn [typed] (ctx graphql.Context, mut m vgraph.Mutation) ! {
+					mut tm := CategoryMutation{
+						inner: m
+					}
+					typed(ctx, mut tm)!
+				}
+			}
+		})
+	}
+}
+
+// use_hook registers hooks for the writes to `categories`, with `on` and
+// conditions, after the graph's.
+pub fn (q CategoryQuery) use_hook(hooks ...vgraph.Hook) {
+	q.graph.client.use_on('categories', ...hooks)
+}
+
+// intercept registers typed interceptors for the queries of `categories`: each
+// gets a query, and returns it, narrowed, or an error.
+pub fn (q CategoryQuery) intercept(interceptors ...fn (ctx graphql.Context, q CategoryQuery) !CategoryQuery) {
+	g := q.graph
+	for f in interceptors {
+		q.graph.client.intercept_on('categories', vgraph.Interceptor{
+			run: fn [f, g] (ctx graphql.Context, _ string, mut query load.Query) ! {
+				next := f(ctx, CategoryQuery{
+					graph: g
+					query: query
+				})!
+				query = next.query
+			}
+		})
+	}
+}
+
+// policy registers privacy rules for `categories`, after the graph's.
+pub fn (q CategoryQuery) policy(policies ...vgraph.Policy) {
+	q.graph.client.policy_on('categories', ...policies)
 }
 
 // operation returns what the write does.
 pub fn (m CategoryMutation) operation() vgraph.Op {
-	return m.data.operation()
+	return m.inner.operation()
 }
 
 // table_name returns the table the write is to.
 pub fn (m CategoryMutation) table_name() string {
-	return m.data.table_name()
+	return m.inner.table_name()
 }
 
 // changed_columns returns the columns the write sets, null included.
 pub fn (m CategoryMutation) changed_columns() []string {
-	return m.data.changed_columns()
+	return m.inner.changed_columns()
 }
 
 // field_value returns the value the write sets `column` to, or `none`.
 pub fn (m CategoryMutation) field_value(column string) ?orm.Primitive {
-	return m.data.field_value(column)
+	return m.inner.field_value(column)
 }
 
 // added_ids returns the keys the write adds to `edge`.
 pub fn (m CategoryMutation) added_ids(edge string) []string {
-	return m.data.added_ids(edge)
+	return m.inner.added_ids(edge)
 }
 
 // removed_ids returns the keys the write removes from `edge`.
 pub fn (m CategoryMutation) removed_ids(edge string) []string {
-	return m.data.removed_ids(edge)
+	return m.inner.removed_ids(edge)
 }
 
 // edge_cleared reports whether the write removes every target of `edge`.
 pub fn (m CategoryMutation) edge_cleared(edge string) bool {
-	return m.data.edge_cleared(edge)
+	return m.inner.edge_cleared(edge)
+}
+
+// key returns the key of the row a `*_one` write is to, or that a create stored.
+pub fn (m CategoryMutation) key() string {
+	return m.inner.key()
+}
+
+// keys returns the keys of the rows the write reaches.
+pub fn (m CategoryMutation) keys() ![]string {
+	return m.inner.keys()
+}
+
+// old_field returns the stored value of `column`, before an update_one or delete_one.
+pub fn (mut m CategoryMutation) old_field(column string) !orm.Primitive {
+	return m.inner.old_field(column)
 }
 
 // set_field_value makes the write set `column` to `value`.
 pub fn (mut m CategoryMutation) set_field_value(column string, value orm.Primitive) {
-	m.data.set_field_value(column, value)
+	m.inner.set_field_value(column, value)
 }
 
 // clear_field_value makes the write set `column` to null.
 pub fn (mut m CategoryMutation) clear_field_value(column string) {
-	m.data.clear_field_value(column)
+	m.inner.clear_field_value(column)
+}
+
+// add_ids adds the targets with the keys `ids` to `edge`.
+pub fn (mut m CategoryMutation) add_ids(edge string, ids ...string) {
+	m.inner.add_ids(edge, ...ids)
+}
+
+// remove_ids removes the targets with the keys `ids` from `edge`.
+pub fn (mut m CategoryMutation) remove_ids(edge string, ids ...string) {
+	m.inner.remove_ids(edge, ...ids)
+}
+
+// clear_edge removes every target of `edge`.
+pub fn (mut m CategoryMutation) clear_edge(edge string) {
+	m.inner.clear_edge(edge)
+}
+
+// where narrows the rows an update or delete reaches.
+pub fn (mut m CategoryMutation) where(conds ...load.Cond) {
+	m.inner.where(...conds)
+}
+
+// set_op changes what the write does.
+pub fn (mut m CategoryMutation) set_op(op vgraph.Op) {
+	m.inner.set_op(op)
+}
+
+// on_commit runs `f` once the write's transaction commits.
+pub fn (mut m CategoryMutation) on_commit(f fn ()) {
+	m.inner.on_commit(f)
+}
+
+// on_rollback runs `f` if the write's transaction rolls back.
+pub fn (mut m CategoryMutation) on_rollback(f fn ()) {
+	m.inner.on_rollback(f)
 }
 
 // id returns the value the write sets `id` to, or `none` when it
 // doesn't set it, or sets it to null.
 pub fn (m CategoryMutation) id() ?int {
-	value := m.data.values['id'] or { return none }
+	value := m.inner.field_value('id') or { return none }
 	return if value is int { value } else { none }
+}
+
+// set_id makes the write set `id` to `value`.
+pub fn (mut m CategoryMutation) set_id(value int) {
+	m.inner.set_field_value('id', value)
+}
+
+// old_id returns the stored `id` of the row an update_one or
+// delete_one is to.
+pub fn (mut m CategoryMutation) old_id() !int {
+	value := m.inner.old_field('id')!
+	return if value is int { value } else { error('`categories.id` is not a int') }
 }
 
 // name returns the value the write sets `name` to, or `none` when it
 // doesn't set it, or sets it to null.
 pub fn (m CategoryMutation) name() ?string {
-	value := m.data.values['name'] or { return none }
+	value := m.inner.field_value('name') or { return none }
 	return if value is string { value } else { none }
+}
+
+// set_name makes the write set `name` to `value`.
+pub fn (mut m CategoryMutation) set_name(value string) {
+	m.inner.set_field_value('name', value)
+}
+
+// old_name returns the stored `name` of the row an update_one or
+// delete_one is to.
+pub fn (mut m CategoryMutation) old_name() !string {
+	value := m.inner.old_field('name')!
+	return if value is string { value } else { error('`categories.name` is not a string') }
 }
 
 // parent_id returns the value the write sets `parent_id` to, or `none` when it
 // doesn't set it, or sets it to null.
 pub fn (m CategoryMutation) parent_id() ?int {
-	value := m.data.values['parent_id'] or { return none }
+	value := m.inner.field_value('parent_id') or { return none }
 	return if value is int { value } else { none }
+}
+
+// set_parent_id makes the write set `parent_id` to `value`.
+pub fn (mut m CategoryMutation) set_parent_id(value int) {
+	m.inner.set_field_value('parent_id', value)
+}
+
+// clear_parent_id makes the write set `parent_id` to null.
+pub fn (mut m CategoryMutation) clear_parent_id() {
+	m.inner.clear_field_value('parent_id')
 }
 
 // CategoryCreate builds the insert of one `categories` row, and of its edges. Start one
@@ -292,9 +430,9 @@ pub fn (q CategoryQuery) update_one_id(id int) CategoryUpdateOne {
 	return CategoryUpdateOne{
 		graph: q.graph
 		data:  vgraph.MutationData{
-			op:    .update_one
-			table: 'categories'
-			key:   id.str()
+			op:      .update_one
+			table:   'categories'
+			row_key: id.str()
 		}
 	}
 }
@@ -400,7 +538,7 @@ pub fn (b CategoryUpdateOne) clear_children() CategoryUpdateOne {
 // back, or a `NotFoundError`.
 pub fn (b CategoryUpdateOne) save() !CategoryNode {
 	b.exec()!
-	return b.graph.categories_by_keys([b.data.key])![0]
+	return b.graph.categories_by_keys([b.data.row_key])![0]
 }
 
 // exec updates the row and its edges, in one transaction, or returns a
@@ -643,9 +781,9 @@ pub fn (q CategoryQuery) delete_one_id(id int) CategoryDeleteOne {
 	return CategoryDeleteOne{
 		graph: q.graph
 		data:  vgraph.MutationData{
-			op:    .delete_one
-			table: 'categories'
-			key:   id.str()
+			op:      .delete_one
+			table:   'categories'
+			row_key: id.str()
 		}
 	}
 }
@@ -782,7 +920,10 @@ pub fn (b CategoryDelete) exec() !int {
 
 // categories_by_keys returns the rows with the keys `keys`, in their order.
 fn (g Graph) categories_by_keys(keys []string) ![]CategoryNode {
-	rows := g.categories().where(load.in_keys('id', keys, .int)).all()!
+	// as stored: no privacy rule or interceptor hides a row just written
+	rows := Graph{
+		client: g.client.bypass()
+	}.categories().where(load.in_keys('id', keys, .int)).all()!
 	mut by_key := map[string]CategoryNode{}
 	for row in rows {
 		by_key[row.category.id.str()] = row

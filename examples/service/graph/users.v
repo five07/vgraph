@@ -77,7 +77,7 @@ pub fn (q UserQuery) offset(count int) UserQuery {
 // count returns how many rows match, in one query; order, limit and offset
 // do not apply.
 pub fn (q UserQuery) count() !int {
-	return load.count_where[users_models.User](q.graph.client.conn, q.query)
+	return load.count_where[users_models.User](q.graph.client.conn, q.graph.client.prepare_query('users', q.query)!)
 }
 
 // where_id keeps the rows whose `id` is `value`.
@@ -423,7 +423,7 @@ pub fn (q UserQuery) with_comments(configure ...fn (CommentQuery) CommentQuery) 
 
 // all returns the matching rows, with the requested edges.
 pub fn (q UserQuery) all() ![]UserNode {
-	rows := load.select_where[users_models.User](q.graph.client.conn, q.query)!
+	rows := load.select_where[users_models.User](q.graph.client.conn, q.graph.client.prepare_query('users', q.query)!)!
 	return q.nodes(rows)
 }
 
@@ -454,7 +454,7 @@ pub fn (q UserQuery) nodes(rows []users_models.User) ![]UserNode {
 		children := sub.nodes(load.select_in[articles_models.Article](q.graph.client.conn,
 			'user_id', rows.map(it.id.str()),
 			soft_del: 'deleted_at'
-			query:    sub.query
+			query:    q.graph.client.prepare_query('articles', sub.query)!
 		)!)!
 		mut by_parent := map[string][]ArticleNode{}
 		for child in children {
@@ -472,7 +472,7 @@ pub fn (q UserQuery) nodes(rows []users_models.User) ![]UserNode {
 		children := sub.nodes(load.select_in[posts_models.Post](q.graph.client.conn, 'user_id',
 			rows.map(it.id.str()),
 			soft_del: 'deleted_at'
-			query:    sub.query
+			query:    q.graph.client.prepare_query('posts', sub.query)!
 		)!)!
 		mut by_parent := map[string][]PostNode{}
 		for child in children {
@@ -490,7 +490,7 @@ pub fn (q UserQuery) nodes(rows []users_models.User) ![]UserNode {
 		children := sub.nodes(load.select_in[comments_models.Comment](q.graph.client.conn,
 			'user_id', rows.map(it.id.str()),
 			soft_del: 'deleted_at'
-			query:    sub.query
+			query:    q.graph.client.prepare_query('comments', sub.query)!
 		)!)!
 		mut by_parent := map[string][]CommentNode{}
 		for child in children {

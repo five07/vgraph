@@ -68,7 +68,8 @@ pub fn generate(out_module string, entities []Entity, tables []Table) !map[strin
 // something else.
 fn check_names(info Info) ! {
 	t := info.table
-	if t.name in ['client', 'new', 'with_ctx', 'ctx', 'tx', 'graphql'] {
+	if t.name in ['client', 'new', 'with_ctx', 'ctx', 'tx', 'graphql', 'use', 'intercept', 'policy',
+		'skip', 'privileged', 'on_commit', 'on_rollback'] {
 		return error('table `${t.name}`: `Graph.${t.name}` is taken; rename the table')
 	}
 	for edge in t.edges {
@@ -139,6 +140,50 @@ pub fn (g Graph) tx(f fn (tx Graph) !) ! {
 		return err
 	}
 	client.commit()!
+}
+
+// use registers hooks for the writes of every table, before each table\'s own.
+// Register them at startup, before the graph serves requests.
+pub fn (g Graph) use(hooks ...vgraph.Hook) {
+	g.client.use(...hooks)
+}
+
+// intercept registers interceptors for the queries of every table, before
+// each table\'s own.
+pub fn (g Graph) intercept(interceptors ...vgraph.Interceptor) {
+	g.client.intercept(...interceptors)
+}
+
+// policy registers privacy rules for every table, before each table\'s own.
+pub fn (g Graph) policy(policies ...vgraph.Policy) {
+	g.client.policy(...policies)
+}
+
+// skip returns a graph that leaves out the hooks and interceptors named
+// `names`, such as `soft_delete`.
+pub fn (g Graph) skip(names ...string) Graph {
+	return Graph{
+		client: g.client.skip(...names)
+	}
+}
+
+// privileged returns a graph that skips privacy rules, for seeds, migrations
+// and system jobs.
+pub fn (g Graph) privileged() Graph {
+	return Graph{
+		client: g.client.privileged()
+	}
+}
+
+// on_commit runs `f` once the transaction of `g` (in `tx`) commits; outside
+// one, at once.
+pub fn (g Graph) on_commit(f fn ()) {
+	g.client.on_commit(f)
+}
+
+// on_rollback runs `f` if the transaction of `g` (in `tx`) rolls back.
+pub fn (g Graph) on_rollback(f fn ()) {
+	g.client.on_rollback(f)
 }
 
 // NotFoundError is the error of `first()` when no row matches, and of a write
@@ -262,7 +307,7 @@ pub fn (q ${q}) offset(count int) ${q} {
 // count returns how many rows match, in one query; order, limit and offset
 // do not apply.
 pub fn (q ${q}) count() !int {
-	return load.count_where[${info.typ()}](q.graph.client.conn, q.query)
+	return load.count_where[${info.typ()}](q.graph.client.conn, q.graph.client.prepare_query(\'${t.name}\', q.query)!)
 }')
 	write_predicates(mut b, t, q, true)
 	for i, edge in t.edges {
@@ -280,7 +325,7 @@ pub fn (q ${q}) with_${edge.name}(configure ...fn (${target.query()}) ${target.q
 	b.writeln('
 // all returns the matching rows, with the requested edges.
 pub fn (q ${q}) all() ![]${n} {
-	rows := load.select_where[${info.typ()}](q.graph.client.conn, q.query)!
+	rows := load.select_where[${info.typ()}](q.graph.client.conn, q.graph.client.prepare_query(\'${t.name}\', q.query)!)!
 	return q.nodes(rows)
 }
 
@@ -409,7 +454,7 @@ fn filters(edge Edge, with_type bool) string {
 	if edge.soft_del != '' {
 		parts << "soft_del: '${edge.soft_del}'"
 	}
-	parts << 'query: sub.query'
+	parts << "query: q.graph.client.prepare_query('${edge.to}', sub.query)!"
 	return parts.join(', ')
 }
 

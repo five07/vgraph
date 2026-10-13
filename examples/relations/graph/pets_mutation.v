@@ -3,79 +3,235 @@ module graph
 
 import orm
 import five07.vgraph
+import five07.vgraph.graphql
 import five07.vgraph.load
+import time
 
-// PetMutation is a write to `pets` before it runs, with a typed getter for each
-// column. It implements `vgraph.Mutation`.
+// PetMutation is a write to `pets` while its hooks run, with a typed getter and
+// setter for each column. It implements `vgraph.Mutation`, through `inner`.
 pub struct PetMutation {
 pub mut:
-	data vgraph.MutationData
+	inner vgraph.Mutation
+}
+
+// PetMutate runs a write to `pets`, or the rest of its hooks.
+pub type PetMutate = fn (ctx graphql.Context, mut m PetMutation) !
+
+// PetHook wraps the writes to `pets`, as a `vgraph.Hook` does.
+pub type PetHook = fn (next PetMutate) PetMutate
+
+// use registers typed hooks for the writes to `pets`, after the graph's.
+pub fn (q PetQuery) use(hooks ...PetHook) {
+	for h in hooks {
+		q.graph.client.use_on('pets', vgraph.Hook{
+			run: fn [h] (next vgraph.Mutate) vgraph.Mutate {
+				typed := h(fn [next] (ctx graphql.Context, mut m PetMutation) ! {
+					next(ctx, mut m.inner)!
+				})
+				return fn [typed] (ctx graphql.Context, mut m vgraph.Mutation) ! {
+					mut tm := PetMutation{
+						inner: m
+					}
+					typed(ctx, mut tm)!
+				}
+			}
+		})
+	}
+}
+
+// use_hook registers hooks for the writes to `pets`, with `on` and
+// conditions, after the graph's.
+pub fn (q PetQuery) use_hook(hooks ...vgraph.Hook) {
+	q.graph.client.use_on('pets', ...hooks)
+}
+
+// intercept registers typed interceptors for the queries of `pets`: each
+// gets a query, and returns it, narrowed, or an error.
+pub fn (q PetQuery) intercept(interceptors ...fn (ctx graphql.Context, q PetQuery) !PetQuery) {
+	g := q.graph
+	for f in interceptors {
+		q.graph.client.intercept_on('pets', vgraph.Interceptor{
+			run: fn [f, g] (ctx graphql.Context, _ string, mut query load.Query) ! {
+				next := f(ctx, PetQuery{
+					graph: g
+					query: query
+				})!
+				query = next.query
+			}
+		})
+	}
+}
+
+// policy registers privacy rules for `pets`, after the graph's.
+pub fn (q PetQuery) policy(policies ...vgraph.Policy) {
+	q.graph.client.policy_on('pets', ...policies)
 }
 
 // operation returns what the write does.
 pub fn (m PetMutation) operation() vgraph.Op {
-	return m.data.operation()
+	return m.inner.operation()
 }
 
 // table_name returns the table the write is to.
 pub fn (m PetMutation) table_name() string {
-	return m.data.table_name()
+	return m.inner.table_name()
 }
 
 // changed_columns returns the columns the write sets, null included.
 pub fn (m PetMutation) changed_columns() []string {
-	return m.data.changed_columns()
+	return m.inner.changed_columns()
 }
 
 // field_value returns the value the write sets `column` to, or `none`.
 pub fn (m PetMutation) field_value(column string) ?orm.Primitive {
-	return m.data.field_value(column)
+	return m.inner.field_value(column)
 }
 
 // added_ids returns the keys the write adds to `edge`.
 pub fn (m PetMutation) added_ids(edge string) []string {
-	return m.data.added_ids(edge)
+	return m.inner.added_ids(edge)
 }
 
 // removed_ids returns the keys the write removes from `edge`.
 pub fn (m PetMutation) removed_ids(edge string) []string {
-	return m.data.removed_ids(edge)
+	return m.inner.removed_ids(edge)
 }
 
 // edge_cleared reports whether the write removes every target of `edge`.
 pub fn (m PetMutation) edge_cleared(edge string) bool {
-	return m.data.edge_cleared(edge)
+	return m.inner.edge_cleared(edge)
+}
+
+// key returns the key of the row a `*_one` write is to, or that a create stored.
+pub fn (m PetMutation) key() string {
+	return m.inner.key()
+}
+
+// keys returns the keys of the rows the write reaches.
+pub fn (m PetMutation) keys() ![]string {
+	return m.inner.keys()
+}
+
+// old_field returns the stored value of `column`, before an update_one or delete_one.
+pub fn (mut m PetMutation) old_field(column string) !orm.Primitive {
+	return m.inner.old_field(column)
 }
 
 // set_field_value makes the write set `column` to `value`.
 pub fn (mut m PetMutation) set_field_value(column string, value orm.Primitive) {
-	m.data.set_field_value(column, value)
+	m.inner.set_field_value(column, value)
 }
 
 // clear_field_value makes the write set `column` to null.
 pub fn (mut m PetMutation) clear_field_value(column string) {
-	m.data.clear_field_value(column)
+	m.inner.clear_field_value(column)
+}
+
+// add_ids adds the targets with the keys `ids` to `edge`.
+pub fn (mut m PetMutation) add_ids(edge string, ids ...string) {
+	m.inner.add_ids(edge, ...ids)
+}
+
+// remove_ids removes the targets with the keys `ids` from `edge`.
+pub fn (mut m PetMutation) remove_ids(edge string, ids ...string) {
+	m.inner.remove_ids(edge, ...ids)
+}
+
+// clear_edge removes every target of `edge`.
+pub fn (mut m PetMutation) clear_edge(edge string) {
+	m.inner.clear_edge(edge)
+}
+
+// where narrows the rows an update or delete reaches.
+pub fn (mut m PetMutation) where(conds ...load.Cond) {
+	m.inner.where(...conds)
+}
+
+// set_op changes what the write does.
+pub fn (mut m PetMutation) set_op(op vgraph.Op) {
+	m.inner.set_op(op)
+}
+
+// on_commit runs `f` once the write's transaction commits.
+pub fn (mut m PetMutation) on_commit(f fn ()) {
+	m.inner.on_commit(f)
+}
+
+// on_rollback runs `f` if the write's transaction rolls back.
+pub fn (mut m PetMutation) on_rollback(f fn ()) {
+	m.inner.on_rollback(f)
 }
 
 // id returns the value the write sets `id` to, or `none` when it
 // doesn't set it, or sets it to null.
 pub fn (m PetMutation) id() ?int {
-	value := m.data.values['id'] or { return none }
+	value := m.inner.field_value('id') or { return none }
 	return if value is int { value } else { none }
+}
+
+// set_id makes the write set `id` to `value`.
+pub fn (mut m PetMutation) set_id(value int) {
+	m.inner.set_field_value('id', value)
+}
+
+// old_id returns the stored `id` of the row an update_one or
+// delete_one is to.
+pub fn (mut m PetMutation) old_id() !int {
+	value := m.inner.old_field('id')!
+	return if value is int { value } else { error('`pets.id` is not a int') }
 }
 
 // name returns the value the write sets `name` to, or `none` when it
 // doesn't set it, or sets it to null.
 pub fn (m PetMutation) name() ?string {
-	value := m.data.values['name'] or { return none }
+	value := m.inner.field_value('name') or { return none }
 	return if value is string { value } else { none }
+}
+
+// set_name makes the write set `name` to `value`.
+pub fn (mut m PetMutation) set_name(value string) {
+	m.inner.set_field_value('name', value)
+}
+
+// old_name returns the stored `name` of the row an update_one or
+// delete_one is to.
+pub fn (mut m PetMutation) old_name() !string {
+	value := m.inner.old_field('name')!
+	return if value is string { value } else { error('`pets.name` is not a string') }
 }
 
 // owner_id returns the value the write sets `owner_id` to, or `none` when it
 // doesn't set it, or sets it to null.
 pub fn (m PetMutation) owner_id() ?int {
-	value := m.data.values['owner_id'] or { return none }
+	value := m.inner.field_value('owner_id') or { return none }
 	return if value is int { value } else { none }
+}
+
+// set_owner_id makes the write set `owner_id` to `value`.
+pub fn (mut m PetMutation) set_owner_id(value int) {
+	m.inner.set_field_value('owner_id', value)
+}
+
+// clear_owner_id makes the write set `owner_id` to null.
+pub fn (mut m PetMutation) clear_owner_id() {
+	m.inner.clear_field_value('owner_id')
+}
+
+// deleted_at returns the value the write sets `deleted_at` to, or `none` when it
+// doesn't set it, or sets it to null.
+pub fn (m PetMutation) deleted_at() ?time.Time {
+	value := m.inner.field_value('deleted_at') or { return none }
+	return if value is time.Time { value } else { none }
+}
+
+// set_deleted_at makes the write set `deleted_at` to `value`.
+pub fn (mut m PetMutation) set_deleted_at(value time.Time) {
+	m.inner.set_field_value('deleted_at', value)
+}
+
+// clear_deleted_at makes the write set `deleted_at` to null.
+pub fn (mut m PetMutation) clear_deleted_at() {
+	m.inner.clear_field_value('deleted_at')
 }
 
 // PetCreate builds the insert of one `pets` row, and of its edges. Start one
@@ -118,6 +274,26 @@ pub fn (b PetCreate) set_nillable_owner_id(value ?int) PetCreate {
 	return PetCreate{
 		...b
 		data: b.data.with_value('owner_id', if v := value {
+			orm.Primitive(v)
+		} else {
+			orm.Primitive(orm.Null{})
+		})
+	}
+}
+
+// set_deleted_at sets `deleted_at`.
+pub fn (b PetCreate) set_deleted_at(value time.Time) PetCreate {
+	return PetCreate{
+		...b
+		data: b.data.with_value('deleted_at', orm.Primitive(value))
+	}
+}
+
+// set_nillable_deleted_at sets `deleted_at`, to null for `none`.
+pub fn (b PetCreate) set_nillable_deleted_at(value ?time.Time) PetCreate {
+	return PetCreate{
+		...b
+		data: b.data.with_value('deleted_at', if v := value {
 			orm.Primitive(v)
 		} else {
 			orm.Primitive(orm.Null{})
@@ -276,9 +452,9 @@ pub fn (q PetQuery) update_one_id(id int) PetUpdateOne {
 	return PetUpdateOne{
 		graph: q.graph
 		data:  vgraph.MutationData{
-			op:    .update_one
-			table: 'pets'
-			key:   id.str()
+			op:      .update_one
+			table:   'pets'
+			row_key: id.str()
 		}
 	}
 }
@@ -324,6 +500,34 @@ pub fn (b PetUpdateOne) clear_owner_id() PetUpdateOne {
 	}
 }
 
+// set_deleted_at sets `deleted_at`.
+pub fn (b PetUpdateOne) set_deleted_at(value time.Time) PetUpdateOne {
+	return PetUpdateOne{
+		...b
+		data: b.data.with_value('deleted_at', orm.Primitive(value))
+	}
+}
+
+// set_nillable_deleted_at sets `deleted_at`, to null for `none`.
+pub fn (b PetUpdateOne) set_nillable_deleted_at(value ?time.Time) PetUpdateOne {
+	return PetUpdateOne{
+		...b
+		data: b.data.with_value('deleted_at', if v := value {
+			orm.Primitive(v)
+		} else {
+			orm.Primitive(orm.Null{})
+		})
+	}
+}
+
+// clear_deleted_at sets `deleted_at` to null.
+pub fn (b PetUpdateOne) clear_deleted_at() PetUpdateOne {
+	return PetUpdateOne{
+		...b
+		data: b.data.with_value('deleted_at', orm.Primitive(orm.Null{}))
+	}
+}
+
 // set_owner sets `owner` to `node`.
 pub fn (b PetUpdateOne) set_owner(node UserNode) PetUpdateOne {
 	return PetUpdateOne{
@@ -344,7 +548,7 @@ pub fn (b PetUpdateOne) clear_owner() PetUpdateOne {
 // back, or a `NotFoundError`.
 pub fn (b PetUpdateOne) save() !PetNode {
 	b.exec()!
-	return b.graph.pets_by_keys([b.data.key])![0]
+	return b.graph.pets_by_keys([b.data.row_key])![0]
 }
 
 // exec updates the row and its edges, in one transaction, or returns a
@@ -471,6 +675,41 @@ pub fn (q PetUpdate) where_owner_id_is_not_null() PetUpdate {
 	return q.where(load.is_not_null('owner_id'))
 }
 
+// where_deleted_at keeps the rows whose `deleted_at` is `value`.
+pub fn (q PetUpdate) where_deleted_at(value time.Time) PetUpdate {
+	return q.where(load.eq('deleted_at', value))
+}
+
+// where_deleted_at_lt keeps the rows whose `deleted_at` comes before `value`.
+pub fn (q PetUpdate) where_deleted_at_lt(value time.Time) PetUpdate {
+	return q.where(load.lt('deleted_at', value))
+}
+
+// where_deleted_at_le keeps the rows whose `deleted_at` comes at or before `value`.
+pub fn (q PetUpdate) where_deleted_at_le(value time.Time) PetUpdate {
+	return q.where(load.le('deleted_at', value))
+}
+
+// where_deleted_at_gt keeps the rows whose `deleted_at` comes after `value`.
+pub fn (q PetUpdate) where_deleted_at_gt(value time.Time) PetUpdate {
+	return q.where(load.gt('deleted_at', value))
+}
+
+// where_deleted_at_ge keeps the rows whose `deleted_at` comes at or after `value`.
+pub fn (q PetUpdate) where_deleted_at_ge(value time.Time) PetUpdate {
+	return q.where(load.ge('deleted_at', value))
+}
+
+// where_deleted_at_is_null keeps the rows whose `deleted_at` is null.
+pub fn (q PetUpdate) where_deleted_at_is_null() PetUpdate {
+	return q.where(load.is_null('deleted_at'))
+}
+
+// where_deleted_at_is_not_null keeps the rows whose `deleted_at` is not null.
+pub fn (q PetUpdate) where_deleted_at_is_not_null() PetUpdate {
+	return q.where(load.is_not_null('deleted_at'))
+}
+
 // set_name sets `name`.
 pub fn (b PetUpdate) set_name(value string) PetUpdate {
 	return PetUpdate{
@@ -504,6 +743,34 @@ pub fn (b PetUpdate) clear_owner_id() PetUpdate {
 	return PetUpdate{
 		...b
 		data: b.data.with_value('owner_id', orm.Primitive(orm.Null{}))
+	}
+}
+
+// set_deleted_at sets `deleted_at`.
+pub fn (b PetUpdate) set_deleted_at(value time.Time) PetUpdate {
+	return PetUpdate{
+		...b
+		data: b.data.with_value('deleted_at', orm.Primitive(value))
+	}
+}
+
+// set_nillable_deleted_at sets `deleted_at`, to null for `none`.
+pub fn (b PetUpdate) set_nillable_deleted_at(value ?time.Time) PetUpdate {
+	return PetUpdate{
+		...b
+		data: b.data.with_value('deleted_at', if v := value {
+			orm.Primitive(v)
+		} else {
+			orm.Primitive(orm.Null{})
+		})
+	}
+}
+
+// clear_deleted_at sets `deleted_at` to null.
+pub fn (b PetUpdate) clear_deleted_at() PetUpdate {
+	return PetUpdate{
+		...b
+		data: b.data.with_value('deleted_at', orm.Primitive(orm.Null{}))
 	}
 }
 
@@ -547,9 +814,9 @@ pub fn (q PetQuery) delete_one_id(id int) PetDeleteOne {
 	return PetDeleteOne{
 		graph: q.graph
 		data:  vgraph.MutationData{
-			op:    .delete_one
-			table: 'pets'
-			key:   id.str()
+			op:      .delete_one
+			table:   'pets'
+			row_key: id.str()
 		}
 	}
 }
@@ -678,6 +945,41 @@ pub fn (q PetDelete) where_owner_id_is_not_null() PetDelete {
 	return q.where(load.is_not_null('owner_id'))
 }
 
+// where_deleted_at keeps the rows whose `deleted_at` is `value`.
+pub fn (q PetDelete) where_deleted_at(value time.Time) PetDelete {
+	return q.where(load.eq('deleted_at', value))
+}
+
+// where_deleted_at_lt keeps the rows whose `deleted_at` comes before `value`.
+pub fn (q PetDelete) where_deleted_at_lt(value time.Time) PetDelete {
+	return q.where(load.lt('deleted_at', value))
+}
+
+// where_deleted_at_le keeps the rows whose `deleted_at` comes at or before `value`.
+pub fn (q PetDelete) where_deleted_at_le(value time.Time) PetDelete {
+	return q.where(load.le('deleted_at', value))
+}
+
+// where_deleted_at_gt keeps the rows whose `deleted_at` comes after `value`.
+pub fn (q PetDelete) where_deleted_at_gt(value time.Time) PetDelete {
+	return q.where(load.gt('deleted_at', value))
+}
+
+// where_deleted_at_ge keeps the rows whose `deleted_at` comes at or after `value`.
+pub fn (q PetDelete) where_deleted_at_ge(value time.Time) PetDelete {
+	return q.where(load.ge('deleted_at', value))
+}
+
+// where_deleted_at_is_null keeps the rows whose `deleted_at` is null.
+pub fn (q PetDelete) where_deleted_at_is_null() PetDelete {
+	return q.where(load.is_null('deleted_at'))
+}
+
+// where_deleted_at_is_not_null keeps the rows whose `deleted_at` is not null.
+pub fn (q PetDelete) where_deleted_at_is_not_null() PetDelete {
+	return q.where(load.is_not_null('deleted_at'))
+}
+
 // exec deletes the rows, with their join table rows, in one transaction, and
 // returns how many there were.
 pub fn (b PetDelete) exec() !int {
@@ -686,7 +988,10 @@ pub fn (b PetDelete) exec() !int {
 
 // pets_by_keys returns the rows with the keys `keys`, in their order.
 fn (g Graph) pets_by_keys(keys []string) ![]PetNode {
-	rows := g.pets().where(load.in_keys('id', keys, .int)).all()!
+	// as stored: no privacy rule or interceptor hides a row just written
+	rows := Graph{
+		client: g.client.bypass()
+	}.pets().where(load.in_keys('id', keys, .int)).all()!
 	mut by_key := map[string]PetNode{}
 	for row in rows {
 		by_key[row.pet.id.str()] = row

@@ -73,7 +73,7 @@ pub fn (q ArticleQuery) offset(count int) ArticleQuery {
 // count returns how many rows match, in one query; order, limit and offset
 // do not apply.
 pub fn (q ArticleQuery) count() !int {
-	return load.count_where[articles_models.Article](q.graph.client.conn, q.query)
+	return load.count_where[articles_models.Article](q.graph.client.conn, q.graph.client.prepare_query('articles', q.query)!)
 }
 
 // where_id keeps the rows whose `id` is `value`.
@@ -556,7 +556,7 @@ pub fn (q ArticleQuery) with_comments(configure ...fn (CommentQuery) CommentQuer
 
 // all returns the matching rows, with the requested edges.
 pub fn (q ArticleQuery) all() ![]ArticleNode {
-	rows := load.select_where[articles_models.Article](q.graph.client.conn, q.query)!
+	rows := load.select_where[articles_models.Article](q.graph.client.conn, q.graph.client.prepare_query('articles', q.query)!)!
 	return q.nodes(rows)
 }
 
@@ -590,7 +590,7 @@ pub fn (q ArticleQuery) nodes(rows []articles_models.Article) ![]ArticleNode {
 		}
 		targets := sub.nodes(load.select_in[users_models.User](q.graph.client.conn, 'id',
 			load.unique(keys),
-			query: sub.query
+			query: q.graph.client.prepare_query('users', sub.query)!
 		)!)!
 		mut by_key := map[string]&UserNode{}
 		for target in targets {
@@ -614,7 +614,7 @@ pub fn (q ArticleQuery) nodes(rows []articles_models.Article) ![]ArticleNode {
 			type_col: 'owner_type'
 			type_val: 'Article'
 			soft_del: 'deleted_at'
-			query:    sub.query
+			query:    q.graph.client.prepare_query('comments', sub.query)!
 		)!)!
 		mut by_parent := map[string][]CommentNode{}
 		for child in children {

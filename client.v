@@ -15,8 +15,23 @@ pub:
 	ctx graphql.Context = NoContext{}
 	// in_tx: the client runs inside a transaction (`begin`).
 	in_tx bool
+	// skipped: the names of the hooks and interceptors it leaves out (`skip`)
+	skipped []string
+	// privileged: it skips privacy rules; bypassed: interceptors too
+	privileged bool
+	bypassed   bool
 mut:
-	owns_tx bool
+	owns_tx  bool
+	registry &Registry = &Registry{}
+	txstate  &TxState  = unsafe { nil }
+}
+
+// TxState holds what runs once a transaction ends.
+@[heap]
+struct TxState {
+mut:
+	commits   []fn ()
+	rollbacks []fn ()
 }
 
 // NoContext is the context of a client that `with_ctx` hasn't given one.
@@ -27,8 +42,9 @@ pub struct NoContext {}
 pub fn Client.new(conn orm.Connection, schema Schema) !Client {
 	schema.validate()!
 	return Client{
-		conn:   conn
-		schema: schema
+		conn:     conn
+		schema:   schema
+		registry: &Registry{}
 	}
 }
 
@@ -62,6 +78,7 @@ pub fn (c Client) begin() !Client {
 			conn:    inner
 			in_tx:   true
 			owns_tx: true
+			txstate: &TxState{}
 		}
 	}
 	if c.conn is orm.TransactionalConnection {
@@ -71,46 +88,91 @@ pub fn (c Client) begin() !Client {
 			...c
 			in_tx:   true
 			owns_tx: true
+			txstate: &TxState{}
 		}
 	}
 	return error('this connection runs no transactions: pass a vgraph driver (five07.vgraph.sqlite or five07.vgraph.pg), or an orm.TransactionalConnection')
 }
 
-// commit commits the transaction that `begin` started.
+// commit commits the transaction that `begin` started, then runs what
+// `on_commit` registered.
 pub fn (c Client) commit() ! {
 	if !c.owns_tx {
 		return
 	}
-	if c.conn is TxConnection {
-		mut t := c.conn as TxConnection
-		t.commit_tx()!
-	} else if c.conn is orm.TransactionalConnection {
-		mut t := c.conn as orm.TransactionalConnection
-		t.orm_commit()!
+	if c.in_tx {
+		if c.conn is TxConnection {
+			mut t := c.conn as TxConnection
+			t.commit_tx()!
+		} else if c.conn is orm.TransactionalConnection {
+			mut t := c.conn as orm.TransactionalConnection
+			t.orm_commit()!
+		}
+	}
+	if !isnil(c.txstate) {
+		for f in c.txstate.commits {
+			f()
+		}
 	}
 }
 
-// rollback rolls back the transaction that `begin` started.
+// rollback rolls back the transaction that `begin` started, then runs what
+// `on_rollback` registered.
 pub fn (c Client) rollback() ! {
 	if !c.owns_tx {
 		return
 	}
-	if c.conn is TxConnection {
-		mut t := c.conn as TxConnection
-		t.rollback_tx()!
-	} else if c.conn is orm.TransactionalConnection {
-		mut t := c.conn as orm.TransactionalConnection
-		t.orm_rollback()!
+	defer {
+		if !isnil(c.txstate) {
+			for f in c.txstate.rollbacks {
+				f()
+			}
+		}
+	}
+	if c.in_tx {
+		if c.conn is TxConnection {
+			mut t := c.conn as TxConnection
+			t.rollback_tx()!
+		} else if c.conn is orm.TransactionalConnection {
+			mut t := c.conn as orm.TransactionalConnection
+			t.orm_rollback()!
+		}
 	}
 }
 
-// atomic returns a client in a transaction when the connection can run one,
-// and else `c`, whose statements then run one by one.
+// on_commit runs `f` once the client's transaction commits; outside one, at
+// once.
+pub fn (c Client) on_commit(f fn ()) {
+	if isnil(c.txstate) {
+		f()
+		return
+	}
+	mut state := c.txstate
+	state.commits << f
+}
+
+// on_rollback runs `f` if the client's transaction rolls back; outside one,
+// never.
+pub fn (c Client) on_rollback(f fn ()) {
+	if isnil(c.txstate) {
+		return
+	}
+	mut state := c.txstate
+	state.rollbacks << f
+}
+
+// atomic returns a client in a transaction when the connection can run one.
+// Otherwise it returns `c`, whose statements then run one by one, with its own
+// callbacks for `on_commit` and `on_rollback`.
 fn (c Client) atomic() !Client {
 	if c.in_tx || c.conn is Driver || c.conn is orm.TransactionalConnection {
 		return c.begin()
 	}
-	return c
+	return Client{
+		...c
+		owns_tx: true
+		txstate: &TxState{}
+	}
 }
 
 // load_one follows the many_to_one edge `edge` of `C` from each of `children`,
@@ -125,6 +187,7 @@ pub fn (c Client) load_one[C, P](children []C, edge string) !map[string]P {
 		type_col: e.type_col
 		type_val: e.type_val
 		soft_del: e.soft_del
+		query:    c.prepare_query(e.to, load.Query{})!
 	)
 }
 
@@ -138,6 +201,7 @@ pub fn (c Client) load_many[P, C](parents []P, edge string) !map[string][]C {
 		type_col: e.type_col
 		type_val: e.type_val
 		soft_del: e.soft_del
+		query:    c.prepare_query(e.to, load.Query{})!
 	}
 	return match e.kind {
 		.one_to_many, .one_to_one { load.load_many[P, C](c.conn, parents, e.column, opts)! }

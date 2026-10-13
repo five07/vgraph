@@ -67,7 +67,7 @@ pub fn (q LoginQuery) offset(count int) LoginQuery {
 // count returns how many rows match, in one query; order, limit and offset
 // do not apply.
 pub fn (q LoginQuery) count() !int {
-	return load.count_where[models.Login](q.graph.client.conn, q.query)
+	return load.count_where[models.Login](q.graph.client.conn, q.graph.client.prepare_query('logins', q.query)!)
 }
 
 // where_id keeps the rows whose `id` is `value`.
@@ -222,7 +222,7 @@ pub fn (q LoginQuery) with_device(configure ...fn (DeviceQuery) DeviceQuery) Log
 
 // all returns the matching rows, with the requested edges.
 pub fn (q LoginQuery) all() ![]LoginNode {
-	rows := load.select_where[models.Login](q.graph.client.conn, q.query)!
+	rows := load.select_where[models.Login](q.graph.client.conn, q.graph.client.prepare_query('logins', q.query)!)!
 	return q.nodes(rows)
 }
 
@@ -256,7 +256,7 @@ pub fn (q LoginQuery) nodes(rows []models.Login) ![]LoginNode {
 		}
 		targets := sub.nodes(load.select_in[models.Device](q.graph.client.conn, 'id',
 			load.unique(keys),
-			query: sub.query
+			query: q.graph.client.prepare_query('devices', sub.query)!
 		)!)!
 		mut by_key := map[string]&DeviceNode{}
 		for target in targets {

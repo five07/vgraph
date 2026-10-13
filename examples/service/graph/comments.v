@@ -83,7 +83,7 @@ pub fn (q CommentQuery) offset(count int) CommentQuery {
 // count returns how many rows match, in one query; order, limit and offset
 // do not apply.
 pub fn (q CommentQuery) count() !int {
-	return load.count_where[comments_models.Comment](q.graph.client.conn, q.query)
+	return load.count_where[comments_models.Comment](q.graph.client.conn, q.graph.client.prepare_query('comments', q.query)!)
 }
 
 // where_id keeps the rows whose `id` is `value`.
@@ -613,7 +613,7 @@ pub fn (q CommentQuery) with_replies(configure ...fn (CommentQuery) CommentQuery
 
 // all returns the matching rows, with the requested edges.
 pub fn (q CommentQuery) all() ![]CommentNode {
-	rows := load.select_where[comments_models.Comment](q.graph.client.conn, q.query)!
+	rows := load.select_where[comments_models.Comment](q.graph.client.conn, q.graph.client.prepare_query('comments', q.query)!)!
 	return q.nodes(rows)
 }
 
@@ -647,7 +647,7 @@ pub fn (q CommentQuery) nodes(rows []comments_models.Comment) ![]CommentNode {
 		}
 		targets := sub.nodes(load.select_in[users_models.User](q.graph.client.conn, 'id',
 			load.unique(keys),
-			query: sub.query
+			query: q.graph.client.prepare_query('users', sub.query)!
 		)!)!
 		mut by_key := map[string]&UserNode{}
 		for target in targets {
@@ -674,7 +674,7 @@ pub fn (q CommentQuery) nodes(rows []comments_models.Comment) ![]CommentNode {
 		}
 		targets := sub.nodes(load.select_in[comments_models.Comment](q.graph.client.conn, 'id',
 			load.unique(keys),
-			query: sub.query
+			query: q.graph.client.prepare_query('comments', sub.query)!
 		)!)!
 		mut by_key := map[string]&CommentNode{}
 		for target in targets {
@@ -704,7 +704,7 @@ pub fn (q CommentQuery) nodes(rows []comments_models.Comment) ![]CommentNode {
 		}
 		targets := sub.nodes(load.select_in[articles_models.Article](q.graph.client.conn, 'id',
 			load.unique(keys),
-			query: sub.query
+			query: q.graph.client.prepare_query('articles', sub.query)!
 		)!)!
 		mut by_key := map[string]&ArticleNode{}
 		for target in targets {
@@ -735,7 +735,7 @@ pub fn (q CommentQuery) nodes(rows []comments_models.Comment) ![]CommentNode {
 		}
 		targets := sub.nodes(load.select_in[posts_models.Post](q.graph.client.conn, 'id',
 			load.unique(keys),
-			query: sub.query
+			query: q.graph.client.prepare_query('posts', sub.query)!
 		)!)!
 		mut by_key := map[string]&PostNode{}
 		for target in targets {
@@ -760,7 +760,7 @@ pub fn (q CommentQuery) nodes(rows []comments_models.Comment) ![]CommentNode {
 		children := sub.nodes(load.select_in[comments_models.Comment](q.graph.client.conn,
 			'parent_id', rows.map(it.id.str()),
 			soft_del: 'deleted_at'
-			query:    sub.query
+			query:    q.graph.client.prepare_query('comments', sub.query)!
 		)!)!
 		mut by_parent := map[string][]CommentNode{}
 		for child in children {

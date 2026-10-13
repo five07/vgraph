@@ -70,7 +70,7 @@ pub fn (q NodeQuery) offset(count int) NodeQuery {
 // count returns how many rows match, in one query; order, limit and offset
 // do not apply.
 pub fn (q NodeQuery) count() !int {
-	return load.count_where[models.Node](q.graph.client.conn, q.query)
+	return load.count_where[models.Node](q.graph.client.conn, q.graph.client.prepare_query('nodes', q.query)!)
 }
 
 // where_id keeps the rows whose `id` is `value`.
@@ -259,7 +259,7 @@ pub fn (q NodeQuery) with_prev(configure ...fn (NodeQuery) NodeQuery) NodeQuery 
 
 // all returns the matching rows, with the requested edges.
 pub fn (q NodeQuery) all() ![]NodeNode {
-	rows := load.select_where[models.Node](q.graph.client.conn, q.query)!
+	rows := load.select_where[models.Node](q.graph.client.conn, q.graph.client.prepare_query('nodes', q.query)!)!
 	return q.nodes(rows)
 }
 
@@ -295,7 +295,7 @@ pub fn (q NodeQuery) nodes(rows []models.Node) ![]NodeNode {
 		}
 		targets := sub.nodes(load.select_in[models.Node](q.graph.client.conn, 'id',
 			load.unique(keys),
-			query: sub.query
+			query: q.graph.client.prepare_query('nodes', sub.query)!
 		)!)!
 		mut by_key := map[string]&NodeNode{}
 		for target in targets {
@@ -318,7 +318,7 @@ pub fn (q NodeQuery) nodes(rows []models.Node) ![]NodeNode {
 		}
 		children := sub.nodes(load.select_in[models.Node](q.graph.client.conn, 'next_id',
 			rows.map(it.id.str()),
-			query: sub.query
+			query: q.graph.client.prepare_query('nodes', sub.query)!
 		)!)!
 		mut by_parent := map[string][]NodeNode{}
 		for child in children {

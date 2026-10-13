@@ -3,6 +3,8 @@
 module models
 
 import five07.vgraph
+import five07.vgraph.graphql
+import time
 
 // User is in nearly every kind of relationship.
 @[table: 'users']
@@ -105,13 +107,25 @@ pub fn (c Card) edges() []vgraph.Edge {
 	]
 }
 
-// Pet has at most one owner, who can have many pets.
+// Pet has at most one owner, who can have many pets. Deleting a pet only marks
+// it deleted: see `hooks` and `interceptors`.
 @[table: 'pets']
 pub struct Pet {
 pub:
-	id       int @[primary; sql: serial]
-	name     string
-	owner_id ?int
+	id         int @[primary; sql: serial]
+	name       string
+	owner_id   ?int
+	deleted_at ?time.Time
+}
+
+// hooks turns a pet's delete into setting `deleted_at`.
+pub fn (p Pet) hooks() []vgraph.Hook {
+	return [vgraph.soft_delete_hook('deleted_at')]
+}
+
+// interceptors leaves deleted pets out of every query.
+pub fn (p Pet) interceptors() []vgraph.Interceptor {
+	return [vgraph.soft_delete_query('deleted_at')]
 }
 
 // edges declares a pet's owner, the other side of `User.pets`.
@@ -126,12 +140,30 @@ pub fn (p Pet) edges() []vgraph.Edge {
 	]
 }
 
-// Group has many users, who can be in many groups.
+// Group has many users, who can be in many groups. Only an admin may delete one:
+// see `policy`.
 @[table: 'groups']
 pub struct Group {
 pub:
 	id   int @[primary; sql: serial]
 	name string
+}
+
+// Admin is the context of a request by an administrator.
+pub struct Admin {}
+
+// policy lets only an admin delete groups.
+pub fn (g Group) policy() vgraph.Policy {
+	return vgraph.Policy{
+		mutation: [
+			fn (ctx graphql.Context, m vgraph.Mutation) !vgraph.Decision {
+				if m.operation() !in [.delete, .delete_one] {
+					return .skip
+				}
+				return if ctx is Admin { .allow } else { .deny }
+			},
+		]
+	}
 }
 
 // edges declares a group's users, the other side of `User.groups`, and its

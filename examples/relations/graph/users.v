@@ -88,7 +88,7 @@ pub fn (q UserQuery) offset(count int) UserQuery {
 // count returns how many rows match, in one query; order, limit and offset
 // do not apply.
 pub fn (q UserQuery) count() !int {
-	return load.count_where[models.User](q.graph.client.conn, q.query)
+	return load.count_where[models.User](q.graph.client.conn, q.graph.client.prepare_query('users', q.query)!)
 }
 
 // where_id keeps the rows whose `id` is `value`.
@@ -316,7 +316,7 @@ pub fn (q UserQuery) with_devices(configure ...fn (DeviceQuery) DeviceQuery) Use
 
 // all returns the matching rows, with the requested edges.
 pub fn (q UserQuery) all() ![]UserNode {
-	rows := load.select_where[models.User](q.graph.client.conn, q.query)!
+	rows := load.select_where[models.User](q.graph.client.conn, q.graph.client.prepare_query('users', q.query)!)!
 	return q.nodes(rows)
 }
 
@@ -346,7 +346,7 @@ pub fn (q UserQuery) nodes(rows []models.User) ![]UserNode {
 		}
 		children := sub.nodes(load.select_in[models.Card](q.graph.client.conn, 'owner_id',
 			rows.map(it.id.str()),
-			query: sub.query
+			query: q.graph.client.prepare_query('cards', sub.query)!
 		)!)!
 		mut by_parent := map[string][]CardNode{}
 		for child in children {
@@ -374,7 +374,7 @@ pub fn (q UserQuery) nodes(rows []models.User) ![]UserNode {
 		}
 		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
 			load.unique(keys),
-			query: sub.query
+			query: q.graph.client.prepare_query('users', sub.query)!
 		)!)!
 		mut by_key := map[string]&UserNode{}
 		for target in targets {
@@ -397,7 +397,7 @@ pub fn (q UserQuery) nodes(rows []models.User) ![]UserNode {
 		}
 		children := sub.nodes(load.select_in[models.Pet](q.graph.client.conn, 'owner_id',
 			rows.map(it.id.str()),
-			query: sub.query
+			query: q.graph.client.prepare_query('pets', sub.query)!
 		)!)!
 		mut by_parent := map[string][]PetNode{}
 		for child in children {
@@ -418,7 +418,7 @@ pub fn (q UserQuery) nodes(rows []models.User) ![]UserNode {
 			'group_id', rows.map(it.id.str()), .int, .int)!
 		targets := sub.nodes(load.select_in[models.Group](q.graph.client.conn, 'id',
 			load.unique(pairs.map(it[1])),
-			query: sub.query
+			query: q.graph.client.prepare_query('groups', sub.query)!
 		)!)!
 		// each parent's targets in the order of the query
 		mut parents_of := map[string][]string{}
@@ -444,7 +444,7 @@ pub fn (q UserQuery) nodes(rows []models.User) ![]UserNode {
 			'followee_id', rows.map(it.id.str()), .int, .int)!
 		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
 			load.unique(pairs.map(it[1])),
-			query: sub.query
+			query: q.graph.client.prepare_query('users', sub.query)!
 		)!)!
 		// each parent's targets in the order of the query
 		mut parents_of := map[string][]string{}
@@ -470,7 +470,7 @@ pub fn (q UserQuery) nodes(rows []models.User) ![]UserNode {
 			'follower_id', rows.map(it.id.str()), .int, .int)!
 		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
 			load.unique(pairs.map(it[1])),
-			query: sub.query
+			query: q.graph.client.prepare_query('users', sub.query)!
 		)!)!
 		// each parent's targets in the order of the query
 		mut parents_of := map[string][]string{}
@@ -496,7 +496,7 @@ pub fn (q UserQuery) nodes(rows []models.User) ![]UserNode {
 			'friend_id', rows.map(it.id.str()), .int, .int)!
 		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
 			load.unique(pairs.map(it[1])),
-			query: sub.query
+			query: q.graph.client.prepare_query('users', sub.query)!
 		)!)!
 		// each parent's targets in the order of the query
 		mut parents_of := map[string][]string{}
@@ -520,7 +520,7 @@ pub fn (q UserQuery) nodes(rows []models.User) ![]UserNode {
 		}
 		children := sub.nodes(load.select_in[models.Device](q.graph.client.conn, 'owner_id',
 			rows.map(it.id.str()),
-			query: sub.query
+			query: q.graph.client.prepare_query('devices', sub.query)!
 		)!)!
 		mut by_parent := map[string][]DeviceNode{}
 		for child in children {

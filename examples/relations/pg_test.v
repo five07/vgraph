@@ -75,3 +75,7 @@ fn test_graphql() {
 fn test_writes() {
 	check_writes(fixture()!)!
 }
+
+fn test_soft_delete() {
+	check_soft_delete(fixture()!)!
+}

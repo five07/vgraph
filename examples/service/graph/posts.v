@@ -73,7 +73,7 @@ pub fn (q PostQuery) offset(count int) PostQuery {
 // count returns how many rows match, in one query; order, limit and offset
 // do not apply.
 pub fn (q PostQuery) count() !int {
-	return load.count_where[posts_models.Post](q.graph.client.conn, q.query)
+	return load.count_where[posts_models.Post](q.graph.client.conn, q.graph.client.prepare_query('posts', q.query)!)
 }
 
 // where_id keeps the rows whose `id` is `value`.
@@ -425,7 +425,7 @@ pub fn (q PostQuery) with_comments(configure ...fn (CommentQuery) CommentQuery) 
 
 // all returns the matching rows, with the requested edges.
 pub fn (q PostQuery) all() ![]PostNode {
-	rows := load.select_where[posts_models.Post](q.graph.client.conn, q.query)!
+	rows := load.select_where[posts_models.Post](q.graph.client.conn, q.graph.client.prepare_query('posts', q.query)!)!
 	return q.nodes(rows)
 }
 
@@ -459,7 +459,7 @@ pub fn (q PostQuery) nodes(rows []posts_models.Post) ![]PostNode {
 		}
 		targets := sub.nodes(load.select_in[users_models.User](q.graph.client.conn, 'id',
 			load.unique(keys),
-			query: sub.query
+			query: q.graph.client.prepare_query('users', sub.query)!
 		)!)!
 		mut by_key := map[string]&UserNode{}
 		for target in targets {
@@ -483,7 +483,7 @@ pub fn (q PostQuery) nodes(rows []posts_models.Post) ![]PostNode {
 			type_col: 'owner_type'
 			type_val: 'Post'
 			soft_del: 'deleted_at'
-			query:    sub.query
+			query:    q.graph.client.prepare_query('comments', sub.query)!
 		)!)!
 		mut by_parent := map[string][]CommentNode{}
 		for child in children {

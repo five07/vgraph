@@ -35,9 +35,32 @@ pub interface Mutation {
 	added_ids(edge string) []string
 	removed_ids(edge string) []string
 	edge_cleared(edge string) bool
+	// key returns the key of the row a `*_one` write is to, or of the row a
+	// create stored, once the create has run; else ''.
+	key() string
+	// keys returns the keys of the rows the write reaches, read in its
+	// transaction; a create has its key once it has run.
+	keys() ![]string
+	// old_field returns the stored value of `column`, `orm.Null{}` for null,
+	// before an update_one or delete_one: one select of the row, kept for the
+	// next call.
 mut:
+	old_field(column string) !orm.Primitive
 	set_field_value(column string, value orm.Primitive)
 	clear_field_value(column string)
+	add_ids(edge string, ids ...string)
+	remove_ids(edge string, ids ...string)
+	clear_edge(edge string)
+	// where narrows the rows an update or delete reaches.
+	where(conds ...load.Cond)
+	// set_op changes what the write does, such as a delete into an update.
+	set_op(op Op)
+	// on_commit runs `f` once the write's transaction commits, or once the
+	// write succeeds when it has no transaction.
+	on_commit(f fn ())
+	// on_rollback runs `f` if the write's transaction rolls back, or the write
+	// fails when it has no transaction.
+	on_rollback(f fn ())
 }
 
 // MutationData is a write: what the generated builders collect, and what
@@ -54,11 +77,16 @@ pub mut:
 	removed map[string][]string
 	cleared []string
 	// update and delete: the rows; update_one and delete_one: the row's key
-	conds []load.Cond
-	key   string
+	conds   []load.Cond
+	row_key string
 	// create: the upsert
 	conflict_columns []string
 	on_conflict      OnConflict
+mut:
+	// set when the write runs: its client, in its transaction
+	client   ?Client
+	old      ?map[string]orm.Primitive
+	affected int
 }
 
 // operation returns what the write does.
@@ -104,6 +132,84 @@ pub fn (mut m MutationData) set_field_value(column string, value orm.Primitive) 
 // clear_field_value makes the write set `column` to null.
 pub fn (mut m MutationData) clear_field_value(column string) {
 	m.values[column] = orm.Null{}
+}
+
+// key returns the key of the row a `*_one` write is to, or of the row a create
+// stored, once it has run.
+pub fn (m MutationData) key() string {
+	return m.row_key
+}
+
+// keys returns the keys of the rows the write reaches, read in its
+// transaction.
+pub fn (m MutationData) keys() ![]string {
+	if m.op in [.create, .update_one, .delete_one] {
+		return if m.row_key == '' { []string{} } else { [m.row_key] }
+	}
+	c := m.client or { return error("`${m.table}`: the write isn't running") }
+	return c.select_keys(c.schema.table(m.table)!, m.conds)
+}
+
+// old_field returns the stored value of `column`, `orm.Null{}` for null, of the
+// row an update_one or delete_one is to: one select of the row, kept for the
+// next call.
+pub fn (mut m MutationData) old_field(column string) !orm.Primitive {
+	if m.op !in [.update_one, .delete_one] {
+		return error('`${m.table}`: old values are only read for update_one and delete_one, not ${m.op}')
+	}
+	if old := m.old {
+		return old[column] or { return error('`${m.table}` has no column `${column}`') }
+	}
+	c := m.client or { return error("`${m.table}`: the write isn't running") }
+	t := c.schema.table(m.table)!
+	row := c.select_row(t, m.row_key)!
+	m.old = row
+	return row[column] or { return error('`${m.table}` has no column `${column}`') }
+}
+
+// add_ids adds the targets with the keys `ids` to `edge`.
+pub fn (mut m MutationData) add_ids(edge string, ids ...string) {
+	mut list := m.added[edge] or { []string{} }
+	list << ids
+	m.added[edge] = list
+}
+
+// remove_ids removes the targets with the keys `ids` from `edge`.
+pub fn (mut m MutationData) remove_ids(edge string, ids ...string) {
+	mut list := m.removed[edge] or { []string{} }
+	list << ids
+	m.removed[edge] = list
+}
+
+// clear_edge removes every target of `edge`, before any are added.
+pub fn (mut m MutationData) clear_edge(edge string) {
+	if edge !in m.cleared {
+		m.cleared << edge
+	}
+}
+
+// where narrows the rows an update or delete reaches.
+pub fn (mut m MutationData) where(conds ...load.Cond) {
+	m.conds << conds
+}
+
+// set_op changes what the write does, such as a delete into an update.
+pub fn (mut m MutationData) set_op(op Op) {
+	m.op = op
+}
+
+// on_commit runs `f` once the write's transaction commits.
+pub fn (mut m MutationData) on_commit(f fn ()) {
+	if c := m.client {
+		c.on_commit(f)
+	}
+}
+
+// on_rollback runs `f` if the write's transaction rolls back.
+pub fn (mut m MutationData) on_rollback(f fn ()) {
+	if c := m.client {
+		c.on_rollback(f)
+	}
 }
 
 // clone returns a copy of `m` that shares nothing with it.

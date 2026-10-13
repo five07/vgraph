@@ -95,7 +95,7 @@ pub fn is_not_null(column string) Cond {
 
 // Query narrows, orders and limits a select.
 pub struct Query {
-pub:
+pub mut:
 	conds  []Cond
 	order  string // a column to order by; none when empty
 	desc   bool

@@ -685,13 +685,13 @@ that Ent doesn't.
 | | `Update`, `UpdateOne`, `UpdateOneID`: `Set`, `Add` (increment), `Clear`, `Append` | `update`, `update_one`, `update_one_id`; `set_`, `add_`, `clear_` | 6a (done); `Append` 6d, with JSON fields |
 | | edge writes: `Add<Edge>IDs`, `Remove<Edge>`, `Clear<Edge>`, `Set<Edge>ID` | `add_` / `remove_<edge>_ids`, `add_` / `remove_<edge>`, `clear_<edge>`, `set_<edge>_id`, `set_<edge>` | 6a (done) |
 | | `Delete`, `DeleteOne`, `DeleteOneID` | `delete`, `delete_one`, `delete_one_id` | 6a (done) |
-| | the `Mutation` interface (changed fields, old values) | `vgraph.Mutation`, `MutationData`, and a typed `<T>Mutation` per table | 6a (done); old values 6c |
-| | transactions: `Tx`, `Commit`, `Rollback`, transaction hooks | `g.tx`, `Client.begin` / `commit` / `rollback` | 6a (done); transaction hooks 6c |
-| **Runtime** | hooks: schema and runtime, `On` / `If` / `Unless` | none | 6c |
-| | interceptors: `Intercept`, `Traverse`, soft delete as an interceptor | per-edge `soft_del` | 6c |
-| | privacy: policies, rules, viewer context | none | 6c |
-| | `context.Context` on every call | `g.with_ctx(ctx)`, passed on by the GraphQL server | 6a (done); its use 6c |
-| | debug logging of queries | `CountingConnection` in tests; `app/trace.v` in `service` | 6c (`vgraph.trace`, Q16) |
+| | the `Mutation` interface (changed fields, old values) | `vgraph.Mutation`, `MutationData`, a typed `<T>Mutation` per table; `old_field`, `old_<field>()` | 6a, 6c (done) |
+| | transactions: `Tx`, `Commit`, `Rollback`, transaction hooks | `g.tx`, `Client.begin` / `commit` / `rollback`; `on_commit`, `on_rollback` | 6a, 6c (done) |
+| **Runtime** | hooks: schema and runtime, `On` / `If` / `Unless` | `hooks()`, `g.use`, typed `g.<table>().use`; `on`, `only_if`, `unless` | 6c (done) |
+| | interceptors: `Intercept`, `Traverse`, soft delete as an interceptor | `interceptors()`, `g.intercept`, typed `g.<table>().intercept` (before a query, as `Traverse`; no result rewriting); `soft_delete_query` / `soft_delete_hook`; per-edge `soft_del` | 6c (done) |
+| | privacy: policies, rules, viewer context | `policy()`, `g.policy`, query and mutation rules, filter rules, `privileged()` | 6c (done) |
+| | `context.Context` on every call | `g.with_ctx(ctx)`, passed on by the GraphQL server, to hooks, interceptors and rules | 6a, 6c (done) |
+| | debug logging of queries | `vgraph.trace`, without values (Q67) | 6c (done) |
 | **Codegen** | `entc` feature flags, external templates, extensions | `vgraph gen`, no options | 6d |
 | | `ent describe` | none | 6d (`vgraph describe`) |
 | | schema visualization (entviz) | none | §8 |
@@ -800,6 +800,61 @@ Work per sub-phase (Q51–Q60 answered):
   `WhereInput`; multi-field `orderBy`; the remaining annotations.
 - **After 6e** (Q58): `examples/service` drops its REST API and stores, and runs on
   vgraph alone.
+
+Decisions before 6c (Q61–Q69, 2026-10-13): the defaults. Trace events carry no
+values: no parameters, and no error messages (Q67).
+
+*6c result (2026-10-13, done):*
+- **Hooks** (`hooks.v`, Q61–Q63): `vgraph.Hook` (`name`, `on`, `cond`, `run`),
+  `vgraph.on` / `only_if` / `unless`; `Client.use` / `use_on`, and a model's
+  `hooks()`, reflected by `Schema.add`. A write now runs as: defaults, then the hooks
+  outermost first (privacy, graph, table, model), then innermost the checks and the
+  SQL, all in the write's transaction. `Mutation` gained `key`, `keys`, `old_field`,
+  `add_ids`, `remove_ids`, `clear_edge`, `where`, `set_op`, `on_commit`, `on_rollback`.
+  `old_field` returns `!orm.Primitive` (`orm.Null{}` for null): V has no `!?T`, so the
+  typed `old_<field>()` exists for non-null fields only. A bulk create runs its hooks
+  per row; with no hooks it keeps 6a's single statement on PostgreSQL. The required
+  check moved after the hooks, so a hook can supply a required value. `MutationData.key`
+  is now `row_key`: `key()` is the method.
+- **Typed runtime hooks** (Q62): per table, `<T>Mutate`, `<T>Hook`, and on `<T>Query`
+  `use` (typed), `use_hook` (a `vgraph.Hook`), `intercept` (typed: a `<T>Query` in,
+  narrowed out) and `policy`. `<T>Mutation` wraps the `vgraph.Mutation` (`inner`),
+  with typed getters, setters, `clear_<field>` and `old_<field>`. `Graph` gained
+  `use`, `intercept`, `policy`, `skip`, `privileged`, `on_commit`, `on_rollback`. The
+  registry is shared by every copy of a client.
+- **Transaction hooks** (Q64): `TxState` on the client that owns a transaction;
+  `commit` and `rollback` run the callbacks after the transaction ends. A write with no
+  transaction available runs them when it succeeds or fails.
+- **Interceptors** (Q65): `Interceptor{name, run}`, run by `Client.prepare_query`,
+  which every generated select now goes through: `all`, `count`, edge loads,
+  traversals, and so the GraphQL resolvers; `load_one` / `load_many` too.
+  `soft_delete_query` and `soft_delete_hook` (named `soft_delete`); `skip(...)`. A
+  write's read-back uses `bypass()`, so no rule or interceptor hides the row it wrote.
+  `load.Query`'s fields are now `pub mut`, for interceptors.
+- **Privacy** (Q66): `Policy{query, mutation}`, `Decision`, `always_allow` /
+  `always_deny` (and the `_query` forms), `PrivacyError`, `policy()` on a model,
+  `policy` / `policy_on` on the client, `privileged()`. Mutation rules run as the
+  outermost hook; query rules before the interceptors.
+- **Tracing** (`trace.v`, Q67): `vgraph.trace(conn, f)` returns a `Traced`,
+  `TracedTx` or `TracedDriver`, so a driver and a transactional connection stay what
+  they are. `TraceEvent{kind, table, statement, duration, failed}`: no parameters, no
+  error text, and no SQL for raw `execute` calls, which may hold values.
+- **GraphQL** (Q68): a denied query or a hook's error is an error at its field;
+  tested through the generated server.
+- **Tests:** `hooks_test.v` (order, `on` / `only_if` / `unless`, skipping, a hook's
+  error rolling back, `keys`, `old_field`, hook edge changes and conditions,
+  transaction hooks inside and outside `begin`, interceptors, soft delete with `skip`,
+  every privacy decision, `privileged`, tracing without values) on SQLite with and
+  without the driver. The generator test's project has a model hook and policy, typed
+  hooks with `old_title()`, a typed interceptor on edge loads, and privacy through
+  GraphQL. `examples/relations`: pets are soft-deleted (hidden in queries, edges,
+  counts and GraphQL; `skip` purges), groups have a policy (only an `Admin` context
+  deletes one), and its counting connection is now `vgraph.trace`, with the same
+  query counts. All 20 test files pass, and both PostgreSQL tests against PostgreSQL
+  18. `examples/service`'s code is unchanged (Q58).
+- **Compiler bug, again:** the shadowing bug of 6a also hit a closure named `fail` in
+  `field.v`, compiled as `app.fail` of `examples/service`, a module vgraph never
+  imports; the regression's notes say so.
 
 *6a result (2026-10-13, done):*
 - **Drivers** (Q51): `vgraph.Driver` (`orm.Connection`, `dialect()`,
@@ -1448,6 +1503,290 @@ are clean.
 - docs section: after 6e, before `v0.1.0`;
 - federation: already §8.
 >  A: Hold on TODO. Once we complete v0.1.0, we will work on these in a new PLAN.md
+
+### Phase 6c (runtime): answer before 6c starts
+
+Background: 6a left a `Mutation` (`MutationData`, and a typed `<T>Mutation` per
+table) that every write builds before it runs, and `g.with_ctx(ctx)`, whose `ctx` is
+a `graphql.Context` (6a result). Every select the generated client runs starts
+from a `<T>Query`: root lists, `count()`, edge loads (`with_<edge>`, which build a
+query of the target) and traversals. So one point in the generated code can see
+every query, and one point in `Client` every write. Two V constraints shape the
+answers: a model's `hooks()` can't import the generated `graph` (Q54), and V has no
+`any`, so nothing can rewrite a query's results generically.
+
+**Q61. The shape of a hook.** **Default:**
+```v ignore
+// in vgraph
+pub type Mutate = fn (ctx graphql.Context, mut m Mutation) !
+pub struct Hook {
+pub:
+	name string                                   // for errors and skipping
+	on   []Op                                     // empty: every operation
+	cond ?fn (ctx graphql.Context, m Mutation) bool // `If`; `unless` negates it
+	run  fn (next Mutate) Mutate                  @[required]
+}
+// on a model, untyped (Q54)
+pub fn (a Article) hooks() []vgraph.Hook {
+	return [vgraph.Hook{
+		on:  [.create]
+		run: fn (next vgraph.Mutate) vgraph.Mutate {
+			return fn [next] (ctx graphql.Context, mut m vgraph.Mutation) ! {
+				if m.field_value('slug') == none {
+					m.set_field_value('slug', new_slug())
+				}
+				next(ctx, mut m)!
+			}
+		}
+	}]
+}
+```
+A hook changes the mutation before `next`, checks after it, or returns an error to
+stop the write. `next` returns nothing: Ent's returns the new value, which V can't
+type generically; a hook that needs the new row's key reads `m.key()` after `next`.
+The order, outermost first: privacy (Q66), runtime hooks for every table, runtime
+hooks for the table, the model's `hooks()` in order; then the checks (`fields()`)
+and the SQL. Defaults are applied before the hooks run, as in Ent, so hooks see
+them. Models import `five07.vgraph.graphql` for the context type.
+>  A: looks good
+
+**Q62. Typed runtime hooks.** Registered on the graph at startup:
+`g.use(hooks ...vgraph.Hook)` for every table, and
+`g.articles().use(fn (next graph.ArticleMutate) graph.ArticleMutate { ... })`, where
+the hook gets the typed `ArticleMutation` (`m.title()`, `m.set_title('V')`).
+**Default:** yes. The registry is shared by every copy of the `Graph` (`with_ctx`,
+`tx`), and is set up before the graph serves requests: registering while requests run
+is not safe across threads.
+>  A: yes
+
+**Q63. What a hook can see and change.** **Default:** besides 6a's methods,
+`Mutation` gains:
+- `key() string`: the row's key; on a create, set once `next` has run;
+- `keys() ![]string`: the keys an `update` or `delete` of many rows reaches, read in
+  the write's transaction;
+- `old_field(column) !?orm.Primitive` on `update_one` and `delete_one`: the stored
+  value, from one select of the row, cached; the typed mutation has
+  `old_<field>()`;
+- `add_ids(edge, ...)`, `remove_ids(edge, ...)`, `clear_edge(edge)`: hooks can change
+  edges too;
+- `set_op(.update)` on a delete, for soft deletes (Q65).
+
+A bulk create runs the hooks once per row, as Ent's `CreateBulk` does.
+>  A: these look good
+
+**Q64. Transaction hooks** (moved from 6a). **Default:** inside `g.tx`, `tx.on_commit(fn ())`
+and `tx.on_rollback(fn ())` run after the transaction ends, such as to send an email
+only once its row is stored. A write outside `g.tx` that runs its own transaction
+runs them too.
+>  A: looks good
+
+**Q65. Interceptors.** Ent's `Intercept` wraps a query and can change its result;
+`Traverse` changes the query before it runs. vgraph can't type a result generically.
+**Default:** traverse-style only:
+```v ignore
+pub type Intercept = fn (ctx graphql.Context, table string, mut q load.Query) !
+```
+registered like hooks (on a model as `interceptors()`, on the graph with
+`g.intercept(...)` or `g.articles().intercept(...)`), and run on every select of the
+table: root queries, counts, edge loads, traversals, and the GraphQL resolvers that
+use them. One can add conditions (a tenant, soft delete) or return an error (deny).
+Typed per-table interceptors get `ArticleQuery` and return it.
+
+Soft delete, as Ent's pattern, built from both: `vgraph.soft_delete('deleted_at')`
+returns an interceptor that adds `deleted_at IS NULL`, and a hook that turns a delete
+into an update setting it to now. `g.skip('soft_delete')` returns a graph that skips
+the interceptors and hooks of that name, to read or purge deleted rows. Per-edge
+`soft_del` stays: it is about one edge (an old comment's deleted author still shows).
+>  A: agreed
+
+**Q66. Privacy.** **Default:** as Ent's, on top of hooks and interceptors:
+```v ignore
+pub fn (a Article) policy() vgraph.Policy {
+	return vgraph.Policy{
+		query:    [allow_if_admin, filter_own_tenant]  // fn (ctx, table, mut q load.Query) !Decision
+		mutation: [deny_if_anonymous, allow_if_owner, vgraph.always_deny] // fn (ctx, m Mutation) !Decision
+	}
+}
+```
+- rules run in order; each returns `.allow`, `.deny` or `.skip`; the first `.allow` or
+  `.deny` decides; when all skip, the operation is allowed, as in Ent, so a list
+  should end with `always_deny` where that matters;
+- a query rule can narrow the query instead of deciding (a filter rule), as Ent's
+  `privacy.FilterFunc`;
+- a deny is a `vgraph.PrivacyError`; in GraphQL it is an error at the field, and the
+  rest of the response stands;
+- runtime policies on the graph (`g.policy(...)`) as for hooks; `g.privileged()`
+  returns a graph that skips privacy, for seeds, migrations and system jobs.
+>  A: looks great
+
+**Q67. Query tracing** (`vgraph.trace`, Q16). **Default:** `vgraph.trace(conn,
+fn (e vgraph.TraceEvent))` wraps a connection, driver or not, and reports each
+statement: its kind (select, insert, update, delete, raw), table, duration and
+error, plus the SQL and parameters of the driver's own statements. The examples'
+`Counting` connections are replaced by it in `examples/relations`
+(`examples/service` waits, Q58). OpenTelemetry stays held with `TODO.md` (Q60).
+>  A: good, so long as it does not expose values. we can discuss if you have other ideas
+>
+> *So an event has no parameters, and no error message either: a database's message
+> can quote values (PostgreSQL's unique violation: `Key (name)=(red) already
+> exists`). It says that the statement failed; the caller gets the error itself.*
+
+**Q68. GraphQL.** **Default:** the generated server already passes each request's
+context (6a). In 6c, a `PrivacyError` or a hook's error in a resolver is reported at
+its field. The GraphQL transaction (moved from 6a to 6e) stays in 6e.
+>  A: perfect
+
+**Q69. Exit criteria for 6c.** **Default:** Q59's, and:
+- `hooks_test.v` (or similar) covers each hook form, its order, `on` / `if` /
+  `unless`, `old_field`, `keys`, edge changes, transaction hooks, interceptors,
+  soft delete with `skip`, every privacy decision, and `privileged`, on SQLite with
+  and without a driver;
+- the generator test's project uses typed runtime hooks, a model hook, an
+  interceptor and a policy through the generated client and its GraphQL server;
+- `examples/relations` runs a soft-delete table and a policy on SQLite and
+  PostgreSQL;
+- no new example: the hooks/JWT example is held with `TODO.md` (Q60).
+>  A: agreed
+
+### Phase 6b (queries): answer before 6b starts
+
+Background (checked 2026-10-13): every read runs through `orm.Connection.select`
+(`load.select_where`, `select_in`, `count_where`), and every generated select goes
+through `Client.prepare_query` (6c). `load.Cond` is a flat list joined with AND.
+What the ORM's select can express without a driver: AND and OR with parentheses
+(`QueryData.is_and`, `parentheses`), the comparison operators, `LIKE` / `ILIKE`, `IN`
+/ `NOT IN`, `IS [NOT] NULL`, one `ORDER BY` column, `LIMIT` / `OFFSET`, `DISTINCT`, one
+aggregate per select, inner and left joins. What it can't: `NOT` (other than by
+negating each operator; there is no `NOT LIKE`), `ESCAPE`, subqueries and `EXISTS`,
+`GROUP BY`, more than one order column, `NULLS FIRST/LAST`, `FOR UPDATE`. So most of
+6b needs the drivers (Q51), and one fact shapes how: the SQLite driver's raw call
+returns a null cell as `''`, so rows can't be read back reliably as text.
+
+**Q70. How reads use the drivers.** **Default:** (a).
+- (a) **Keys first.** A query that needs SQL the ORM can't express runs in two
+  steps: the driver runs `SELECT key FROM … WHERE … ORDER BY … LIMIT …` with
+  everything (OR, NOT, ESCAPE, EXISTS, several order columns, locks), then the ORM
+  reads those rows by key, typed as today, and vgraph puts them back in the first
+  query's order. Keys are never null, so the text result is safe. A query the ORM
+  can express stays one query, so today's query counts don't change. Without a
+  driver, such a query is refused, with an error naming the adapter, except where
+  Q73 and Q74 give a fallback.
+- (b) **One query, read as text.** The driver runs the whole select and vgraph parses
+  each cell from text by field type and dialect. One query, but SQLite's `''` for
+  null makes optional strings ambiguous, and time and bool parsing differ by dialect.
+- (c) **Wait for the upstream `orm.RawConnection`** (`TODO.md`), which returns typed
+  cells. Blocks 6b.
+>  A:
+
+**Q71. Composing predicates: `and`, `or`, `not`.** `load.Cond` becomes a tree:
+`load.and(...)`, `load.or(...)`, `load.not(...)`. **Default:**
+- the generated client gains one typed function per field and operator, named after
+  the struct, for use inside `or` / `not`:
+  `g.articles().where(load.or(graph.article_title_contains('V'), graph.article_views_gt(10)))`;
+  the chained `where_<field>…()` methods stay and are ANDed, as today;
+- AND and OR run through the ORM, with no driver needed; `not` is rewritten by
+  negating each operator (`=` to `<>`, `IN` to `NOT IN`, `<` to `>=`, AND to OR), and
+  needs a driver only around `LIKE`;
+- the generated client gains the missing `where_<field>_ne` and `where_<field>_not_in`.
+>  A:
+
+**Q72. String predicates.** **Default:**
+- `where_<field>_contains`, `_has_prefix`, `_has_suffix`: `LIKE` with `%` and `_`
+  escaped (`ESCAPE '\'`) through a driver. Without one, a value holding `%` or `_` is
+  refused, not used as a wildcard. `_like` stays, as the raw pattern;
+- `_equal_fold` and `_contains_fold`: `LOWER(column) = LOWER(?)` and `LOWER(column)
+  LIKE LOWER(?)` through a driver, the same on SQLite (ASCII case only) and
+  PostgreSQL. Without a driver, `ILIKE` on PostgreSQL; refused on SQLite;
+- GraphQL's `Contains` / `HasPrefix` / `HasSuffix` switch to the escaped forms here,
+  which fixes the Phase 4 note; `EqualFold` / `ContainsFold` join the `WhereInput` in
+  6e with the rest of it (Q80).
+>  A:
+
+**Q73. Edge predicates.** `has_<edge>()` and `has_<edge>_with(fn (q PetQuery) PetQuery)`,
+on every edge kind, polymorphic and through join tables. **Default:**
+- with a driver: one `EXISTS (SELECT 1 FROM … WHERE …)` subquery;
+- without one: two queries, the targets' keys first, then `IN`;
+- the target's privacy rules and interceptors apply to the subquery, as to an edge
+  load, so a soft-deleted pet doesn't count; Ent leaves them out, but here edge
+  loads already apply them, and the two should agree.
+>  A:
+
+**Q74. Traversal from a query.** `g.users().where_name('ada').query_pets()` returns a
+`PetQuery` of the pets of every user that matches. **Default:** the `PetQuery` holds
+the users query and resolves it when it runs: a subquery (`owner_id IN (SELECT id
+FROM users WHERE …)`) with a driver, two queries without one. Every edge kind, as
+`query_<edge>` on a node has today; a many_to_many edge reads its join table in the
+same way.
+>  A:
+
+**Q75. Results.** **Default:**
+- `only()`: the one matching row, a `NotFoundError` for none, a `NotSingularError`
+  for more than one (it reads two);
+- `ids() ![]KeyT`, `first_id()`, `only_id()`, `exist() !bool`: keys only, with no edge
+  loads;
+- `select(...columns)`: the rows with only those columns read, the others left at
+  their zero values, as Ent's `Select` fills only what it selects; `unique()` adds
+  `DISTINCT`;
+- `scan[T]() ![]T`: rows read into an app struct by column name, with
+  `load.select_where[T]`'s mapping. It is the one generic method here, and gets a
+  regression test of its own.
+>  A:
+
+**Q76. Aggregates.** V has no `any`, so results are typed by what they are.
+**Default:**
+- without grouping, typed methods per numeric field: `sum_<field>() !f64`,
+  `min_<field>()`, `max_<field>()`, `mean_<field>() !f64`, besides `count()`. One
+  aggregate per query, as the ORM has, so no driver is needed;
+- `group_by(...columns).aggregate(vgraph.count(), vgraph.sum('views'), ...)`,
+  needing a driver, returns `[]vgraph.Group`: `key map[string]orm.Primitive` (the
+  grouped columns) and `values map[string]f64` (`count`, `sum_views`, …), with
+  `scan[T]()` to read groups into an app struct instead.
+>  A:
+
+**Q77. Ordering.** **Default:**
+- `order_by_<field>()` and `_desc()` add an order column instead of replacing the
+  last one, as Ent's `Order` does; a second one needs a driver (Q70);
+- `order_by(vgraph.asc('title').nulls_last(), vgraph.desc('id'))` for nulls
+  first/last;
+- by an edge: `order_by_<edge>_count()` on list edges, and
+  `order_by_<edge>_<field>()` on unique ones (many_to_one, one_to_one), through a
+  driver subquery;
+- GraphQL's `orderBy` stays one field until 6e.
+>  A:
+
+**Q78. Locking.** **Default:** `for_update()` and `for_share()`, with `no_wait()` and
+`skip_locked()`, through a driver, inside a transaction only (an error outside one).
+On PostgreSQL they lock the rows. SQLite has no row locks: there they are refused
+with an error saying so, rather than accepted and ignored. The other choice is to
+accept them as no-ops on SQLite, since its transactions already serialize writers.
+>  A:
+
+**Q79. The rest of the query inventory.** **Default:**
+- named edges: `with_named_<edge>(name, configure)` loads an edge more than once
+  with different settings, into `node.named_<edge>[name]`;
+- "not loaded" told apart from "empty": `<edge>_or_err() !…` on a node returns a
+  `NotLoadedError` when its query didn't ask for the edge; the fields stay as they
+  are;
+- raw predicates: `load.raw('lower(title) = ?', 'v')`, with parameters only, never
+  interpolated text, through a driver; Ent's `Modify` for selects is left out;
+- `entql` (filtering at runtime, untyped): the `load.Cond` tree and
+  `Client.prepare_query` already are that, and `Client.select_keys` is exposed for it.
+>  A:
+
+**Q80. GraphQL in 6b.** **Default:** only the escaping fix (Q72). `and` / `or` / `not`,
+`has<Edge>` / `has<Edge>With`, the `Fold` predicates, multi-field `orderBy` and
+connections stay in 6e, which builds them on 6b.
+>  A:
+
+**Q81. Exit criteria for 6b.** **Default:** Q59's, and:
+- every predicate, result method, aggregate, order and lock tested on SQLite and
+  PostgreSQL, through the generated client, with and without a driver where both
+  work, and each refusal tested where a driver is needed;
+- `examples/relations` checks `has_<edge>`, `has_<edge>_with` and traversal from a
+  query for each relationship kind, with the queries each runs;
+- the existing query-count tests unchanged: what the ORM can run still runs in one
+  query.
+>  A:
 
 ## 8. Future state
 

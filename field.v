@@ -137,7 +137,9 @@ fn (c Column) with_options(o Field) Column {
 
 // check runs the checks of `o` on `value`, which is set and not null.
 fn (o Field) check(table string, column string, value orm.Primitive) ! {
-	fail := fn [table, column] (message string) IError {
+	// not `fail`: a variable named like a function of a module the app imports
+	// is called as that function (regressions/fn_var_shadows_module_fn/)
+	invalid := fn [table, column] (message string) IError {
 		return ValidationError{
 			table:   table
 			field:   column
@@ -146,40 +148,40 @@ fn (o Field) check(table string, column string, value orm.Primitive) ! {
 	}
 	if value is string {
 		if o.not_empty && value == '' {
-			return fail('is empty')
+			return invalid('is empty')
 		}
 		if o.min_len > 0 && value.len < o.min_len {
-			return fail('is shorter than ${o.min_len} bytes')
+			return invalid('is shorter than ${o.min_len} bytes')
 		}
 		if o.max_len > 0 && value.len > o.max_len {
-			return fail('is longer than ${o.max_len} bytes')
+			return invalid('is longer than ${o.max_len} bytes')
 		}
 		if o.pattern != '' {
-			mut re := regex.regex_opt(o.pattern) or { return fail('has an invalid pattern') }
+			mut re := regex.regex_opt(o.pattern) or { return invalid('has an invalid pattern') }
 			if !re.matches_string(value) {
-				return fail('does not match `${o.pattern}`')
+				return invalid('does not match `${o.pattern}`')
 			}
 		}
 	}
 	if number := as_f64(value) {
 		if min := o.min {
 			if number < min {
-				return fail('is less than ${min}')
+				return invalid('is less than ${min}')
 			}
 		}
 		if max := o.max {
 			if number > max {
-				return fail('is more than ${max}')
+				return invalid('is more than ${max}')
 			}
 		}
 		if o.positive && number <= 0 {
-			return fail('is not positive')
+			return invalid('is not positive')
 		}
 	}
 	// not `validate`: a variable named like a function that `graphql` declares
 	// generates invalid C (regressions/shadowed_fn_call.vv)
 	if custom := o.validate {
-		custom(value) or { return fail(err.msg()) }
+		custom(value) or { return invalid(err.msg()) }
 	}
 }
 

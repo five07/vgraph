@@ -1,12 +1,15 @@
 module vgraph
 
+import graphql
 import load
 import orm
 import time
 
 // Writes. The generated builders collect a `MutationData` and run it here. A
-// write and its edge writes run in one transaction when the connection can run
-// one (`Client.begin`); inside a transaction already, they join it.
+// write runs in one transaction when the connection can run one
+// (`Client.begin`); inside a transaction already, it joins it. Defaults apply
+// first, then the hooks (`hooks_of`), outermost first, then, innermost, the
+// checks and the SQL.
 
 type Row = map[string]orm.Primitive
 
@@ -18,23 +21,20 @@ pub fn (c Client) create(m MutationData) !string {
 
 // create_bulk inserts the rows `ms` describe, all of one table, with their
 // edges, in one transaction, and returns their keys in order, '' for a row
-// left out by `do_nothing`. With a PostgreSQL driver, rows that set the same
-// columns go in one statement.
+// left out by `do_nothing`. Hooks run once per row. With a PostgreSQL driver
+// and no hooks, rows that set the same columns go in one statement.
 pub fn (c Client) create_bulk(ms []MutationData) ![]string {
 	if ms.len == 0 {
 		return []string{}
 	}
 	t := c.schema.table(ms[0].table)!
-	options := c.schema.options(t.name)
-	mut rows := []Row{cap: ms.len}
 	for m in ms {
 		if m.table != t.name {
 			return error('create_bulk: `${m.table}` and `${t.name}` rows are mixed')
 		}
-		rows << prepare_create(t, options, m)!
 	}
 	tc := c.atomic()!
-	keys := tc.create_rows(t, rows, ms) or {
+	keys := tc.create_all(t, ms) or {
 		tc.rollback() or {}
 		return err
 	}
@@ -42,42 +42,126 @@ pub fn (c Client) create_bulk(ms []MutationData) ![]string {
 	return keys
 }
 
-fn (c Client) create_rows(t Table, rows []Row, ms []MutationData) ![]string {
-	keys := c.insert_rows(t, rows, ms[0])!
-	for i, m in ms {
-		if keys[i] != '' {
-			c.write_edges(t, keys[i], m)!
+fn (c Client) create_all(t Table, ms []MutationData) ![]string {
+	options := c.schema.options(t.name)
+	hooks := c.hooks_of(t.name)
+	if hooks.len == 0 {
+		mut rows := []Row{cap: ms.len}
+		for m in ms {
+			mut data := m.clone()
+			data.op = .create
+			apply_defaults(t, options, mut data)
+			rows << prepare_create(t, options, data)!
 		}
+		keys := c.insert_rows(t, rows, ms[0])!
+		for i, m in ms {
+			if keys[i] != '' {
+				c.write_edges(t, keys[i], m)!
+			}
+		}
+		return keys
+	}
+	mut keys := []string{cap: ms.len}
+	for m in ms {
+		data := c.run(t, hooks, m, .create)!
+		keys << data.row_key
 	}
 	return keys
 }
 
-// update_one updates the row whose key is `m.key`, with its edges, and
+// update_one updates the row whose key is `m.row_key`, with its edges, and
 // reports whether there was one.
 pub fn (c Client) update_one(m MutationData) !bool {
-	t := c.schema.table(m.table)!
-	return c.update(MutationData{
-		...m
-		conds: [load.in_keys(t.key, [m.key], key_type(t)!)]
-	})! > 0
+	return c.mutate(m, .update_one)!.affected > 0
 }
 
 // update updates the rows that match `m.conds`, with their edges, and returns
 // how many there were. It reads their keys first, in the same transaction.
 pub fn (c Client) update(m MutationData) !int {
+	return c.mutate(m, .update)!.affected
+}
+
+// delete_one deletes the row whose key is `m.row_key`, and reports whether
+// there was one.
+pub fn (c Client) delete_one(m MutationData) !bool {
+	return c.mutate(m, .delete_one)!.affected > 0
+}
+
+// delete deletes the rows that match `m.conds`, and returns how many there
+// were. The join table rows of the table's many_to_many edges go with them;
+// rows of other tables that hold their keys stay.
+pub fn (c Client) delete(m MutationData) !int {
+	return c.mutate(m, .delete)!.affected
+}
+
+// mutate runs `m` as `op` in a transaction, and returns it as the write left
+// it.
+fn (c Client) mutate(m MutationData, op Op) !&MutationData {
 	t := c.schema.table(m.table)!
-	set := prepare_update(t, c.schema.options(t.name), m)!
 	tc := c.atomic()!
-	count := tc.update_rows(t, set, m) or {
+	data := tc.run(t, tc.hooks_of(t.name), m, op) or {
 		tc.rollback() or {}
 		return err
 	}
 	tc.commit()!
-	return count
+	return data
 }
 
-fn (c Client) update_rows(t Table, set Row, m MutationData) !int {
-	keys := c.select_keys(t, m.conds)!
+// run applies the defaults of `m`, then runs it as `op` through `hooks`, and
+// returns it as the write left it.
+fn (c Client) run(t Table, hooks []Hook, m MutationData, op Op) !&MutationData {
+	mut data := &MutationData{
+		...m.clone()
+		op:     op
+		client: c
+	}
+	apply_defaults(t, c.schema.options(t.name), mut data)
+	mut chain := Mutate(fn [c, t, mut data] (_ graphql.Context, mut _ Mutation) ! {
+		c.write(t, mut data)!
+	})
+	for i := hooks.len - 1; i >= 0; i-- {
+		chain = hooks[i].wrap(chain)
+	}
+	mut iface := Mutation(data)
+	chain(c.ctx, mut iface)!
+	return data
+}
+
+// write runs `m`, the innermost step of its hooks: the checks, then the SQL.
+fn (c Client) write(t Table, mut m MutationData) ! {
+	options := c.schema.options(t.name)
+	match m.op {
+		.create {
+			row := prepare_create(t, options, m)!
+			keys := c.insert_rows(t, [row], m)!
+			m.row_key = keys[0]
+			if m.row_key != '' {
+				c.write_edges(t, m.row_key, m)!
+				m.affected = 1
+			}
+		}
+		.update_one, .update {
+			set := prepare_update(t, options, m)!
+			m.affected = c.update_rows(t, set, m.target(t)!, m)!
+		}
+		.delete_one, .delete {
+			m.affected = c.delete_rows(t, m.target(t)!)!
+		}
+	}
+}
+
+// target returns the conditions of the rows `m` reaches: its own, and its key
+// for a `*_one` write.
+fn (m MutationData) target(t Table) ![]load.Cond {
+	mut conds := m.conds.clone()
+	if m.op in [.update_one, .delete_one] {
+		conds << load.in_keys(t.key, [m.row_key], key_type(t)!)
+	}
+	return conds
+}
+
+fn (c Client) update_rows(t Table, set Row, conds []load.Cond, m MutationData) !int {
+	keys := c.select_keys(t, conds)!
 	if keys.len == 0 {
 		return 0
 	}
@@ -92,32 +176,8 @@ fn (c Client) update_rows(t Table, set Row, m MutationData) !int {
 	return keys.len
 }
 
-// delete_one deletes the row whose key is `m.key`, and reports whether there
-// was one.
-pub fn (c Client) delete_one(m MutationData) !bool {
-	t := c.schema.table(m.table)!
-	return c.delete(MutationData{
-		...m
-		conds: [load.in_keys(t.key, [m.key], key_type(t)!)]
-	})! > 0
-}
-
-// delete deletes the rows that match `m.conds`, and returns how many there
-// were. The join table rows of the table's many_to_many edges go with them;
-// rows of other tables that hold their keys stay.
-pub fn (c Client) delete(m MutationData) !int {
-	t := c.schema.table(m.table)!
-	tc := c.atomic()!
-	count := tc.delete_rows(t, m) or {
-		tc.rollback() or {}
-		return err
-	}
-	tc.commit()!
-	return count
-}
-
-fn (c Client) delete_rows(t Table, m MutationData) !int {
-	keys := c.select_keys(t, m.conds)!
+fn (c Client) delete_rows(t Table, conds []load.Cond) !int {
+	keys := c.select_keys(t, conds)!
 	if keys.len == 0 {
 		return 0
 	}
@@ -134,9 +194,37 @@ fn (c Client) delete_rows(t Table, m MutationData) !int {
 	return keys.len
 }
 
-// prepare_create returns the row `m` inserts: its values, then the defaults of
-// the columns it leaves unset. It reports a required column left unset, and
-// runs every check.
+// apply_defaults sets the defaults of the columns `m` leaves unset: on a
+// create, `default` and `default_now`; on an update, `update_default` and
+// `update_now`. Hooks then see them.
+fn apply_defaults(t Table, options map[string]Field, mut m MutationData) {
+	for column in t.columns {
+		if column.name in m.values || column.name in m.adds {
+			continue
+		}
+		o := options[column.field] or { continue }
+		match m.op {
+			.create {
+				if default := o.default {
+					m.values[column.name] = default()
+				} else if o.default_now {
+					m.values[column.name] = now()
+				}
+			}
+			.update_one, .update {
+				if default := o.update_default {
+					m.values[column.name] = default()
+				} else if o.update_now {
+					m.values[column.name] = now()
+				}
+			}
+			else {}
+		}
+	}
+}
+
+// prepare_create returns the row `m` inserts. It reports a required column left
+// unset, and runs every check.
 fn prepare_create(t Table, options map[string]Field, m MutationData) !Row {
 	if m.adds.len > 0 {
 		return error("`${t.name}`: a create can't add to a column")
@@ -147,19 +235,7 @@ fn prepare_create(t Table, options map[string]Field, m MutationData) !Row {
 		row[name] = value
 	}
 	for column in t.columns {
-		if column.name in row {
-			continue
-		}
-		o := options[column.field] or {
-			Field{
-				name: column.field
-			}
-		}
-		if default := o.default {
-			row[column.name] = default()
-		} else if o.default_now {
-			row[column.name] = now()
-		} else if !column.optional {
+		if column.name !in row && !column.optional && !column.has_default {
 			return ValidationError{
 				table:   t.name
 				field:   column.name
@@ -171,9 +247,8 @@ fn prepare_create(t Table, options map[string]Field, m MutationData) !Row {
 	return row
 }
 
-// prepare_update returns the columns `m` sets on each row: its values, its
-// additions, then the update defaults of the columns it leaves unset. It
-// reports a column that may not change, and runs every check.
+// prepare_update returns the columns `m` sets on each row: its values and its
+// additions. It reports a column that may not change, and runs every check.
 fn prepare_update(t Table, options map[string]Field, m MutationData) !Row {
 	mut set := Row{}
 	for name, value in m.values {
@@ -212,17 +287,6 @@ fn prepare_update(t Table, options map[string]Field, m MutationData) !Row {
 			name:     name
 			operator: .add
 			right:    delta
-		}
-	}
-	for column in t.columns {
-		if column.name in set {
-			continue
-		}
-		o := options[column.field] or { continue }
-		if default := o.update_default {
-			set[column.name] = default()
-		} else if o.update_now {
-			set[column.name] = now()
 		}
 	}
 	return set
@@ -558,4 +622,47 @@ fn key_text(value orm.Primitive) string {
 		string { value }
 		else { '' }
 	}
+}
+
+// select_row returns the stored values of the row of `t` with the key `key`,
+// by column, in one query.
+fn (c Client) select_row(t Table, key string) !Row {
+	mut names := []string{}
+	mut types := []int{}
+	for column in t.columns {
+		typ := match column.typ.trim_left('?') {
+			'int' { orm.type_idx['int'] }
+			'i64' { orm.type_idx['i64'] }
+			'f64' { orm.type_idx['f64'] }
+			'bool' { orm.type_idx['bool'] }
+			'string' { orm.type_string }
+			'time.Time' { orm.time_ }
+			else { continue }
+		}
+		names << column.name
+		types << typ
+	}
+	where := load.where_data([load.in_keys(t.key, [key], key_type(t)!)]) or {
+		return error('`${t.name}`: no row has the key `${key}`')
+	}
+	config := orm.SelectConfig{
+		table:        orm.Table{
+			name: t.name
+		}
+		has_where:    true
+		primary:      t.key
+		fields:       names
+		select_exprs: names
+		types:        types
+	}
+	mut conn := c.conn
+	rows := conn.select(config, orm.QueryData{}, where)!
+	if rows.len == 0 {
+		return error('`${t.name}`: no row has the key `${key}`')
+	}
+	mut row := Row{}
+	for i, name in names {
+		row[name] = rows[0][i]
+	}
+	return row
 }

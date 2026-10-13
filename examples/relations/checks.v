@@ -10,51 +10,11 @@ import five07.vgraph.graphql
 import graph
 import models
 
-// Log holds the table of each select a `Counting` connection ran.
+// Log holds the table of each select a traced connection ran.
 @[heap]
 struct Log {
 mut:
 	tables []string
-}
-
-// Counting runs every query on `inner`, and logs each select in `log`.
-struct Counting {
-mut:
-	inner orm.Connection
-	log   &Log
-}
-
-fn (mut c Counting) select(config orm.SelectConfig, data orm.QueryData, where orm.QueryData) ![][]orm.Primitive {
-	c.log.tables << config.table.name
-	return c.inner.select(config, data, where)
-}
-
-fn (mut c Counting) insert(table orm.Table, data orm.QueryData) ! {
-	c.inner.insert(table, data)!
-}
-
-fn (mut c Counting) update(table orm.Table, data orm.QueryData, where orm.QueryData) ! {
-	c.inner.update(table, data, where)!
-}
-
-fn (mut c Counting) delete(table orm.Table, where orm.QueryData) ! {
-	c.inner.delete(table, where)!
-}
-
-fn (mut c Counting) create(table orm.Table, fields []orm.TableField) ! {
-	c.inner.create(table, fields)!
-}
-
-fn (mut c Counting) drop(table orm.Table) ! {
-	c.inner.drop(table)!
-}
-
-fn (mut c Counting) last_id() int {
-	return c.inner.last_id()
-}
-
-fn (mut c Counting) execute(query string) ![]orm.Row {
-	return c.inner.execute(query)
 }
 
 // Fixture is a seeded database, its client, and the log of its selects, and a
@@ -251,10 +211,12 @@ fn seed(db orm.Connection, driver orm.Connection) !Fixture {
 		}!
 	}
 	log := &Log{}
-	g := graph.Graph.new(Counting{
-		inner: db
-		log:   log
-	})!
+	g := graph.Graph.new(vgraph.trace(db, fn [log] (e vgraph.TraceEvent) {
+		if e.kind == .select {
+			mut l := unsafe { log }
+			l.tables << e.table
+		}
+	}))!
 	return Fixture{
 		g:   g
 		w:   graph.Graph.new(driver)!
@@ -570,7 +532,13 @@ fn check_writes(f Fixture) ! {
 	]
 	w.groups().update_one_id(2).remove_users_ids(1).exec()!
 	assert w.users().where_id(1).first()!.query_groups()!.all()!.map(it.group.name) == ['admins']
-	w.groups().delete_one_id(1).exec()!
+	// only an admin may delete a group (`Group.policy`)
+	if _ := w.groups().delete_one_id(1).exec() {
+		assert false
+	} else {
+		assert err is vgraph.PrivacyError
+	}
+	w.with_ctx(models.Admin{}).groups().delete_one_id(1).exec()!
 	assert w.users().where_id_in([1, 3]).with_groups().order_by_id().all()!.map(it.groups.map(it.group.name)) == [
 		[]string{},
 		['devs'],
@@ -629,4 +597,28 @@ fn check_writes(f Fixture) ! {
 	assert w.users().where_name('zed').count()! == 0
 	// the read client sees the writes
 	assert f.g.users().count()! == 5
+}
+
+// Soft delete and privacy: deleted pets are hidden everywhere, edges and
+// GraphQL included, until a graph skips `soft_delete`.
+fn check_soft_delete(f Fixture) ! {
+	w := f.w
+	w.pets().delete_one_id(1).exec()!
+	assert w.pets().order_by_id().all()!.map(it.pet.name) == ['tom', 'stray']
+	assert w.users().where_id(1).with_pets().first()!.pets.map(it.pet.name) == ['tom']
+	assert w.users().where_id(1).first()!.query_pets().count()! == 1
+	assert gql(f, '{ pets(orderBy: {field: ID}) { name } usersCount }')! == '{"data":{"pets":[{"name":"tom"},{"name":"stray"}],"usersCount":4}}'
+	// a second delete finds nothing; an update leaves it alone
+	if _ := w.pets().delete_one_id(1).exec() {
+		assert false
+	} else {
+		assert err is graph.NotFoundError
+	}
+	assert w.pets().update().set_name('x').where_name('rex').exec()! == 0
+	all := w.skip('soft_delete').pets().order_by_id().all()!
+	assert all.map(it.pet.name) == ['rex', 'tom', 'stray']
+	assert all.map(it.pet.deleted_at != none) == [true, false, false]
+	// skipped, a delete is a delete
+	assert w.skip('soft_delete').pets().delete().where_deleted_at_is_not_null().exec()! == 1
+	assert w.skip('soft_delete').pets().count()! == 2
 }

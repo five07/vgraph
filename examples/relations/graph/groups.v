@@ -70,7 +70,7 @@ pub fn (q GroupQuery) offset(count int) GroupQuery {
 // count returns how many rows match, in one query; order, limit and offset
 // do not apply.
 pub fn (q GroupQuery) count() !int {
-	return load.count_where[models.Group](q.graph.client.conn, q.query)
+	return load.count_where[models.Group](q.graph.client.conn, q.graph.client.prepare_query('groups', q.query)!)
 }
 
 // where_id keeps the rows whose `id` is `value`.
@@ -182,7 +182,7 @@ pub fn (q GroupQuery) with_devices(configure ...fn (DeviceQuery) DeviceQuery) Gr
 
 // all returns the matching rows, with the requested edges.
 pub fn (q GroupQuery) all() ![]GroupNode {
-	rows := load.select_where[models.Group](q.graph.client.conn, q.query)!
+	rows := load.select_where[models.Group](q.graph.client.conn, q.graph.client.prepare_query('groups', q.query)!)!
 	return q.nodes(rows)
 }
 
@@ -214,7 +214,7 @@ pub fn (q GroupQuery) nodes(rows []models.Group) ![]GroupNode {
 			'user_id', rows.map(it.id.str()), .int, .int)!
 		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
 			load.unique(pairs.map(it[1])),
-			query: sub.query
+			query: q.graph.client.prepare_query('users', sub.query)!
 		)!)!
 		// each parent's targets in the order of the query
 		mut parents_of := map[string][]string{}
@@ -240,7 +240,7 @@ pub fn (q GroupQuery) nodes(rows []models.Group) ![]GroupNode {
 			'device_id', rows.map(it.id.str()), .int, .string)!
 		targets := sub.nodes(load.select_in[models.Device](q.graph.client.conn, 'id',
 			load.unique(pairs.map(it[1])),
-			query: sub.query
+			query: q.graph.client.prepare_query('devices', sub.query)!
 		)!)!
 		// each parent's targets in the order of the query
 		mut parents_of := map[string][]string{}

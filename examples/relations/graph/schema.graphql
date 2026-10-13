@@ -348,6 +348,7 @@ type Pet {
   id: ID!
   name: String!
   ownerID: ID
+  deletedAt: Time
   owner: User
 }
 
@@ -383,6 +384,16 @@ input PetWhereInput {
   ownerIDNotIn: [ID!]
   ownerIDIsNil: Boolean
   ownerIDNotNil: Boolean
+
+  """deletedAt field predicates"""
+  deletedAt: Time
+  deletedAtNEQ: Time
+  deletedAtGT: Time
+  deletedAtGTE: Time
+  deletedAtLT: Time
+  deletedAtLTE: Time
+  deletedAtIsNil: Boolean
+  deletedAtNotNil: Boolean
 }
 
 """Ordering options for Pet lists"""
@@ -399,6 +410,7 @@ enum PetOrderField {
   ID
   NAME
   OWNER_ID
+  DELETED_AT
 }
 
 type User {
@@ -475,3 +487,6 @@ enum OrderDirection {
   """Specifies a descending order for a given `orderBy` argument."""
   DESC
 }
+
+"""An RFC 3339 date and time, such as `2026-10-13T07:30:00Z`."""
+scalar Time @specifiedBy(url: "https://scalars.graphql.org/chillicream/date-time.html")
