@@ -1,0 +1,31 @@
+// A generic call whose type argument is a field type from `$for` generates C
+// that doesn't compile: `use of undeclared identifier 'kind'`.
+// Run: `v run comptime_generic_call.vv`. It prints [1, 2] once fixed.
+// Worked around in `vgraph/load/select.v` by inlining the `$if` checks.
+module main
+
+struct Row {
+	id   int
+	name string
+}
+
+fn kind[F]() int {
+	$if F is int {
+		return 1
+	} $else $if F is string {
+		return 2
+	}
+	return 0
+}
+
+fn kinds[T]() []int {
+	mut out := []int{}
+	$for field in T.fields {
+		out << kind[field.typ]()
+	}
+	return out
+}
+
+fn main() {
+	println(kinds[Row]())
+}

@@ -212,6 +212,14 @@ It becomes the test bed for each feature and, later, the published example. Then
 *Exit:* every `example` test still passes, and the traced SQL shows the same number of
 queries or fewer than the baseline.
 
+*Result (2026-10-12, done):* `example/` holds `rest-api` at `9d802d6`, renamed. Its
+loading now runs through `example/vgraph/load` (`load_one`, `load_many`, polymorphic
+via `Poly`), built on `orm.Connection.select` (Q17). `slugs_of` (four stores),
+`app.distinct` and the registry's slug loading are gone; the registry keeps `id_of`.
+`test_read_endpoints_query_counts` asserts the selects of 15 read endpoints, and gives
+the same list before and after the swap (`rest-api` already batched). All 11 test files
+pass. One compiler bug turned up: `vgraph/regressions/comptime_generic_call.vv`.
+
 **Phase 2: standalone package.** Add `v.mod` (`name: 'vgraph'`, MIT) to this repo's root;
 `v new --lib` would make a new folder, so copy what it generates instead. Move the
 `Edge` and `schema` layers there, with a SQLite test suite and a Postgres CI job (Q3).
@@ -334,4 +342,4 @@ Postgres/MySQL come with it. The cost is mapping each field type ourselves: opti
 `time.Time`, enums, `sql_type` overrides. The spike maps int, i64, f64, bool and string
 in about 60 lines (`spike/load/select.v`). The other choice is `new_query` for now,
 switching when its new home is known.
-> A:
+> A: default choice
