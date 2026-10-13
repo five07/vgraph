@@ -18,14 +18,21 @@ pub:
 // Graph.new registers every struct of the schema, checks its edges, and returns a
 // client that runs on `conn`.
 pub fn Graph.new(conn orm.Connection) !Graph {
-	mut schema := vgraph.Schema{}
-	schema.add[articles_models.Article]()!
-	schema.add[comments_models.Comment]()!
-	schema.add[posts_models.Post]()!
-	schema.add[users_models.User]()!
 	return Graph{
-		client: vgraph.Client.new(conn, schema)!
+		client: vgraph.Client.new(conn, schema()!)!
 	}
+}
+
+// schema returns the schema with every struct registered, for migrations
+// (`vgraph.add_edge_indexes`) and anything else that needs it without a
+// connection. `Graph.new` checks it.
+pub fn schema() !vgraph.Schema {
+	mut s := vgraph.Schema{}
+	s.add[articles_models.Article]()!
+	s.add[comments_models.Comment]()!
+	s.add[posts_models.Post]()!
+	s.add[users_models.User]()!
+	return s
 }
 
 // NotFoundError is the error of `first()` when no row matches.

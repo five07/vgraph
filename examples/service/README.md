@@ -29,9 +29,11 @@ environment variables override it. Copy `.env.example` to start one.
 | `SEED` | `true` | Load example data at startup when the database has no users. |
 | `DB_DRIVER` | `sqlite` | Only `sqlite` is supported for now. |
 
-Tables are created at startup if they don't exist, and so are the indexes the edges
-need (`ensure_indexes`). There are no migrations yet: after a schema change, delete
-the database file.
+Startup runs the pending migrations of `migrations/` through V's `v.migrations`,
+which records them in `schema_migrations`. The first, `1 initial`, creates the
+tables from the models and the indexes their edges need
+(`vgraph.add_edge_indexes`). A schema change is a new migration. A database file
+from before migrations has the tables but no `schema_migrations`: delete it.
 
 ## Layout
 
@@ -40,6 +42,7 @@ that holds the struct, its validation and its store:
 
 ```
 main.v, app.v, seed.v      startup, wiring, example data
+migrations/                the database migrations, run at startup
 app/                       Context, config, database, errors, JSON in and out, slugs
 graph/                     the typed vgraph client and GraphQL server, generated from the
                            models' edges() and api.graphql; resolvers.v is written by hand
@@ -165,8 +168,8 @@ Things in V 0.5.2 this project works around; section 5 of `../../PLAN.md` lists 
 - `sqlite.DB.exec` ignores errors raised while a statement runs; use the ORM or
   `exec_param_many` for writes.
 - A variable named `update` inside `sql { }` makes V skip the statement silently.
-- The struct attribute `@[index: '...']` creates no index on SQLite; `comments`
-  creates its index with raw SQL.
+- The struct attribute `@[index: '...']` creates no index on SQLite; the
+  migrations create the indexes instead.
 - The ORM leaves `@[references]` columns nullable; `sql_type: 'INTEGER NOT NULL'`
   adds the `NOT NULL`.
 

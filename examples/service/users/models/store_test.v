@@ -4,7 +4,9 @@ import app
 
 fn new_store() !UserStore {
 	db := app.connect(app.Config{})!
-	create_tables(db)!
+	sql db {
+		create table User
+	}!
 	return UserStore.new(db)
 }
 

@@ -1,5 +1,6 @@
 module main
 
+import db.sqlite
 import json2
 import os
 import net
@@ -12,6 +13,7 @@ import comments.models as comment_models
 import posts.models as post_models
 import users.models as user_models
 import five07.vgraph.graphql
+import migrations
 
 // start runs a new app with an empty in-memory database on a free port, and
 // returns its base URL once it answers.
@@ -806,23 +808,43 @@ fn test_read_endpoints_query_counts() {
 	}
 }
 
-// Startup creates the indexes that the edges need, and running it again on the
-// same database is fine.
-fn test_startup_creates_edge_indexes() {
+// edge_indexes returns the names of the indexes that vgraph's edges need.
+fn edge_indexes(db sqlite.DB) ![]string {
+	rows := db.exec("SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE '%_idx' ORDER BY name")!
+	return rows.map(it.vals[0])
+}
+
+// Startup migrates an empty database through v.migrations alone, and running it
+// again on the same database is fine. The indexes are the ones the edges need,
+// as `ensure_indexes` made them before Phase 5. The migration rolls back and
+// applies again.
+fn test_startup_migrates() {
 	cfg := app.Config{
 		seed: false
 	}
-	db := app.connect(cfg)!
+	mut db := app.connect(cfg)!
 	new_app_on(cfg, db, db)!
 	new_app_on(cfg, db, db)!
-	rows := db.exec("SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE '%_idx' ORDER BY name")!
-	assert rows.map(it.vals[0]) == [
+	mut m := migrations.new(mut db)!
+	assert m.status()!.map('${it.version} ${it.name} ${it.state}') == ['1 initial applied']
+	indexes := [
 		'articles_user_id_idx',
 		'comments_owner_type_owner_id_idx',
 		'comments_parent_id_idx',
 		'comments_user_id_idx',
 		'posts_user_id_idx',
 	]
+	assert edge_indexes(db)! == indexes
+
+	m.rollback(1)!
+	assert m.status()!.map('${it.version} ${it.name} ${it.state}') == ['1 initial pending']
+	tables := "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('users', 'articles', 'posts', 'comments')"
+	assert db.exec(tables)!.len == 0
+	assert edge_indexes(db)! == []
+
+	m.migrate()!
+	assert db.exec(tables)!.len == 4
+	assert edge_indexes(db)! == indexes
 }
 
 // gql posts a GraphQL request to the app, and returns the response, parsed.

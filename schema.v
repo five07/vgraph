@@ -20,6 +20,8 @@ pub:
 	typ      string // the field's V type, such as `?time.Time`, or `other`
 	kind     ColumnKind
 	nullable bool
+	// sql_type is the field's `sql_type` attribute, such as `uuid`, or empty.
+	sql_type string
 	// graphql_skip leaves the column out of the GraphQL schema: the field has
 	// `@[graphql: '-']`.
 	graphql_skip bool
@@ -113,6 +115,7 @@ pub fn (mut s Schema) add[T]() ! {
 					else { ColumnKind.other }
 				}
 				nullable:     typ.starts_with('?')
+				sql_type:     sql_type_of(field.attrs)
 				graphql_skip: is_graphql_skip(field.attrs)
 			}
 		}
@@ -150,6 +153,16 @@ fn is_graphql_skip(attrs []string) bool {
 		}
 	}
 	return false
+}
+
+// sql_type_of returns the value of a field's `sql_type` attribute, or ''.
+fn sql_type_of(attrs []string) string {
+	for attr in attrs {
+		if attr.starts_with('sql_type:') {
+			return attr.all_after('sql_type:').trim(" '")
+		}
+	}
+	return ''
 }
 
 // table returns the registered table `name`.

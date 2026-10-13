@@ -32,9 +32,11 @@ The rule behind the table: the side without the foreign key is `one_to_one` or
 `many_to_many`.
 
 vgraph only reads. For a bidirectional edge, the app writes both directions: both
-`spouse_id`s, or both friendship rows. `ensure_indexes` gives each `one_to_one`
+`spouse_id`s, or both friendship rows. The tables come from one `v.migrations`
+migration (`checks.v`), whose `vgraph.add_edge_indexes` gives each `one_to_one`
 edge a unique index (`cards.owner_id`, `nodes.next_id`), so the database rejects a
-second card for the same user.
+second card for the same user, and each join table a unique index on its two
+columns, so it rejects a second copy of a pair.
 
 ```sh
 v test .                           # needs this checkout at ~/.vmodules/five07/vgraph

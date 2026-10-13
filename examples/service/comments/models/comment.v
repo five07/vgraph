@@ -1,6 +1,5 @@
 module models
 
-import orm
 import time
 import five07.vgraph
 
@@ -166,14 +165,4 @@ fn (fields CommentUpdate) validate() ! {
 	if fields.body.len > max_body_len {
 		return error('the body is longer than ${max_body_len} bytes')
 	}
-}
-
-// create_tables creates the tables of this module's models. The `users` table
-// has to exist first. The indexes that the edges need come from vgraph's
-// `ensure_indexes`, not the ORM's `@[index]`: for SQLite that puts CREATE INDEX
-// after CREATE TABLE in one string, and SQLite runs only the first statement.
-pub fn create_tables(db orm.Connection) ! {
-	sql db {
-		create table Comment
-	}!
 }

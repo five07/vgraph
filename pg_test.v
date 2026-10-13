@@ -9,6 +9,7 @@ module vgraph
 import db.pg
 import os
 import time
+import v.migrations
 
 @[table: 'vg_users']
 struct PgUser {
@@ -106,16 +107,33 @@ struct PgArticleTag {
 	tag_id     int
 }
 
-fn pg_client() !Client {
-	mut db := pg.connect(pg.Config{
+// The tables the tests use, in an order they can be dropped in.
+const pg_tables = ['vg_schema_migrations', 'vg_article_tags', 'vg_tags', 'vg_comments', 'vg_articles',
+	'vg_users']
+
+fn pg_config() pg.Config {
+	return pg.Config{
 		host:     os.getenv_opt('PGHOST') or { 'localhost' }
 		port:     (os.getenv_opt('PGPORT') or { '5432' }).int()
 		user:     os.getenv_opt('PGUSER') or { 'postgres' }
 		password: os.getenv_opt('PGPASSWORD') or { '12345678' }
 		dbname:   os.getenv_opt('PGDATABASE') or { 'postgres' }
-	}, pg.PoolConfig{})!
+	}
+}
+
+fn pg_schema() !Schema {
+	mut s := Schema{}
+	s.add[PgUser]()!
+	s.add[PgArticle]()!
+	s.add[PgComment]()!
+	s.add[PgTag]()!
+	return s
+}
+
+fn pg_client() !Client {
+	mut db := pg.connect(pg_config(), pg.PoolConfig{})!
 	db.exec('SET client_min_messages = warning')!
-	for table in ['vg_article_tags', 'vg_tags', 'vg_comments', 'vg_articles', 'vg_users'] {
+	for table in pg_tables {
 		db.exec('DROP TABLE IF EXISTS ${table}')!
 	}
 	sql db {
@@ -174,12 +192,7 @@ fn pg_client() !Client {
 			insert link into PgArticleTag
 		}!
 	}
-	mut s := Schema{}
-	s.add[PgUser]()!
-	s.add[PgArticle]()!
-	s.add[PgComment]()!
-	s.add[PgTag]()!
-	return Client.new(db, s)!
+	return Client.new(db, pg_schema()!)!
 }
 
 fn test_postgres_edges() {
@@ -217,12 +230,53 @@ fn test_postgres_edges() {
 	assert tags['2'].map(it.name) == ['sql']
 }
 
-fn test_postgres_ensure_indexes() {
-	c := pg_client()!
-	mut conn := c.conn
-	assert c.ensure_indexes()!.len == 3
-	c.ensure_indexes()!
-	rows := conn.execute("SELECT indexname FROM pg_indexes WHERE indexname LIKE 'vg_%_idx' ORDER BY indexname")!
-	assert rows.map(it.vals[0]) == ['vg_article_tags_article_id_idx', 'vg_articles_user_id_idx',
-		'vg_comments_owner_type_owner_id_idx']
+// The migration helpers on PostgreSQL, which `v.migrations` runs on a direct
+// connection (`pg.connect_direct`), not a pool: the tables, the join table from
+// `join_table`, the other foreign keys with `add_foreign_key`, then the indexes.
+fn test_postgres_migration_helpers() {
+	mut db := pg.connect_direct(pg_config())!
+	defer {
+		db.close() or {}
+	}
+	db.exec('SET client_min_messages = warning')!
+	for table in pg_tables {
+		db.exec('DROP TABLE IF EXISTS ${table}')!
+	}
+	s := pg_schema()!
+	join := s.join_table('vg_articles', 'tags')!
+	mut m := migrations.new(mut db, [
+		migrations.Migration{
+			version: 1
+			name:    'edges'
+			up:      fn [s, join] (mut ctx migrations.Context) ! {
+				migrations.create_orm_table[PgUser](mut ctx)!
+				migrations.create_orm_table[PgArticle](mut ctx)!
+				migrations.create_orm_table[PgComment](mut ctx)!
+				migrations.create_orm_table[PgTag](mut ctx)!
+				ctx.create_table(join)!
+				for key in s.foreign_keys()! {
+					if key.from_table != join.name {
+						ctx.add_foreign_key(key)!
+					}
+				}
+				add_edge_indexes(mut ctx, s)!
+			}
+			down:    fn [s] (mut ctx migrations.Context) ! {
+				remove_edge_indexes(mut ctx, s)!
+			}
+		},
+	], dialect: .pg, table: 'vg_schema_migrations')!
+	m.migrate()!
+	indexes := "SELECT indexname FROM pg_indexes WHERE indexname LIKE 'vg_%_idx' ORDER BY indexname"
+	assert db.exec(indexes)!.map(it.vals[0] or { '' }) == s.migration_indexes().map(it.name)
+	keys := db.exec("SELECT conname FROM pg_constraint WHERE contype = 'f' AND conname LIKE 'vg_%' ORDER BY conname")!
+	assert keys.map(it.vals[0] or { '' }) == [
+		'vg_article_tags_article_id_fkey',
+		'vg_article_tags_tag_id_fkey',
+		'vg_articles_user_id_fkey',
+		'vg_comments_parent_id_fkey',
+	]
+	assert s.foreign_keys()!.map(it.name) == keys.map(it.vals[0] or { '' })
+	m.rollback(1)!
+	assert db.exec(indexes)!.len == 0
 }

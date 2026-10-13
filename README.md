@@ -54,7 +54,6 @@ schema.add[User]()!
 schema.add[Article]()!
 schema.add[Comment]()!
 graph := vgraph.Client.new(db, schema)! // checks every edge against the structs
-graph.ensure_indexes()! // indexes the columns edge loads filter by (temporary, see below)
 
 articles := sql db {
 	select from Article
@@ -166,9 +165,41 @@ from graphql-js, the reference implementation Apollo builds on, and matches its
 messages, locations, printed schemas and introspection exactly
 (`graphql/testdata/README.md`).
 
-`ensure_indexes` runs `CREATE INDEX IF NOT EXISTS` (SQLite and PostgreSQL) for each
-column an edge load filters by. It is a stopgap: once a V release includes
-`v.migrations`, vgraph will emit migration steps instead.
+## Migrations
+
+vgraph doesn't run migrations: V's `v.migrations` does, from migrations you write.
+vgraph gives them what the declared edges need, as `v.migrations` values:
+
+- `schema.migration_indexes()`: an index on each column an edge load filters by
+  (unique for a `one_to_one` edge), and a unique index on each join table's two
+  columns, so a pair is stored once;
+- `schema.foreign_keys()`: a foreign key on each column that holds one table's
+  keys; none for a polymorphic edge's column, which holds several tables' keys;
+- `schema.join_table(table, edge)`: a many_to_many edge's join table, for
+  `ctx.create_table`;
+- `vgraph.add_edge_indexes(mut ctx, schema)` and `remove_edge_indexes`, for a
+  migration's `up` and `down`.
+
+```v ignore
+import v.migrations
+
+fn initial_up(mut ctx migrations.Context) ! {
+	migrations.create_orm_table[User](mut ctx)!
+	migrations.create_orm_table[Article](mut ctx)!
+	migrations.create_orm_table[Comment](mut ctx)!
+	vgraph.add_edge_indexes(mut ctx, graph.schema()!)! // graph.schema(): from vgraph gen
+}
+```
+
+A migration that takes its indexes from the schema makes those the edges need when
+it is written. A later migration that adds edges adds their indexes, and the first
+one then lists its own, so a new database gets the same ones.
+
+SQLite can't add a foreign key to a table that exists: put a table's keys in the
+`migrations.Table` that creates it, or use the ORM's `@[references]` on tables
+created from structs. `v.migrations` runs on PostgreSQL through a direct
+connection (`pg.connect_direct`), not a pool. Both examples migrate this way, on
+SQLite and PostgreSQL.
 
 ## Layout
 

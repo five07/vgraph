@@ -1,6 +1,5 @@
 module models
 
-import orm
 import time
 import five07.vgraph
 
@@ -99,12 +98,4 @@ fn (fields PostUpdate) validate() ! {
 	if fields.body.len > max_body_len {
 		return error('the body is longer than ${max_body_len} bytes')
 	}
-}
-
-// create_tables creates the tables of this module's models. The `users`
-// table has to exist first.
-pub fn create_tables(db orm.Connection) ! {
-	sql db {
-		create table Post
-	}!
 }

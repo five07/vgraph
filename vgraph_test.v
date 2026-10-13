@@ -2,6 +2,7 @@ module vgraph
 
 import db.sqlite
 import time
+import v.migrations
 
 @[table: 'users']
 struct User {
@@ -343,24 +344,123 @@ fn test_load_errors() {
 	}
 }
 
-fn test_indexes() {
+fn test_migration_indexes() {
 	s := schema()!
-	assert s.indexes().map(it.sql()) == [
-		'CREATE INDEX IF NOT EXISTS "article_tags_article_id_idx" ON "article_tags" ("article_id")',
-		'CREATE INDEX IF NOT EXISTS "articles_user_id_idx" ON "articles" ("user_id")',
-		'CREATE INDEX IF NOT EXISTS "comments_owner_type_owner_id_idx" ON "comments" ("owner_type", "owner_id")',
-		'CREATE UNIQUE INDEX IF NOT EXISTS "profiles_user_id_idx" ON "profiles" ("user_id")',
+	assert s.migration_indexes().map('${it.name} ${it.table} ${it.columns} ${it.unique}') == [
+		"article_tags_article_id_idx article_tags ['article_id'] false",
+		"article_tags_article_id_tag_id_idx article_tags ['article_id', 'tag_id'] true",
+		"articles_user_id_idx articles ['user_id'] false",
+		"comments_owner_type_owner_id_idx comments ['owner_type', 'owner_id'] false",
+		"profiles_user_id_idx profiles ['user_id'] true",
 	]
 }
 
-fn test_ensure_indexes_creates_them_once() {
-	c := client()!
-	mut conn := c.conn
-	assert c.ensure_indexes()!.len == 4
-	c.ensure_indexes()!
-	rows := conn.execute("SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE '%_idx' ORDER BY name")!
-	assert rows.map(it.vals[0]) == ['article_tags_article_id_idx', 'articles_user_id_idx',
-		'comments_owner_type_owner_id_idx', 'profiles_user_id_idx']
+fn test_foreign_keys() {
+	s := schema()!
+	// none on comments.owner_id, which the polymorphic edges use
+	assert s.foreign_keys()!.map('${it.name}: ${it.from_table}.${it.column} -> ${it.to_table}.${it.primary_key}') == [
+		'article_tags_article_id_fkey: article_tags.article_id -> articles.id',
+		'article_tags_tag_id_fkey: article_tags.tag_id -> tags.id',
+		'articles_user_id_fkey: articles.user_id -> users.id',
+		'profiles_user_id_fkey: profiles.user_id -> users.id',
+	]
+}
+
+fn test_join_table() {
+	s := schema()!
+	t := s.join_table('articles', 'tags')!
+	assert t.name == 'article_tags'
+	assert t.id
+	assert t.columns.map('${it.name} ${it.kind} ${it.nullable or { true }}') == [
+		'article_id integer false',
+		'tag_id integer false',
+	]
+	assert t.foreign_keys.map(it.name) == ['article_tags_article_id_fkey', 'article_tags_tag_id_fkey']
+	if _ := s.join_table('articles', 'author') {
+		assert false
+	} else {
+		assert err.msg() == '`articles.author` is many_to_one; only a many_to_many edge has a join table'
+	}
+}
+
+// edge_migration creates the tables of `schema()`, the join table from
+// `join_table`, and the edges' indexes; its down removes the indexes only.
+fn edge_migration(s Schema) migrations.Migration {
+	return migrations.Migration{
+		version: 1
+		name:    'edges'
+		up:      fn [s] (mut ctx migrations.Context) ! {
+			migrations.create_orm_table[User](mut ctx)!
+			migrations.create_orm_table[Article](mut ctx)!
+			migrations.create_orm_table[Comment](mut ctx)!
+			migrations.create_orm_table[Tag](mut ctx)!
+			migrations.create_orm_table[Profile](mut ctx)!
+			ctx.create_table(s.join_table('articles', 'tags')!)!
+			add_edge_indexes(mut ctx, s)!
+		}
+		down:    fn [s] (mut ctx migrations.Context) ! {
+			remove_edge_indexes(mut ctx, s)!
+		}
+	}
+}
+
+fn edge_index_names(mut db sqlite.DB) ![]string {
+	rows := db.exec("SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE '%_idx' ORDER BY name")!
+	return rows.map(it.vals[0])
+}
+
+fn test_migrate_adds_and_removes_edge_indexes() {
+	s := schema()!
+	mut db := sqlite.connect(':memory:')!
+	db.exec('PRAGMA foreign_keys = ON')!
+	mut m := migrations.new(mut db, [edge_migration(s)], dialect: .sqlite)!
+	m.migrate()!
+	assert edge_index_names(mut db)! == s.migration_indexes().map(it.name)
+	// the join table's keys are checked, and a pair is stored once (through
+	// `exec_param_many`: `exec` ignores errors raised while a statement runs)
+	link := 'INSERT INTO article_tags (article_id, tag_id) VALUES (?, ?)'
+	db.exec_param_many('INSERT INTO articles (user_id, title) VALUES (?, ?)', ['1', 'a'])!
+	db.exec_param_many('INSERT INTO tags (name) VALUES (?)', ['v'])!
+	db.exec_param_many(link, ['1', '1'])!
+	if _ := db.exec_param_many(link, ['1', '1']) {
+		assert false, 'a pair is stored once'
+	}
+	if _ := db.exec_param_many(link, ['1', '9']) {
+		assert false, 'tag 9 does not exist'
+	}
+	m.rollback(1)!
+	assert edge_index_names(mut db)! == []
+}
+
+// Gadget is keyed by a UUID, and linked to people through a join table.
+@[table: 'gadgets']
+struct Gadget {
+	id   string @[primary; sql_type: 'uuid']
+	name string
+}
+
+fn (g Gadget) edges() []Edge {
+	return [
+		Edge{
+			name:       'people'
+			kind:       .many_to_many
+			to:         'people'
+			column:     'gadget_id'
+			through:    'gadget_people'
+			through_to: 'person_id'
+		},
+	]
+}
+
+fn test_join_table_key_types() {
+	mut s := Schema{}
+	s.add[Gadget]()!
+	s.add[Person]()!
+	s.add[Session]()!
+	s.add[Device]()!
+	assert s.table('gadgets')!.column('id')?.sql_type == 'uuid'
+	t := s.join_table('gadgets', 'people')!
+	assert t.columns.map('${it.name} ${it.kind}') == ['gadget_id uuid', 'person_id integer']
 }
 
 fn test_load_one_to_one() {
@@ -378,7 +478,7 @@ fn test_a_one_to_one_index_is_unique_only_alone() {
 	s.add[Profile]()!
 	s.add[ProfileOwner]()!
 	// `ProfileOwner.profiles` needs the same index, and it isn't unique
-	assert s.indexes().map(it.unique) == [false]
+	assert s.migration_indexes().map(it.unique) == [false]
 }
 
 @[table: 'profile_owners']

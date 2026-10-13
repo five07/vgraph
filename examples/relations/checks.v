@@ -4,6 +4,8 @@ module main
 // on PostgreSQL by `pg_test.v`, through the client `vgraph gen` wrote into
 // `graph/`.
 import orm
+import v.migrations
+import five07.vgraph
 import five07.vgraph.graphql
 import graph
 import models
@@ -70,22 +72,56 @@ fn (f Fixture) queries() []string {
 	return tables
 }
 
-// seed creates the tables on `db`, which must have none of them, and fills them.
+// initial is the example's one migration: the tables, from their structs, and
+// the indexes their edges need.
+const initial = migrations.Migration{
+	version: 1
+	name:    'initial'
+	up:      initial_up
+	down:    initial_down
+}
+
+fn initial_up(mut ctx migrations.Context) ! {
+	migrations.create_orm_table[models.User](mut ctx)!
+	migrations.create_orm_table[models.Card](mut ctx)!
+	migrations.create_orm_table[models.Pet](mut ctx)!
+	migrations.create_orm_table[models.Group](mut ctx)!
+	migrations.create_orm_table[models.GroupUser](mut ctx)!
+	migrations.create_orm_table[models.Follow](mut ctx)!
+	migrations.create_orm_table[models.Friendship](mut ctx)!
+	migrations.create_orm_table[models.Node](mut ctx)!
+	migrations.create_orm_table[models.Category](mut ctx)!
+	migrations.create_orm_table[models.Device](mut ctx)!
+	migrations.create_orm_table[models.Login](mut ctx)!
+	migrations.create_orm_table[models.DeviceGroup](mut ctx)!
+	vgraph.add_edge_indexes(mut ctx, graph.schema()!)!
+}
+
+fn initial_down(mut ctx migrations.Context) ! {
+	migrations.drop_orm_table[models.DeviceGroup](mut ctx)!
+	migrations.drop_orm_table[models.Login](mut ctx)!
+	migrations.drop_orm_table[models.Device](mut ctx)!
+	migrations.drop_orm_table[models.Category](mut ctx)!
+	migrations.drop_orm_table[models.Node](mut ctx)!
+	migrations.drop_orm_table[models.Friendship](mut ctx)!
+	migrations.drop_orm_table[models.Follow](mut ctx)!
+	migrations.drop_orm_table[models.GroupUser](mut ctx)!
+	migrations.drop_orm_table[models.Group](mut ctx)!
+	migrations.drop_orm_table[models.Pet](mut ctx)!
+	migrations.drop_orm_table[models.Card](mut ctx)!
+	migrations.drop_orm_table[models.User](mut ctx)!
+}
+
+// migrate applies `initial` to `db`, which must have none of its tables.
+fn migrate(mut db orm.TransactionalConnection, dialect migrations.Dialect) ! {
+	mut m := migrations.new(mut db, [initial], dialect: dialect)!
+	m.migrate()!
+}
+
+// seed fills the tables that `migrate` created on `db`. It takes `db` as an
+// `orm.Connection`: `sql` blocks reject a `TransactionalConnection`
+// (regressions/sql_transactional_connection.vv).
 fn seed(db orm.Connection) !Fixture {
-	sql db {
-		create table models.User
-		create table models.Card
-		create table models.Pet
-		create table models.Group
-		create table models.GroupUser
-		create table models.Follow
-		create table models.Friendship
-		create table models.Node
-		create table models.Category
-		create table models.Device
-		create table models.Login
-		create table models.DeviceGroup
-	}!
 	for name in ['ada', 'bob', 'cy', 'dee'] {
 		user := models.User{
 			name: name
@@ -216,7 +252,6 @@ fn seed(db orm.Connection) !Fixture {
 		inner: db
 		log:   log
 	})!
-	g.client.ensure_indexes()!
 	return Fixture{
 		g:   g
 		db:  db
@@ -353,22 +388,36 @@ fn check_m2m_bidirectional(f Fixture) ! {
 }
 
 // The one_to_one edges get unique indexes, so the database keeps them one to
-// one: it rejects a second card for ada.
-fn check_one_to_one_indexes_are_unique(f Fixture) ! {
-	unique := f.g.client.schema.indexes().filter(it.unique).map(it.name)
-	assert unique == ['cards_owner_id_idx', 'nodes_next_id_idx']
+// one: it rejects a second card for ada. So does each join table's pair of
+// columns: it rejects ada joining admins twice.
+fn check_unique_indexes(f Fixture) ! {
+	unique := f.g.client.schema.migration_indexes().filter(it.unique).map(it.name)
+	assert unique == ['cards_owner_id_idx', 'device_groups_device_id_group_id_idx',
+		'follows_followee_id_follower_id_idx', 'friendships_friend_id_user_id_idx',
+		'group_users_group_id_user_id_idx', 'nodes_next_id_idx']
 	second_card := models.Card{
 		number:   '9999'
 		owner_id: 1
 	}
+	again := models.GroupUser{
+		group_id: 1
+		user_id:  1
+	}
+	mut rejected := 0
 	sql f.db {
 		insert second_card into models.Card
 	} or {
 		// SQLite says `UNIQUE constraint failed`, PostgreSQL `violates unique constraint`
 		assert err.msg().to_lower().contains('unique')
-		return
+		rejected++
 	}
-	return error('a second card for ada should be rejected')
+	sql f.db {
+		insert again into models.GroupUser
+	} or {
+		assert err.msg().to_lower().contains('unique')
+		rejected++
+	}
+	assert rejected == 2, 'a second card for ada, and ada in admins twice, should be rejected'
 }
 
 // UUID keys: devices are keyed by strings, and every kind of edge works on them,

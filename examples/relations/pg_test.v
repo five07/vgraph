@@ -7,21 +7,23 @@ module main
 import db.pg
 import os
 
-const relation_tables = ['users', 'cards', 'pets', 'groups', 'group_users', 'follows', 'friendships',
-	'nodes', 'categories', 'devices', 'logins', 'device_groups']
+const relation_tables = ['schema_migrations', 'users', 'cards', 'pets', 'groups', 'group_users',
+	'follows', 'friendships', 'nodes', 'categories', 'devices', 'logins', 'device_groups']
 
 fn fixture() !Fixture {
-	mut db := pg.connect(pg.Config{
+	// v.migrations runs on a direct connection, not a pool
+	mut db := pg.connect_direct(pg.Config{
 		host:     os.getenv_opt('PGHOST') or { 'localhost' }
 		port:     (os.getenv_opt('PGPORT') or { '5432' }).int()
 		user:     os.getenv_opt('PGUSER') or { 'postgres' }
 		password: os.getenv_opt('PGPASSWORD') or { '12345678' }
 		dbname:   os.getenv_opt('PGDATABASE') or { 'postgres' }
-	}, pg.PoolConfig{})!
+	})!
 	db.exec('SET client_min_messages = warning')!
 	for table in relation_tables {
 		db.exec('DROP TABLE IF EXISTS "${table}"')!
 	}
+	migrate(mut db, .pg)!
 	return seed(db)!
 }
 
@@ -57,8 +59,8 @@ fn test_m2m_bidirectional() {
 	check_m2m_bidirectional(fixture()!)!
 }
 
-fn test_one_to_one_indexes_are_unique() {
-	check_one_to_one_indexes_are_unique(fixture()!)!
+fn test_unique_indexes() {
+	check_unique_indexes(fixture()!)!
 }
 
 fn test_uuid_keys() {

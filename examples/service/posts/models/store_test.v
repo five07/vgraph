@@ -12,8 +12,10 @@ struct Fixture {
 
 fn setup() !Fixture {
 	db := app.connect(app.Config{})!
-	user_models.create_tables(db)!
-	create_tables(db)!
+	sql db {
+		create table user_models.User
+		create table Post
+	}!
 	user := user_models.UserStore.new(db).insert(name: 'Ada', email: 'ada@x')!
 	return Fixture{
 		db:      db

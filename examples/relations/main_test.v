@@ -4,7 +4,9 @@ module main
 import db.sqlite
 
 fn fixture() !Fixture {
-	return seed(sqlite.connect(':memory:')!)!
+	mut db := sqlite.connect(':memory:')!
+	migrate(mut db, .sqlite)!
+	return seed(db)!
 }
 
 fn test_o2o_two_types() {
@@ -39,8 +41,8 @@ fn test_m2m_bidirectional() {
 	check_m2m_bidirectional(fixture()!)!
 }
 
-fn test_one_to_one_indexes_are_unique() {
-	check_one_to_one_indexes_are_unique(fixture()!)!
+fn test_unique_indexes() {
+	check_unique_indexes(fixture()!)!
 }
 
 fn test_uuid_keys() {

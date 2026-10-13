@@ -147,7 +147,7 @@ Changes from the first draft:
 - **No `from` field.** `Schema.add[T]()` knows the declaring table.
 - **`through_to` is new.** A join table has two key columns.
 - **`one_to_one` is new** (Phase 3, after reviewing Ent's relationship kinds). It is
-  the side without the foreign key; `ensure_indexes` makes its index unique.
+  the side without the foreign key; its index is unique (`migration_indexes`, Phase 5).
 
 Ent's relationship kinds map onto these four. `examples/relations` declares and
 tests each one:
@@ -546,7 +546,48 @@ date.
 **Phase 5: migration helpers** for `v.migrations` (Q10): from the declared edges,
 produce the indexes, foreign keys and join tables as `migrations.Index` /
 `ForeignKey` / `Table` values, for migrations written by hand. `examples/service` moves its
-table setup to `v.migrations`.
+table setup to `v.migrations`. Questions: Q44–Q50, all answered with the defaults
+(2026-10-13).
+
+*Result (2026-10-13, done):*
+- **`migrate.v`** (imports `v.migrations`): `Schema.migration_indexes()`,
+  `foreign_keys()`, `join_table(table, edge)`, and `add_edge_indexes` /
+  `remove_edge_indexes` for a migration's `up` and `down`, as Q44–Q46 describe.
+  Index names are unchanged (`<table>_<columns>_idx`); foreign keys are
+  `<table>_<column>_fkey`. `vgraph.Index`, `Index.sql()`, `Schema.indexes()` and
+  `Client.ensure_indexes()` are gone (Q47).
+- **Join tables:** each now gets a unique index on its two columns (sorted, so the
+  two directions of an edge share it), beside the index on each column. The
+  single-column index on the pair's first column is redundant with it; it is kept
+  so edge indexes stay as before.
+- **Schema:** `Column.sql_type` holds a field's `sql_type` attribute, so a join
+  column for a `sql_type: 'uuid'` key is `uuid`.
+- **Generator:** `graph.v` has `pub fn schema() !vgraph.Schema`, which
+  `Graph.new` calls, so a migration gets the schema without a connection.
+- **`examples/service`:** `migrations/` (module `migrations`, importing
+  `v.migrations as vm`) has `1 initial`: `create_orm_table` for the four models,
+  then `add_edge_indexes(graph.schema())`; `down` drops the tables. `new_app_on`
+  migrates `db`, not the counting `conn`. The four `create_tables` are gone, and
+  the store tests create their tables themselves. `test_startup_migrates`: two
+  startups, `status()` is `1 initial applied`, the five indexes are those
+  `ensure_indexes` made, rollback drops everything, and migrate restores it. The
+  query-count tests are unchanged.
+- **`examples/relations`:** `checks.v` has the same kind of migration, run by
+  `migrate` on SQLite and on PostgreSQL (`pg.connect_direct`). The unique-index
+  check now also rejects a duplicate join row.
+- **Tests:** `vgraph_test.v` covers the indexes, foreign keys (none on polymorphic
+  columns), join tables with int and UUID keys, and a migrate and rollback on
+  SQLite, where the join table rejects a duplicate pair and an unknown key.
+  `pg_test.v` runs the helpers through a migration on PostgreSQL, with
+  `add_foreign_key`. All 18 test files pass, and both PostgreSQL tests pass
+  against PostgreSQL 18. CI is unchanged and hasn't run (it runs on `main`).
+- **Compiler bug found:** a seventh, `regressions/sql_transactional_connection.vv`:
+  an `sql` block rejects a value typed `orm.TransactionalConnection`, though it
+  embeds `orm.Connection`. `examples/relations` passes the database to `migrate` and
+  `seed` separately.
+- **Caveat, documented in the README:** a migration that calls `add_edge_indexes`
+  with the current schema makes the indexes the edges need *now*. When a later
+  migration adds edges, the first one has to list its own indexes instead.
 
 **Phase 6: Ent parity** (Q19, Q26). Everything in Ent and entgql that vgraph doesn't
 have yet. The sub-phases are a proposal, in dependency order:
@@ -600,7 +641,7 @@ that Ent doesn't.
 | | `Required`, `Immutable`, `StorageKey` | none | 6a / 6d |
 | | `Through`: edge schemas, join tables with fields of their own | join tables have only the two keys | 6d |
 | | — | polymorphic edges, per-edge soft delete (extra) | done |
-| **Schema** | declared indexes (fields, edges, unique, partial) | `ensure_indexes` on edge columns | 5 / 6d |
+| **Schema** | declared indexes (fields, edges, unique, partial) | edge columns and join pairs, through the migration helpers | 5 (done) / 6d |
 | | mixins (shared fields, edges, hooks) | none; V's embedded structs may serve | 6d |
 | | annotations (`entsql`, `entgql`) | `@[table]`; `@[graphql]` in Phase 4 (Q29) | 4 / 6d |
 | | views, multiple database schemas | none | 6d |
@@ -637,7 +678,7 @@ that Ent doesn't.
 | **Codegen** | `entc` feature flags, external templates, extensions | `vgraph gen`, no options | 6d |
 | | `ent describe` | none | 6d (`vgraph describe`) |
 | | schema visualization (entviz) | none | §8 |
-| **Migrations** | automatic and versioned migrations, diffing through Atlas | none; Phase 5 uses `v.migrations`, migrations written by hand (Q10) | 5 |
+| **Migrations** | automatic and versioned migrations, diffing through Atlas | versioned through `v.migrations`, written by hand, with vgraph's helpers (Q10) | 5 (done); no diffing |
 | **entgql** | schema generation | none | 4 |
 | | `Node` interface, global ids, `node` / `nodes` | none | 6d, with globally unique ids (Q42) |
 | | `CollectFields`: eager loads from the selection set | none | 4 (Q32) |
@@ -1020,6 +1061,92 @@ but Phase 4's resolvers would be built on the `int` load API, and generalizing i
 accept `int`, `i64` and `string` keys, check edge column types against target keys,
 and keep the generated API typed. Test with a UUID-keyed table in `examples/relations`.
 > A: default (2026-10-13)
+
+### Phase 5 (migration helpers): answer before Phase 5 starts
+
+What's there (checked 2026-10-13, V master `53dd72c`): `migrate.v` has `vgraph.Index`,
+`Schema.indexes()` and `Client.ensure_indexes()`, used at startup by both examples.
+`v.migrations` has `migrations.Index{table, columns, name, unique}`,
+`ForeignKey{from_table, column, to_table, primary_key, name, on_delete, on_update}` and
+`Table{name, columns, foreign_keys, id, id_name, if_not_exists}`, run through
+`Context.add_index` / `add_foreign_key` / `create_table`. Its limits that shape Phase 5:
+- `add_index` has no `IF NOT EXISTS`, and names indexes `index_<table>_on_<columns>`
+  when no name is given; vgraph's are `<table>_<columns>_idx`;
+- on SQLite, `add_foreign_key` returns an error: foreign keys go in `Table.foreign_keys`
+  when the table is created, or come from the ORM's `@[references]`, as today;
+- `Table` takes one primary key column, so a join table can't have a composite key;
+- `migrations.new` needs an `orm.TransactionalConnection`. `sqlite.DB` is one, but
+  `examples/service`'s `CountingConnection` isn't; on PostgreSQL it refuses the pool
+  that `pg.connect` returns and needs `pg.connect_direct`'s `pg.Conn`.
+
+**Q44. The helpers' API.** **Default:** in the `vgraph` module, from a `Schema`:
+- `s.migration_indexes() []migrations.Index`: what `indexes()` returns today, with
+  vgraph's names kept, so databases that ran `ensure_indexes` already have them;
+- `s.foreign_keys() []migrations.ForeignKey`: one per many_to_one edge and per join
+  column; none for polymorphic edges, which point at more than one table;
+- `s.join_table(table, edge) !migrations.Table` (Q46);
+- `vgraph.add_edge_indexes(mut ctx, s)!` and `remove_edge_indexes(mut ctx, s)!`, for a
+  migration's `up` and `down`.
+
+`vgraph.Index` and its `sql()` go, replaced by `migrations.Index`. `vgraph` then imports
+`v.migrations`, which no V release has yet (Q13 already accepts that).
+> A: accept default
+
+**Q45. Foreign keys on SQLite.** SQLite can't add one to an existing table, and the
+examples' tables are created by the ORM, whose `@[references]` already writes them.
+**Default:** `foreign_keys()` is for tables created through `ctx.create_table` (put them
+in `Table.foreign_keys`) and for `add_foreign_key` on PostgreSQL and MySQL. Models
+created with `create_orm_table[T]` keep `@[references]`. `Schema.validate` doesn't
+check that a foreign key exists.
+> A: accept default
+
+**Q46. Join tables.** vgraph's join tables are structs with their own `id` (`GroupUser`,
+`ArticleTag`), and a `Table` can't have a composite key. **Default:** `join_table`
+returns a `Table` with an `id`, the two join columns `NOT NULL`, typed from the keys
+they hold (`integer`, `bigint`, `text`, or `uuid` on PostgreSQL), and a foreign key to
+each side. The pair gets a unique index from `migration_indexes()`, so a pair can't be
+stored twice (today nothing stops it). Apps that keep a struct for the join table can
+use `create_orm_table[T]` instead and take only the indexes.
+> A: accept default
+
+**Q47. `ensure_indexes`.** **Default:** remove it and `vgraph.Index.sql()`: nothing is
+published, and both examples move to migrations. Index names stay the same (Q44), so an
+existing database only needs its baseline migration recorded, not rerun; the examples'
+local `.db` files are simply deleted, as `examples/service`'s README already says to do
+after a schema change.
+> A: accept default
+
+**Q48. `examples/service` and `examples/relations`.** **Default:**
+- `examples/service` gets a `migrations/` module with one migration, `1 initial`:
+  `create_orm_table[T]` for its four models in dependency order, then
+  `add_edge_indexes`; `down` reverses it. The four `create_tables` functions go.
+- `new_app_on` runs `migrate()` on `db` (not on `conn`), so the
+  `CountingConnection` counts only what the app runs, and the query-count tests
+  don't change.
+- `examples/relations` does the same in `checks.v`, on SQLite and PostgreSQL
+  (`pg.connect_direct` there).
+- The stores' own tests keep their `sql db { create table }` fixtures.
+> A: accept default
+
+**Q49. Dialects.** **Default:** the helpers take the dialect from the migration's
+`Context`. SQLite and PostgreSQL are tested; MySQL is left untested, as for the rest of
+vgraph.
+> A: accept default
+
+**Q50. Exit criteria for Phase 5.** **Default:**
+- `examples/service` starts from an empty database through `v.migrations` alone;
+  `status()` shows `1 initial` applied, and `rollback` then `migrate` again works;
+- the indexes it ends up with are the ones `ensure_indexes` made, plus Q46's unique
+  pair indexes if that's chosen (compared through `sqlite_master`), and the
+  query-count tests are unchanged;
+- the helpers have tests for every edge kind, polymorphic and UUID keys included, on
+  SQLite and PostgreSQL;
+- `ensure_indexes` is gone from the package and both examples, and CI (`v vet`
+  included) passes.
+
+A command that writes a migration file (`vgraph migrate new`), or diffs the schema
+against the database as Atlas does, stays out (Q10).
+> A: accept default
 
 ## 8. Future state
 

@@ -6,6 +6,7 @@ import net.http
 import orm
 import five07.vgraph.graphql
 import graph
+import migrations
 // `app.Context` is written out in this module: importing `Context` by name
 // makes V 0.5.2 generate C for veb's generics against a `main.Context`.
 import app
@@ -24,7 +25,7 @@ pub struct App {
 	gql &graphql.Server = unsafe { nil }
 }
 
-// new_app opens the database named by `cfg`, creates any missing tables,
+// new_app opens the database named by `cfg`, runs any pending migrations,
 // loads the example data when `cfg.seed` is set and there are no users yet,
 // and mounts each model's controller.
 fn new_app(cfg app.Config) !&App {
@@ -36,15 +37,14 @@ fn new_app(cfg app.Config) !&App {
 // queries through `conn`: `db` itself, or a wrapper such as the
 // `app.CountingConnection` the tests use.
 fn new_app_on(cfg app.Config, db sqlite.DB, conn orm.Connection) !&App {
-	// in dependency order: articles, posts and comments refer to users
-	user_models.create_tables(conn)!
-	article_models.create_tables(conn)!
-	post_models.create_tables(conn)!
-	comment_models.create_tables(conn)!
+	// the tables, and the indexes their edges need, through v.migrations. They
+	// run on `db`, so that a counting `conn` logs only the app's own queries.
+	mut migrator_db := db
+	mut migrator := migrations.new(mut migrator_db)!
+	migrator.migrate()!
 
 	// the client `vgraph gen` writes into `graph/`, which checks the edges
 	g := graph.Graph.new(conn)!
-	g.client.ensure_indexes()!
 
 	user_store := user_models.UserStore.new(conn)
 	article_store := article_models.ArticleStore.new(conn)

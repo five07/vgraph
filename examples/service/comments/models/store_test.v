@@ -12,8 +12,10 @@ struct Fixture {
 
 fn setup() !Fixture {
 	db := app.connect(app.Config{})!
-	user_models.create_tables(db)!
-	create_tables(db)!
+	sql db {
+		create table user_models.User
+		create table Comment
+	}!
 	user := user_models.UserStore.new(db).insert(name: 'Ada', email: 'ada@x')!
 	return Fixture{
 		db:      db
@@ -64,12 +66,6 @@ fn test_find_by_owner() {
 	assert f.store.find_by_owner('Post', 2)!.len == 0
 	f.store.soft_delete(a1.slug)!
 	assert f.store.find_by_owner('Article', 1)!.map(it.slug) == [a1b.slug]
-}
-
-fn test_create_tables_again() {
-	f := setup()!
-	// creating the tables again, as every startup does, is fine
-	create_tables(f.db)!
 }
 
 fn test_replies() {

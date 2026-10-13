@@ -1,6 +1,5 @@
 module models
 
-import orm
 import time
 import five07.vgraph
 
@@ -109,11 +108,4 @@ fn (input UserInput) validate() ! {
 	if input.email.len > max_email_len {
 		return error('the email is longer than ${max_email_len} bytes')
 	}
-}
-
-// create_tables creates the tables of this module's models.
-pub fn create_tables(db orm.Connection) ! {
-	sql db {
-		create table User
-	}!
 }
