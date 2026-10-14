@@ -198,3 +198,9 @@ Things in V 0.5.2 this project works around:
   driver lets one thread's transaction finish before another's starts.
 - `sqlite.DB.exec` ignores errors raised while a statement runs; vgraph's driver
   uses `exec_param_many`, which reports them.
+- On Linux x86_64, veb's server loses some requests when many arrive at once: they
+  never get a response, and the client times out. It's not a bug in the app or
+  vgraph (`regressions/veb_concurrent_requests.vv` shows it with veb alone), but
+  it means this server isn't fit for concurrent load there yet.
+  `test_concurrent_requests` is skipped on that platform unless
+  `VGRAPH_TEST_CONCURRENT` is set.

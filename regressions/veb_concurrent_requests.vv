@@ -1,0 +1,89 @@
+// veb's Linux server (`vlib/fasthttp/fasthttp_linux.v`) loses requests under
+// concurrent load on x86_64: of 30 POSTs sent at once, some never reach their
+// handler, and some are handled but their response never arrives, so the client
+// waits out its 30-second read timeout (`net: op timed out`). It's the server:
+// 30 parallel `curl`s lose requests the same way. A handler that blocks (here,
+// 5 ms under a mutex, like a write in a SQLite transaction) loses more, about 6
+// of 30; one that does nothing still loses about 1. Seen on V 0.5.2 04cb7fa, on
+// GitHub's ubuntu-24.04 runner and in a linux/amd64 container; native arm64
+// Linux and macOS answer all 30.
+// Run: `v run veb_concurrent_requests.vv`. It prints `handled 30 of 30, 0 failed`
+// once fixed; now, after about 30 seconds, something like
+// `handled 27 of 30, 6 failed`.
+// Worked around in `examples/service/main_test.v`: `test_concurrent_requests`
+// is skipped on Linux x86_64, unless `VGRAPH_TEST_CONCURRENT` is set.
+module main
+
+import net
+import net.http
+import sync
+import time
+import veb
+
+pub struct Context {
+	veb.Context
+}
+
+pub struct App {
+mut:
+	mu   &sync.Mutex = sync.new_mutex()
+	seen int
+}
+
+@['/x'; post]
+pub fn (mut app App) x(mut ctx Context) veb.Result {
+	app.mu.lock()
+	time.sleep(5 * time.millisecond)
+	app.seen++
+	app.mu.unlock()
+	return ctx.json('{"ok":true}')
+}
+
+fn free_port() !int {
+	mut l := net.listen_tcp(.ip, '127.0.0.1:0')!
+	defer {
+		l.close() or {}
+	}
+	return int(l.addr()!.port()!)
+}
+
+fn post(base string, i int) !int {
+	res := http.fetch(
+		url:    '${base}/x'
+		method: .post
+		data:   '{"i":${i}}'
+		header: http.new_header(key: .content_type, value: 'application/json')
+	)!
+	return res.status_code
+}
+
+fn main() {
+	mut app := &App{}
+	port := free_port()!
+	spawn veb.run_at[App, Context](mut app,
+		port:                 port
+		family:               .ip
+		host:                 '127.0.0.1'
+		show_startup_message: false
+	)
+	base := 'http://127.0.0.1:${port}'
+	for _ in 0 .. 100 {
+		http.get('${base}/') or {
+			time.sleep(20 * time.millisecond)
+			continue
+		}
+		break
+	}
+	mut threads := []thread !int{}
+	for i in 0 .. 30 {
+		threads << spawn post(base, i)
+	}
+	mut failed := 0
+	for t in threads {
+		t.wait() or { failed++ }
+	}
+	app.mu.lock()
+	seen := app.seen
+	app.mu.unlock()
+	println('handled ${seen} of 30, ${failed} failed')
+}

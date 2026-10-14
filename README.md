@@ -7,7 +7,7 @@ hooks and privacy rules, and serves it all over GraphQL with
 [entgql](https://entgo.io/docs/graphql)'s conventions. It runs on V's ORM, on
 SQLite and PostgreSQL.
 
-**Status:** early, and not on VPM yet. Built against V master at `04cb7fa`
+**Status:** early development but fully functional. Built against V master at `04cb7fa`
 (2026-10-14), a daily build that still reports `V 0.5.2`.
 
 ## Quick start
@@ -180,7 +180,7 @@ Coverage comes from V's own tool:
 writes, hooks, tracing, migration helpers). `load/` runs batched selects and
 the SQL the ORM can't; `graphql/` is the GraphQL server, which doesn't import
 the rest; `gen/` and `cmd/vgraph/` are the generator; `sqlite/` and `pg/` the
-drivers; `regressions/` holds a program per V compiler bug vgraph meets.
+drivers; `regressions/` holds a program per V bug vgraph meets.
 
 **Branches.** Work goes to `develop`, and `main` gets releases, merged from it.
 CI runs on `main`: formatting, doc comments, the API docs, generated code up to
