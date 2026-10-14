@@ -29,6 +29,8 @@ to that version. This plan's questions start at Q121.
 - `sqlite/`, `pg/`: drivers that run vgraph's own parameterized SQL.
 - `examples/relations/`: every Ent relationship kind and schema option, tested on
   SQLite and PostgreSQL. `examples/service/`: a GraphQL API on vgraph alone.
+  `examples/pagination/`: lists and Relay connections, paged at the root and per
+  parent (G5).
 - `regressions/`: one small program per V compiler bug vgraph works around, or
   meets (9 so far).
 
@@ -47,7 +49,7 @@ to that version. This plan's questions start at Q121.
   tables, so use a throwaway database. graphql-js: `graphql/testdata/check_schema.js`,
   with `graphql@16.11.0` from npm on `NODE_PATH`.
 - **After changing the generator or a model:** run `v run cmd/vgraph gen` on
-  `examples/service` and `examples/relations`; CI fails when the checked-in output is
+  `examples/service`, `examples/relations` and `examples/pagination`; CI fails when the checked-in output is
   stale. A change to `examples/service`'s schema needs `testdata/introspection.json`
   re-recorded from graphql-js (`graphql/testdata/README.md`).
 - **CI** (`.github/workflows/ci.yml`) runs only on pushes to `main`: `v fmt -verify`,
@@ -348,6 +350,47 @@ which, with the queries a client sends.
 **Default:** no: a connection pages by cursor, as Relay and entgql do, and offset
 pages are what lists are for. The other choice adds `offset` to connections.
 > A: default
+
+**Result (2026-10-14): done.** `examples/pagination`:
+- Two tables linked many to many through `book_authors`: authors are lists
+  (`limit` / `offset`), books are Relay connections (`relay: true`). So each kind
+  shows at the root and nested under the other: `author.books` is a connection
+  per author, `book.authors` a list per book. 40 authors and 300 books, made by
+  formulas (`catalog/catalog.v`), so the checks work out each page's rows rather
+  than hard-coding them; about four books a year, so an order by year has ties
+  that the key breaks.
+- `main.v` serves it on veb from an in-memory SQLite database (`v run .`,
+  `PORT`). The data and the checks are modules of their own (`catalog/`,
+  `checks/`), so the server builds without "unused function" notices.
+- Checks (`checks/checks.v`, run by `main_test.v` on SQLite and `pg_test.v` on
+  PostgreSQL): lists paged with several sizes, ascending and descending, with a
+  filter and `authorsCount`; connections forwards and backwards, by key and by
+  year both ways, with a filter, `totalCount`, `first: 0` and a bad cursor;
+  per parent, each author's first books with `totalCount` and `hasNextPage`, one
+  author's books walked both ways by cursor, and each book's second author by
+  `limit` / `offset`; the statements of a page the same at any size and place; and
+  a write between two pages, which repeats a row through `offset` and not through
+  a cursor.
+- The README compares the two (a table of when to use which), with the queries a
+  client sends and the responses, captured from the running server. It notes that
+  cursors only work with the order they came from (`invalid cursor` otherwise),
+  that `hasPreviousPage` is false when paging forwards (and `hasNextPage`
+  backwards), as the Relay spec allows, that `totalCount` is a second query, and
+  that an order other than the key needs a driver.
+- CI: the generated-code check, graphql-js's schema check and the PostgreSQL job
+  include the example. The root README links all three examples.
+
+**Q141. Page-size arguments.** Found while writing the example: a negative
+`first` or `last` is an error (`` `first` on a connection cannot be less than
+zero. ``), but `limit: -1` on a list returns every row, and a negative `offset`
+is passed on as it is. Nothing caps a page's size either. **Default:** a negative
+`limit` or `offset` is an error with the same wording as `first`'s, in the
+generated resolvers (a generator change, so all three examples are regenerated);
+caps wait for G6, whose example shows a request check, and the docs say how. The
+other choice adds a cap now: `max_page` on `GraphqlTable`, and a schema-wide
+default in the generated server, which clamps `first`, `last` and `limit`, or
+fails the request.
+> A:
 
 ### G6. Auth example: a JWT and access rules
 

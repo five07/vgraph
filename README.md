@@ -79,6 +79,14 @@ key it holds.
 
 Check out the [examples](./examples) in this repo for various examples and use-cases
 
+- [`examples/relations`](./examples/relations): every Ent relationship kind and
+  schema option, on SQLite and PostgreSQL.
+- [`examples/service`](./examples/service): a GraphQL API on vgraph alone, with
+  hooks, soft deletes, global ids and migrations.
+- [`examples/pagination`](./examples/pagination): lists paged by `limit` and
+  `offset` beside Relay connections paged by cursor, at the root and per parent,
+  and when to use which.
+
 ## Typed client: `vgraph gen`
 
 `vgraph gen` finds the structs with an `edges()` method in a project, checks their
@@ -492,6 +500,7 @@ cut by the database with a window function through a driver, or in V without one
   the row's order values and key, so pages follow from where the last one ended
   (`after` is a condition, not an offset); `totalCount` is counted only when it is
   asked for. A connection orders by its key last, so another order needs a driver.
+  `examples/pagination` compares them with `limit` / `offset` lists.
 - **Node**, per table with `node`: `node(id: ID!)` and `nodes(ids: [ID!]!)` find a
   row by its global id (`vgraph.global_ids`), for tables with an `i64` serial key.
   The server checks at startup that each has its range.
