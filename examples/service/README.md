@@ -6,7 +6,8 @@ users, articles, posts, and comments that can be on either an article or a post,
 with threaded replies. There is no authentication.
 
 Built and tested with V master, like vgraph (see the root README). It imports vgraph
-as `five07.vgraph`, so link the checkout first: `ln -s <vgraph> ~/.vmodules/five07/vgraph`.
+as `five07.vgraph`, so run `v run ../setup.vsh` once per checkout first: it links the
+checkout into `~/.vmodules`, or says which `five07.vgraph` V will use instead.
 
 ## Running
 

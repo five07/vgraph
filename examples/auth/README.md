@@ -9,6 +9,7 @@ vgraph doesn't authenticate anyone. It passes a value of the app's, here
 app decides what it means.
 
 ```sh
+v run ../setup.vsh   # once per checkout: makes it importable as five07.vgraph
 JWT_SECRET='change me: at least 32 bytes of secret' v run .   # http://localhost:8080/graphql
 v test .
 ```

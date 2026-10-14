@@ -11,6 +11,7 @@ Each author has books, and each book one or two authors, so each kind also shows
 up nested under the other, paged per parent.
 
 ```sh
+v run ../setup.vsh # once per checkout: makes it importable as five07.vgraph
 v run .            # serves http://localhost:8080/graphql; PORT changes the port
 v test .           # the checks, on SQLite
 ```

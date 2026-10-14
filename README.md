@@ -153,8 +153,11 @@ entgql feature it matches, if any.
 link your checkout there:
 
 ```sh
-mkdir -p ~/.vmodules/five07 && ln -s "$PWD" ~/.vmodules/five07/vgraph
+v run examples/setup.vsh
 ```
+
+It links the checkout into `~/.vmodules` (`$VMODULES`), and says so when another
+`five07.vgraph` is already there.
 
 **Tests.**
 

@@ -39,6 +39,7 @@ second card for the same user, and each join table a unique index on its two
 columns, so it rejects a second copy of a pair.
 
 ```sh
-v test .                           # needs this checkout at ~/.vmodules/five07/vgraph
+v run ../setup.vsh                 # once per checkout: makes it importable as five07.vgraph
+v test .
 v run ../../cmd/vgraph gen .       # after changing models/models.v
 ```
