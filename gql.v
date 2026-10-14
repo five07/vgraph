@@ -43,6 +43,48 @@ pub:
 	// directives are printed on the object type as written, such as
 	// `@key(fields: "id")`
 	directives []string
+	// default_page: the size of a page of the table's lists and connections,
+	// at the root and on edges, when a request gives none (`limit`, or `first`
+	// and `last`); `GraphqlOptions.default_page` when 0
+	default_page int
+	// max_page: the most rows such a page may ask for; a request for more is
+	// an error, and a request for no size gets this many when there is no
+	// default. `GraphqlOptions.max_page` when 0
+	max_page int
+}
+
+// GraphqlOptions are the options of the generated `Graph.graphql`, for every
+// table whose `graphql()` doesn't set its own: the default and largest page
+// sizes of lists and connections. 0 is no bound.
+@[params]
+pub struct GraphqlOptions {
+pub:
+	default_page int
+	max_page     int
+}
+
+// page_sizes returns the page sizes of each table's lists and connections:
+// its own `default_page` and `max_page`, or those of `opts`. It reports a size
+// below zero, or a default past the maximum.
+pub fn (s Schema) page_sizes(opts GraphqlOptions) !map[string]graphql.PageSize {
+	graphql.PageSize{
+		default_size: opts.default_page
+		max_size:     opts.max_page
+	}.check() or { return error('GraphqlOptions: ${err.msg()}') }
+	mut sizes := map[string]graphql.PageSize{}
+	for t in s.tables() {
+		size := graphql.PageSize{
+			default_size: if t.graphql.default_page > 0 {
+				t.graphql.default_page
+			} else {
+				opts.default_page
+			}
+			max_size:     if t.graphql.max_page > 0 { t.graphql.max_page } else { opts.max_page }
+		}
+		size.check() or { return error('`${t.name}`: ${err.msg()}') }
+		sizes[t.name] = size
+	}
+	return sizes
 }
 
 // Graphql is implemented by structs that give GraphQL options. vgraph finds

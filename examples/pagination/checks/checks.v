@@ -20,6 +20,7 @@ mut:
 // Fixture is a seeded database's GraphQL server, and the log of its
 // statements.
 pub struct Fixture {
+	g      graph.Graph
 	server &graphql.Server
 	log    &Log
 }
@@ -28,6 +29,7 @@ pub struct Fixture {
 // connection reports to `log`.
 pub fn new_fixture(g graph.Graph, log &Log) !Fixture {
 	return Fixture{
+		g:      g
 		server: g.graphql(graph.Resolvers{})!
 		log:    log
 	}
@@ -197,7 +199,7 @@ pub fn check_lists(f Fixture) ! {
 // backwards, by the key or by a field (then the key, so the order is total).
 pub fn check_connections(f Fixture) ! {
 	by_id := all_books().map(catalog.book_title(it))
-	for n in [25, 300] {
+	for n in [25, 100] {
 		forwards, pages := f.walk('books', '', n, true)!
 		assert forwards == by_id
 		assert pages == (catalog.book_count + n - 1) / n
@@ -302,4 +304,73 @@ pub fn check_writes_between_pages(f Fixture) ! {
 	by_year := titles_by_year(all_books())
 	assert titles(conn) == by_year[..5]
 	assert titles(next) == by_year[5..10], 'the cursor carried on where page 1 ended'
+}
+
+// check_page_sizes checks the bounds on page sizes: a size below zero is an
+// error, a server's `GraphqlOptions` give a default and a maximum, and a
+// table's `graphql()` overrides them (books: at most 100).
+pub fn check_page_sizes(plain Fixture) ! {
+	g := plain.g
+	for query, message in {
+		'{ authors(limit: -1) { name } }':                                        '`limit` on a list cannot be less than zero.'
+		'{ authors(offset: -1) { name } }':                                       '`offset` on a list cannot be less than zero.'
+		'{ books(first: -1) { totalCount } }':                                    '`first` on a connection cannot be less than zero.'
+		'{ books(last: -2) { totalCount } }':                                     '`last` on a connection cannot be less than zero.'
+		'{ books(first: 1) { edges { node { authors(limit: -1) { name } } } } }': '`limit` on a list cannot be less than zero.'
+		'{ authors(limit: 1) { books(first: -1) { totalCount } } }':              '`first` on a connection cannot be less than zero.'
+		'{ books(first: 101) { totalCount } }':                                   '`first` on a connection cannot be more than 100.'
+	} {
+		if _ := plain.run(query) {
+			assert false, query
+		} else {
+			assert err.msg() == message
+		}
+	}
+	// without options, a list without a limit is every row, and books are
+	// bounded by their own maximum
+	assert at(plain.run('{ authors { name } }')!, 'authors').as_list().len == catalog.author_count
+	assert titles(at(plain.run('{ books { edges { node { title } } } }')!, 'books')).len == 100
+	// a default and a maximum for every table; books keep their own maximum
+	f := Fixture{
+		g:      g
+		server: g.graphql(graph.Resolvers{}, default_page: 10, max_page: 50)!
+		log:    &Log{}
+	}
+	assert at(f.run('{ authors { name } }')!, 'authors').as_list().len == 10
+	assert at(f.run('{ authors(limit: 50) { name } }')!, 'authors').as_list().len == 40
+	conn := at(f.run('{ books { edges { node { title } } pageInfo { hasNextPage } } }')!, 'books')
+	assert titles(conn).len == 10
+	assert at(conn, 'pageInfo', 'hasNextPage').as_bool()
+	assert titles(at(f.run('{ books(first: 100) { edges { node { title } } } }')!, 'books')).len == 100
+	// per parent too
+	nested := f.run('{ authors(limit: 2, orderBy: {field: ID}) { books { edges { node { title } } } } }')!
+	assert at(nested, 'authors').as_list().map(titles(at(it, 'books')).len) == [10, 10]
+	for query, message in {
+		'{ authors(limit: 51) { name } }':     '`limit` on a list cannot be more than 50.'
+		'{ books(last: 101) { totalCount } }': '`last` on a connection cannot be more than 100.'
+	} {
+		if _ := f.run(query) {
+			assert false, query
+		} else {
+			assert err.msg() == message
+		}
+	}
+	// a maximum alone is the size of a page that asks for none
+	capped := Fixture{
+		g:      g
+		server: g.graphql(graph.Resolvers{}, max_page: 25)!
+		log:    &Log{}
+	}
+	assert at(capped.run('{ authors { name } }')!, 'authors').as_list().len == 25
+	// options that can't hold
+	if _ := g.graphql(graph.Resolvers{}, default_page: 60, max_page: 50) {
+		assert false
+	} else {
+		assert err.msg() == 'GraphqlOptions: the default page size, 60, is more than the maximum, 50'
+	}
+	if _ := g.graphql(graph.Resolvers{}, default_page: 200) {
+		assert false
+	} else {
+		assert err.msg() == '`books`: the default page size, 200, is more than the maximum, 100'
+	}
 }

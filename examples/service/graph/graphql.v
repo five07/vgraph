@@ -817,9 +817,11 @@ scalar Time @specifiedBy(url: "https://scalars.graphql.org/chillicream/date-time
 // graphql returns a GraphQL server for the graph. Its resolvers read through
 // the client, one query per edge per level of a request, and a request's
 // mutations run in one transaction when the client can begin one; `r` resolves
-// the fields the project's .graphql files add.
-pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
+// the fields the project's .graphql files add. `opts` bounds the pages of
+// lists and connections, for the tables whose `graphql()` doesn't.
+pub fn (g Graph) graphql(r Resolvers, opts vgraph.GraphqlOptions) !&graphql.Server {
 	mut s := graphql.Server.new(schema_sdl)!
+	sizes := g.client.schema.page_sizes(opts)!
 	if g.client.can_begin() {
 		s.transaction = vgraph.GraphqlTransaction{
 			client: g.client
@@ -848,8 +850,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Article
-	s.resolve('Query', 'articles', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		page := article_connection(g.with_ctx(ctx).articles().graphql_where(info.args)!, info)!
+	s.resolve('Query', 'articles', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		page := article_connection(g.with_ctx(ctx).articles().graphql_where(info.args)!, info, sizes['articles'])!
 		result := graphql.obj(page)
 		return parents.map(result)
 	})
@@ -867,9 +869,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			return graphql.null
 		})
 	})
-	s.resolve('Article', 'comments', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('Article', 'comments', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		p := graphql.page_args(info.args)!
+		p := graphql.page_args(info.args, sizes['comments'])!
 		orders := comment_order(info.arg('orderBy'), true)!
 		where := cg.comments().graphql_where(info.args)!
 		sub := where.graphql_paged(orders, p)!
@@ -912,8 +914,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Comment
-	s.resolve('Query', 'comments', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		page := comment_connection(g.with_ctx(ctx).comments().graphql_where(info.args)!, info)!
+	s.resolve('Query', 'comments', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		page := comment_connection(g.with_ctx(ctx).comments().graphql_where(info.args)!, info, sizes['comments'])!
 		result := graphql.obj(page)
 		return parents.map(result)
 	})
@@ -958,9 +960,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			return graphql.null
 		})
 	})
-	s.resolve('Comment', 'replies', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('Comment', 'replies', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		p := graphql.page_args(info.args)!
+		p := graphql.page_args(info.args, sizes['comments'])!
 		orders := comment_order(info.arg('orderBy'), true)!
 		where := cg.comments().graphql_where(info.args)!
 		sub := where.graphql_paged(orders, p)!
@@ -1003,8 +1005,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Post
-	s.resolve('Query', 'posts', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		page := post_connection(g.with_ctx(ctx).posts().graphql_where(info.args)!, info)!
+	s.resolve('Query', 'posts', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		page := post_connection(g.with_ctx(ctx).posts().graphql_where(info.args)!, info, sizes['posts'])!
 		result := graphql.obj(page)
 		return parents.map(result)
 	})
@@ -1021,9 +1023,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			return graphql.null
 		})
 	})
-	s.resolve('Post', 'comments', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('Post', 'comments', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		p := graphql.page_args(info.args)!
+		p := graphql.page_args(info.args, sizes['comments'])!
 		orders := comment_order(info.arg('orderBy'), true)!
 		where := cg.comments().graphql_where(info.args)!
 		sub := where.graphql_paged(orders, p)!
@@ -1066,8 +1068,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// User
-	s.resolve('Query', 'users', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		page := user_connection(g.with_ctx(ctx).users().graphql_where(info.args)!, info)!
+	s.resolve('Query', 'users', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		page := user_connection(g.with_ctx(ctx).users().graphql_where(info.args)!, info, sizes['users'])!
 		result := graphql.obj(page)
 		return parents.map(result)
 	})
@@ -1075,9 +1077,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	for name in ['createdAt', 'updatedAt', 'id', 'name', 'email', 'deletedAt'] {
 		s.resolve('User', name, resolve_user_field)
 	}
-	s.resolve('User', 'articles', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('User', 'articles', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		p := graphql.page_args(info.args)!
+		p := graphql.page_args(info.args, sizes['articles'])!
 		orders := article_order(info.arg('orderBy'), true)!
 		where := cg.articles().graphql_where(info.args)!
 		sub := where.graphql_paged(orders, p)!
@@ -1099,9 +1101,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('User', 'posts', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('User', 'posts', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		p := graphql.page_args(info.args)!
+		p := graphql.page_args(info.args, sizes['posts'])!
 		orders := post_order(info.arg('orderBy'), true)!
 		where := cg.posts().graphql_where(info.args)!
 		sub := where.graphql_paged(orders, p)!
@@ -1123,9 +1125,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('User', 'comments', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('User', 'comments', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		p := graphql.page_args(info.args)!
+		p := graphql.page_args(info.args, sizes['comments'])!
 		orders := comment_order(info.arg('orderBy'), true)!
 		where := cg.comments().graphql_where(info.args)!
 		sub := where.graphql_paged(orders, p)!
@@ -1249,8 +1251,9 @@ fn (q ArticleQuery) graphql_where(args map[string]graphql.Value) !ArticleQuery {
 }
 
 // graphql_args applies the arguments of a `Article` list: `where`, `orderBy`,
-// `limit` and `offset`.
-fn (q ArticleQuery) graphql_args(args map[string]graphql.Value) !ArticleQuery {
+// and `limit` and `offset`, bounded by `size`.
+fn (q ArticleQuery) graphql_args(args map[string]graphql.Value, size graphql.PageSize) !ArticleQuery {
+	page := graphql.list_args(args, size)!
 	mut next := q.graphql_where(args)!
 	if o := args['orderBy'] {
 		orders := article_order(o, false)!
@@ -1258,15 +1261,11 @@ fn (q ArticleQuery) graphql_args(args map[string]graphql.Value) !ArticleQuery {
 			next = next.order_by(...orders)
 		}
 	}
-	if limit := args['limit'] {
-		if limit is int {
-			next = next.limit(limit)
-		}
+	if limit := page.limit {
+		next = next.limit(limit)
 	}
-	if offset := args['offset'] {
-		if offset is int {
-			next = next.offset(offset)
-		}
+	if offset := page.offset {
+		next = next.offset(offset)
 	}
 	return next
 }
@@ -1509,9 +1508,10 @@ fn article_where(w map[string]graphql.Value) ![]load.Cond {
 }
 
 // article_connection returns the page of `q` that a `ArticleConnection`'s arguments
-// ask for, and how many rows `q` matches when `totalCount` is asked for.
-fn article_connection(q ArticleQuery, info graphql.FieldInfo) !graphql.Connection {
-	p := graphql.page_args(info.args)!
+// ask for, bounded by `size`, and how many rows `q` matches when `totalCount`
+// is asked for.
+fn article_connection(q ArticleQuery, info graphql.FieldInfo, size graphql.PageSize) !graphql.Connection {
+	p := graphql.page_args(info.args, size)!
 	orders := article_order(info.arg('orderBy'), true)!
 	rows := q.graphql_paged(orders, p)!.all()!
 	total := if info.selected('totalCount') { q.count()! } else { 0 }
@@ -1716,8 +1716,9 @@ fn (q CommentQuery) graphql_where(args map[string]graphql.Value) !CommentQuery {
 }
 
 // graphql_args applies the arguments of a `Comment` list: `where`, `orderBy`,
-// `limit` and `offset`.
-fn (q CommentQuery) graphql_args(args map[string]graphql.Value) !CommentQuery {
+// and `limit` and `offset`, bounded by `size`.
+fn (q CommentQuery) graphql_args(args map[string]graphql.Value, size graphql.PageSize) !CommentQuery {
+	page := graphql.list_args(args, size)!
 	mut next := q.graphql_where(args)!
 	if o := args['orderBy'] {
 		orders := comment_order(o, false)!
@@ -1725,15 +1726,11 @@ fn (q CommentQuery) graphql_args(args map[string]graphql.Value) !CommentQuery {
 			next = next.order_by(...orders)
 		}
 	}
-	if limit := args['limit'] {
-		if limit is int {
-			next = next.limit(limit)
-		}
+	if limit := page.limit {
+		next = next.limit(limit)
 	}
-	if offset := args['offset'] {
-		if offset is int {
-			next = next.offset(offset)
-		}
+	if offset := page.offset {
+		next = next.offset(offset)
 	}
 	return next
 }
@@ -1999,9 +1996,10 @@ fn comment_where(w map[string]graphql.Value) ![]load.Cond {
 }
 
 // comment_connection returns the page of `q` that a `CommentConnection`'s arguments
-// ask for, and how many rows `q` matches when `totalCount` is asked for.
-fn comment_connection(q CommentQuery, info graphql.FieldInfo) !graphql.Connection {
-	p := graphql.page_args(info.args)!
+// ask for, bounded by `size`, and how many rows `q` matches when `totalCount`
+// is asked for.
+fn comment_connection(q CommentQuery, info graphql.FieldInfo, size graphql.PageSize) !graphql.Connection {
+	p := graphql.page_args(info.args, size)!
 	orders := comment_order(info.arg('orderBy'), true)!
 	rows := q.graphql_paged(orders, p)!.all()!
 	total := if info.selected('totalCount') { q.count()! } else { 0 }
@@ -2192,8 +2190,9 @@ fn (q PostQuery) graphql_where(args map[string]graphql.Value) !PostQuery {
 }
 
 // graphql_args applies the arguments of a `Post` list: `where`, `orderBy`,
-// `limit` and `offset`.
-fn (q PostQuery) graphql_args(args map[string]graphql.Value) !PostQuery {
+// and `limit` and `offset`, bounded by `size`.
+fn (q PostQuery) graphql_args(args map[string]graphql.Value, size graphql.PageSize) !PostQuery {
+	page := graphql.list_args(args, size)!
 	mut next := q.graphql_where(args)!
 	if o := args['orderBy'] {
 		orders := post_order(o, false)!
@@ -2201,15 +2200,11 @@ fn (q PostQuery) graphql_args(args map[string]graphql.Value) !PostQuery {
 			next = next.order_by(...orders)
 		}
 	}
-	if limit := args['limit'] {
-		if limit is int {
-			next = next.limit(limit)
-		}
+	if limit := page.limit {
+		next = next.limit(limit)
 	}
-	if offset := args['offset'] {
-		if offset is int {
-			next = next.offset(offset)
-		}
+	if offset := page.offset {
+		next = next.offset(offset)
 	}
 	return next
 }
@@ -2389,9 +2384,10 @@ fn post_where(w map[string]graphql.Value) ![]load.Cond {
 }
 
 // post_connection returns the page of `q` that a `PostConnection`'s arguments
-// ask for, and how many rows `q` matches when `totalCount` is asked for.
-fn post_connection(q PostQuery, info graphql.FieldInfo) !graphql.Connection {
-	p := graphql.page_args(info.args)!
+// ask for, bounded by `size`, and how many rows `q` matches when `totalCount`
+// is asked for.
+fn post_connection(q PostQuery, info graphql.FieldInfo, size graphql.PageSize) !graphql.Connection {
+	p := graphql.page_args(info.args, size)!
 	orders := post_order(info.arg('orderBy'), true)!
 	rows := q.graphql_paged(orders, p)!.all()!
 	total := if info.selected('totalCount') { q.count()! } else { 0 }
@@ -2565,8 +2561,9 @@ fn (q UserQuery) graphql_where(args map[string]graphql.Value) !UserQuery {
 }
 
 // graphql_args applies the arguments of a `User` list: `where`, `orderBy`,
-// `limit` and `offset`.
-fn (q UserQuery) graphql_args(args map[string]graphql.Value) !UserQuery {
+// and `limit` and `offset`, bounded by `size`.
+fn (q UserQuery) graphql_args(args map[string]graphql.Value, size graphql.PageSize) !UserQuery {
+	page := graphql.list_args(args, size)!
 	mut next := q.graphql_where(args)!
 	if o := args['orderBy'] {
 		orders := user_order(o, false)!
@@ -2574,15 +2571,11 @@ fn (q UserQuery) graphql_args(args map[string]graphql.Value) !UserQuery {
 			next = next.order_by(...orders)
 		}
 	}
-	if limit := args['limit'] {
-		if limit is int {
-			next = next.limit(limit)
-		}
+	if limit := page.limit {
+		next = next.limit(limit)
 	}
-	if offset := args['offset'] {
-		if offset is int {
-			next = next.offset(offset)
-		}
+	if offset := page.offset {
+		next = next.offset(offset)
 	}
 	return next
 }
@@ -2791,9 +2784,10 @@ fn user_where(w map[string]graphql.Value) ![]load.Cond {
 }
 
 // user_connection returns the page of `q` that a `UserConnection`'s arguments
-// ask for, and how many rows `q` matches when `totalCount` is asked for.
-fn user_connection(q UserQuery, info graphql.FieldInfo) !graphql.Connection {
-	p := graphql.page_args(info.args)!
+// ask for, bounded by `size`, and how many rows `q` matches when `totalCount`
+// is asked for.
+fn user_connection(q UserQuery, info graphql.FieldInfo, size graphql.PageSize) !graphql.Connection {
+	p := graphql.page_args(info.args, size)!
 	orders := user_order(info.arg('orderBy'), true)!
 	rows := q.graphql_paged(orders, p)!.all()!
 	total := if info.selected('totalCount') { q.count()! } else { 0 }

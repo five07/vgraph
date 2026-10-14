@@ -34,6 +34,10 @@ fn test_statements() {
 	checks.check_statements(fixture()!)!
 }
 
+fn test_page_sizes() {
+	checks.check_page_sizes(fixture()!)!
+}
+
 fn test_writes_between_pages() {
 	checks.check_writes_between_pages(fixture()!)!
 }

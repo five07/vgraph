@@ -9,7 +9,7 @@ import orm
 // max_keys is the most keys one statement lists. A longer list is split, one
 // statement per part: the databases cap a statement's parameters (65,535 on
 // PostgreSQL, 32,766 on SQLite since 3.32), and this leaves room for the rest of
-// its conditions (PLAN.md, Q137).
+// its conditions.
 pub const max_keys = 10_000
 
 // chunks returns `keys` in parts of at most `max_keys`, in order: `[keys]` when
@@ -30,7 +30,7 @@ fn chunks(keys []string) [][]string {
 // parents, each with at most `max_keys` distinct targets, or one parent's when
 // it alone has more; `[pairs]` when they fit. An ordered load of the targets by
 // key, one per group, then orders each parent's targets in one statement, which
-// a split of the targets alone wouldn't (PLAN.md, Q137).
+// a split of the targets alone wouldn't.
 pub fn parent_groups(pairs [][]string) [][][]string {
 	if unique(pairs.map(it[1])).len <= max_keys {
 		return [pairs]

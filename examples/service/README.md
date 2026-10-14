@@ -5,10 +5,6 @@ alone: its schema, queries, writes and checks all come from the models. It has
 users, articles, posts, and comments that can be on either an article or a post,
 with threaded replies. There is no authentication.
 
-It started as a copy of the `rest-api` REST service (commit `9d802d6`), and has been
-vgraph's test bed since. Phase 7 of `../../PLAN.md` replaced its REST API, handlers
-and stores with what vgraph generates.
-
 Built and tested with V master, like vgraph (see the root README). It imports vgraph
 as `five07.vgraph`, so link the checkout first: `ln -s <vgraph> ~/.vmodules/five07/vgraph`.
 
@@ -194,7 +190,7 @@ gql "{ node(id: \"$C1\") { ... on Comment { article { title } } } }" | jq -c .da
 
 ## V notes
 
-Things in V 0.5.2 this project works around; section 5 of `../../PLAN.md` lists them.
+Things in V 0.5.2 this project works around:
 
 - macOS's libsqlite3 is in multi-thread mode, and veb serves requests on several
   threads, so the shared connection is opened with `fullmutex`. vgraph's SQLite

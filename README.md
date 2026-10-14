@@ -501,6 +501,11 @@ cut by the database with a window function through a driver, or in V without one
   (`after` is a condition, not an offset); `totalCount` is counted only when it is
   asked for. A connection orders by its key last, so another order needs a driver.
   `examples/pagination` compares them with `limit` / `offset` lists.
+- **Page sizes:** a negative `limit`, `offset`, `first` or `last` is an error.
+  `g.graphql(r, default_page: 20, max_page: 50)` gives every list and connection
+  a default size and a maximum, and a table's `graphql()` its own
+  (`default_page`, `max_page`), which wins. Past the maximum a request fails;
+  without a size it gets the default, or else the maximum.
 - **Node**, per table with `node`: `node(id: ID!)` and `nodes(ids: [ID!]!)` find a
   row by its global id (`vgraph.global_ids`), for tables with an `i64` serial key.
   The server checks at startup that each has its range.
@@ -517,6 +522,8 @@ pub fn (g Gadget) graphql() vgraph.GraphqlTable {
 		relay:       true              // connections rather than lists
 		mutations:   [.create, .update] // the default is all three; [] for none
 		directives:  ['@key(fields: "id")']
+		default_page: 20               // rows a page gets when a request gives none
+		max_page:     100              // the most a page may ask for
 	}
 }
 

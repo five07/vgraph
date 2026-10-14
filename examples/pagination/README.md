@@ -33,7 +33,7 @@ The data lives in an in-memory SQLite database, seeded at startup by formulas
 Use lists for small, fixed sets, admin screens with page numbers, and nested
 lists that only show a few items. Use connections for feeds, infinite scroll,
 anything that grows or changes while someone reads it, and for Relay clients.
-Connections don't take `offset` (PLAN.md, Q126): offset pages are what lists are
+Connections don't take `offset` - offset pages are what lists are
 for.
 
 ## Lists
@@ -113,9 +113,8 @@ What to know:
 - **An order other than the key needs a vgraph driver**
   (`five07.vgraph.sqlite` or `five07.vgraph.pg`), as the server here uses: two
   order columns and a cursor condition on both are SQL the ORM can't run.
-- `first` and `last` together, or a negative one, are errors. Nothing caps
-  `first` (or a list's `limit`) yet: an API open to anyone needs its own check
-  on page sizes before it runs a request.
+- `first` and `last` together, or a negative one, are errors (see
+  [Page sizes](#page-sizes) for the largest).
 
 ## Nested, per parent
 
@@ -146,6 +145,28 @@ gives each book its first author by name.
 
 However many parents and rows a page has, it runs the same statements: one per
 edge per level, plus the counts asked for (`check_statements`).
+
+## Page sizes
+
+A negative `limit`, `offset`, `first` or `last` is an error. How many rows a page
+may hold, and how many one gets when a request gives no size, are options:
+
+```v ignore
+// every table: 20 rows when a request gives no size, never more than 50
+server := g.graphql(graph.Resolvers{}, default_page: 20, max_page: 50)!
+
+// one table, in its model: its own maximum, which wins over the server's
+pub fn (b Book) graphql() vgraph.GraphqlTable {
+	return vgraph.GraphqlTable{relay: true, max_page: 100}
+}
+```
+
+They bound the table's lists and connections at the root and on edges (per
+parent). A request past the maximum fails, such as
+`` `limit` on a list cannot be more than 50. ``; without a size it gets the
+default, or the maximum when there is no default, so a maximum always holds.
+Without either, a list without `limit` returns every row. The server here
+uses the values above (`main.v`), and `check_page_sizes` checks them.
 
 ## Writes between pages
 

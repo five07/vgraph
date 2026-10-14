@@ -1433,9 +1433,11 @@ scalar Time @specifiedBy(url: "https://scalars.graphql.org/chillicream/date-time
 // graphql returns a GraphQL server for the graph. Its resolvers read through
 // the client, one query per edge per level of a request, and a request's
 // mutations run in one transaction when the client can begin one; `r` resolves
-// the fields the project's .graphql files add.
-pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
+// the fields the project's .graphql files add. `opts` bounds the pages of
+// lists and connections, for the tables whose `graphql()` doesn't.
+pub fn (g Graph) graphql(r Resolvers, opts vgraph.GraphqlOptions) !&graphql.Server {
 	mut s := graphql.Server.new(schema_sdl)!
+	sizes := g.client.schema.page_sizes(opts)!
 	if g.client.can_begin() {
 		s.transaction = vgraph.GraphqlTransaction{
 			client: g.client
@@ -1464,8 +1466,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Card
-	s.resolve('Query', 'cards', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.with_ctx(ctx).cards().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'cards', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).cards().graphql_args(info.args, sizes['cards'])!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
@@ -1506,8 +1508,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Category
-	s.resolve('Query', 'categories', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.with_ctx(ctx).categories().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'categories', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).categories().graphql_args(info.args, sizes['categories'])!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
@@ -1527,9 +1529,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			return graphql.null
 		})
 	})
-	s.resolve('Category', 'children', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('Category', 'children', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.categories().graphql_args(info.args)!
+		sub := cg.categories().graphql_args(info.args, sizes['categories'])!
 		loaded := cg.categories().with_children(fn [sub] (_ CategoryQuery) CategoryQuery {
 			return sub
 		}).nodes(parents.map((it as CategoryNode).category))!
@@ -1560,8 +1562,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Device
-	s.resolve('Query', 'devices', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.with_ctx(ctx).devices().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'devices', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).devices().graphql_args(info.args, sizes['devices'])!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
@@ -1581,9 +1583,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			return graphql.null
 		})
 	})
-	s.resolve('Device', 'logins', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('Device', 'logins', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.logins().graphql_args(info.args)!
+		sub := cg.logins().graphql_args(info.args, sizes['logins'])!
 		loaded := cg.devices().with_logins(fn [sub] (_ LoginQuery) LoginQuery {
 			return sub
 		}).nodes(parents.map((it as DeviceNode).device))!
@@ -1593,9 +1595,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('Device', 'groups', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('Device', 'groups', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.groups().graphql_args(info.args)!
+		sub := cg.groups().graphql_args(info.args, sizes['groups'])!
 		loaded := cg.devices().with_groups(fn [sub] (_ GroupQuery) GroupQuery {
 			return sub
 		}).nodes(parents.map((it as DeviceNode).device))!
@@ -1626,8 +1628,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Gadget
-	s.resolve('Query', 'gadgets', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		page := gadget_connection(g.with_ctx(ctx).gadgets().graphql_where(info.args)!, info)!
+	s.resolve('Query', 'gadgets', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		page := gadget_connection(g.with_ctx(ctx).gadgets().graphql_where(info.args)!, info, sizes['gadgets'])!
 		result := graphql.obj(page)
 		return parents.map(result)
 	})
@@ -1645,9 +1647,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			return graphql.null
 		})
 	})
-	s.resolve('Gadget', 'likers', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('Gadget', 'likers', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.users().graphql_args(info.args)!
+		sub := cg.users().graphql_args(info.args, sizes['users'])!
 		loaded := cg.gadgets().with_likers(fn [sub] (_ UserQuery) UserQuery {
 			return sub
 		}).nodes(parents.map((it as GadgetNode).gadget))!
@@ -1678,8 +1680,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Group
-	s.resolve('Query', 'groups', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.with_ctx(ctx).groups().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'groups', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).groups().graphql_args(info.args, sizes['groups'])!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
@@ -1690,9 +1692,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	for name in ['id', 'name'] {
 		s.resolve('Group', name, resolve_group_field)
 	}
-	s.resolve('Group', 'users', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('Group', 'users', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.users().graphql_args(info.args)!
+		sub := cg.users().graphql_args(info.args, sizes['users'])!
 		loaded := cg.groups().with_users(fn [sub] (_ UserQuery) UserQuery {
 			return sub
 		}).nodes(parents.map((it as GroupNode).group))!
@@ -1702,9 +1704,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('Group', 'devices', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('Group', 'devices', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.devices().graphql_args(info.args)!
+		sub := cg.devices().graphql_args(info.args, sizes['devices'])!
 		loaded := cg.groups().with_devices(fn [sub] (_ DeviceQuery) DeviceQuery {
 			return sub
 		}).nodes(parents.map((it as GroupNode).group))!
@@ -1735,8 +1737,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Like
-	s.resolve('Query', 'likes', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.with_ctx(ctx).likes().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'likes', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).likes().graphql_args(info.args, sizes['likes'])!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
@@ -1786,8 +1788,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Login
-	s.resolve('Query', 'logins', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.with_ctx(ctx).logins().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'logins', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).logins().graphql_args(info.args, sizes['logins'])!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
@@ -1828,8 +1830,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// ListNode
-	s.resolve('Query', 'listNodes', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.with_ctx(ctx).nodes().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'listNodes', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).nodes().graphql_args(info.args, sizes['nodes'])!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
@@ -1879,8 +1881,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// OwnedPet
-	s.resolve('Query', 'petOwners', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.with_ctx(ctx).pet_owners().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'petOwners', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).pet_owners().graphql_args(info.args, sizes['pet_owners'])!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
@@ -1902,8 +1904,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Pet
-	s.resolve('Query', 'pets', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.with_ctx(ctx).pets().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'pets', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).pets().graphql_args(info.args, sizes['pets'])!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
@@ -1944,8 +1946,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// User
-	s.resolve('Query', 'users', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.with_ctx(ctx).users().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'users', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).users().graphql_args(info.args, sizes['users'])!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
@@ -1974,9 +1976,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 			return graphql.null
 		})
 	})
-	s.resolve('User', 'pets', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('User', 'pets', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.pets().graphql_args(info.args)!
+		sub := cg.pets().graphql_args(info.args, sizes['pets'])!
 		loaded := cg.users().with_pets(fn [sub] (_ PetQuery) PetQuery {
 			return sub
 		}).nodes(parents.map((it as UserNode).user))!
@@ -1986,9 +1988,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('User', 'groups', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('User', 'groups', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.groups().graphql_args(info.args)!
+		sub := cg.groups().graphql_args(info.args, sizes['groups'])!
 		loaded := cg.users().with_groups(fn [sub] (_ GroupQuery) GroupQuery {
 			return sub
 		}).nodes(parents.map((it as UserNode).user))!
@@ -1998,9 +2000,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('User', 'following', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('User', 'following', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.users().graphql_args(info.args)!
+		sub := cg.users().graphql_args(info.args, sizes['users'])!
 		loaded := cg.users().with_following(fn [sub] (_ UserQuery) UserQuery {
 			return sub
 		}).nodes(parents.map((it as UserNode).user))!
@@ -2010,9 +2012,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('User', 'followers', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('User', 'followers', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.users().graphql_args(info.args)!
+		sub := cg.users().graphql_args(info.args, sizes['users'])!
 		loaded := cg.users().with_followers(fn [sub] (_ UserQuery) UserQuery {
 			return sub
 		}).nodes(parents.map((it as UserNode).user))!
@@ -2022,9 +2024,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('User', 'friends', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('User', 'friends', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.users().graphql_args(info.args)!
+		sub := cg.users().graphql_args(info.args, sizes['users'])!
 		loaded := cg.users().with_friends(fn [sub] (_ UserQuery) UserQuery {
 			return sub
 		}).nodes(parents.map((it as UserNode).user))!
@@ -2034,9 +2036,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('User', 'devices', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('User', 'devices', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.devices().graphql_args(info.args)!
+		sub := cg.devices().graphql_args(info.args, sizes['devices'])!
 		loaded := cg.users().with_devices(fn [sub] (_ DeviceQuery) DeviceQuery {
 			return sub
 		}).nodes(parents.map((it as UserNode).user))!
@@ -2046,9 +2048,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('User', 'gadgets', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('User', 'gadgets', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		p := graphql.page_args(info.args)!
+		p := graphql.page_args(info.args, sizes['gadgets'])!
 		orders := gadget_order(info.arg('orderBy'), true)!
 		where := cg.gadgets().graphql_where(info.args)!
 		sub := where.graphql_paged(orders, p)!
@@ -2070,9 +2072,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		}
 		return out
 	})
-	s.resolve('User', 'likedGadgets', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('User', 'likedGadgets', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		p := graphql.page_args(info.args)!
+		p := graphql.page_args(info.args, sizes['gadgets'])!
 		orders := gadget_order(info.arg('orderBy'), true)!
 		where := cg.gadgets().graphql_where(info.args)!
 		sub := where.graphql_paged(orders, p)!
@@ -2171,8 +2173,9 @@ fn (q CardQuery) graphql_where(args map[string]graphql.Value) !CardQuery {
 }
 
 // graphql_args applies the arguments of a `Card` list: `where`, `orderBy`,
-// `limit` and `offset`.
-fn (q CardQuery) graphql_args(args map[string]graphql.Value) !CardQuery {
+// and `limit` and `offset`, bounded by `size`.
+fn (q CardQuery) graphql_args(args map[string]graphql.Value, size graphql.PageSize) !CardQuery {
+	page := graphql.list_args(args, size)!
 	mut next := q.graphql_where(args)!
 	if o := args['orderBy'] {
 		orders := card_order(o, false)!
@@ -2180,15 +2183,11 @@ fn (q CardQuery) graphql_args(args map[string]graphql.Value) !CardQuery {
 			next = next.order_by(...orders)
 		}
 	}
-	if limit := args['limit'] {
-		if limit is int {
-			next = next.limit(limit)
-		}
+	if limit := page.limit {
+		next = next.limit(limit)
 	}
-	if offset := args['offset'] {
-		if offset is int {
-			next = next.offset(offset)
-		}
+	if offset := page.offset {
+		next = next.offset(offset)
 	}
 	return next
 }
@@ -2362,8 +2361,9 @@ fn (q CategoryQuery) graphql_where(args map[string]graphql.Value) !CategoryQuery
 }
 
 // graphql_args applies the arguments of a `Category` list: `where`, `orderBy`,
-// `limit` and `offset`.
-fn (q CategoryQuery) graphql_args(args map[string]graphql.Value) !CategoryQuery {
+// and `limit` and `offset`, bounded by `size`.
+fn (q CategoryQuery) graphql_args(args map[string]graphql.Value, size graphql.PageSize) !CategoryQuery {
+	page := graphql.list_args(args, size)!
 	mut next := q.graphql_where(args)!
 	if o := args['orderBy'] {
 		orders := category_order(o, false)!
@@ -2371,15 +2371,11 @@ fn (q CategoryQuery) graphql_args(args map[string]graphql.Value) !CategoryQuery 
 			next = next.order_by(...orders)
 		}
 	}
-	if limit := args['limit'] {
-		if limit is int {
-			next = next.limit(limit)
-		}
+	if limit := page.limit {
+		next = next.limit(limit)
 	}
-	if offset := args['offset'] {
-		if offset is int {
-			next = next.offset(offset)
-		}
+	if offset := page.offset {
+		next = next.offset(offset)
 	}
 	return next
 }
@@ -2601,8 +2597,9 @@ fn (q DeviceQuery) graphql_where(args map[string]graphql.Value) !DeviceQuery {
 }
 
 // graphql_args applies the arguments of a `Device` list: `where`, `orderBy`,
-// `limit` and `offset`.
-fn (q DeviceQuery) graphql_args(args map[string]graphql.Value) !DeviceQuery {
+// and `limit` and `offset`, bounded by `size`.
+fn (q DeviceQuery) graphql_args(args map[string]graphql.Value, size graphql.PageSize) !DeviceQuery {
+	page := graphql.list_args(args, size)!
 	mut next := q.graphql_where(args)!
 	if o := args['orderBy'] {
 		orders := device_order(o, false)!
@@ -2610,15 +2607,11 @@ fn (q DeviceQuery) graphql_args(args map[string]graphql.Value) !DeviceQuery {
 			next = next.order_by(...orders)
 		}
 	}
-	if limit := args['limit'] {
-		if limit is int {
-			next = next.limit(limit)
-		}
+	if limit := page.limit {
+		next = next.limit(limit)
 	}
-	if offset := args['offset'] {
-		if offset is int {
-			next = next.offset(offset)
-		}
+	if offset := page.offset {
+		next = next.offset(offset)
 	}
 	return next
 }
@@ -2869,8 +2862,9 @@ fn (q GadgetQuery) graphql_where(args map[string]graphql.Value) !GadgetQuery {
 }
 
 // graphql_args applies the arguments of a `Gadget` list: `where`, `orderBy`,
-// `limit` and `offset`.
-fn (q GadgetQuery) graphql_args(args map[string]graphql.Value) !GadgetQuery {
+// and `limit` and `offset`, bounded by `size`.
+fn (q GadgetQuery) graphql_args(args map[string]graphql.Value, size graphql.PageSize) !GadgetQuery {
+	page := graphql.list_args(args, size)!
 	mut next := q.graphql_where(args)!
 	if o := args['orderBy'] {
 		orders := gadget_order(o, false)!
@@ -2878,15 +2872,11 @@ fn (q GadgetQuery) graphql_args(args map[string]graphql.Value) !GadgetQuery {
 			next = next.order_by(...orders)
 		}
 	}
-	if limit := args['limit'] {
-		if limit is int {
-			next = next.limit(limit)
-		}
+	if limit := page.limit {
+		next = next.limit(limit)
 	}
-	if offset := args['offset'] {
-		if offset is int {
-			next = next.offset(offset)
-		}
+	if offset := page.offset {
+		next = next.offset(offset)
 	}
 	return next
 }
@@ -3184,9 +3174,10 @@ fn color_enums(v graphql.Value) ![]int {
 }
 
 // gadget_connection returns the page of `q` that a `GadgetConnection`'s arguments
-// ask for, and how many rows `q` matches when `totalCount` is asked for.
-fn gadget_connection(q GadgetQuery, info graphql.FieldInfo) !graphql.Connection {
-	p := graphql.page_args(info.args)!
+// ask for, bounded by `size`, and how many rows `q` matches when `totalCount`
+// is asked for.
+fn gadget_connection(q GadgetQuery, info graphql.FieldInfo, size graphql.PageSize) !graphql.Connection {
+	p := graphql.page_args(info.args, size)!
 	orders := gadget_order(info.arg('orderBy'), true)!
 	rows := q.graphql_paged(orders, p)!.all()!
 	total := if info.selected('totalCount') { q.count()! } else { 0 }
@@ -3446,8 +3437,9 @@ fn (q GroupQuery) graphql_where(args map[string]graphql.Value) !GroupQuery {
 }
 
 // graphql_args applies the arguments of a `Group` list: `where`, `orderBy`,
-// `limit` and `offset`.
-fn (q GroupQuery) graphql_args(args map[string]graphql.Value) !GroupQuery {
+// and `limit` and `offset`, bounded by `size`.
+fn (q GroupQuery) graphql_args(args map[string]graphql.Value, size graphql.PageSize) !GroupQuery {
+	page := graphql.list_args(args, size)!
 	mut next := q.graphql_where(args)!
 	if o := args['orderBy'] {
 		orders := group_order(o, false)!
@@ -3455,15 +3447,11 @@ fn (q GroupQuery) graphql_args(args map[string]graphql.Value) !GroupQuery {
 			next = next.order_by(...orders)
 		}
 	}
-	if limit := args['limit'] {
-		if limit is int {
-			next = next.limit(limit)
-		}
+	if limit := page.limit {
+		next = next.limit(limit)
 	}
-	if offset := args['offset'] {
-		if offset is int {
-			next = next.offset(offset)
-		}
+	if offset := page.offset {
+		next = next.offset(offset)
 	}
 	return next
 }
@@ -3667,8 +3655,9 @@ fn (q LikeQuery) graphql_where(args map[string]graphql.Value) !LikeQuery {
 }
 
 // graphql_args applies the arguments of a `Like` list: `where`, `orderBy`,
-// `limit` and `offset`.
-fn (q LikeQuery) graphql_args(args map[string]graphql.Value) !LikeQuery {
+// and `limit` and `offset`, bounded by `size`.
+fn (q LikeQuery) graphql_args(args map[string]graphql.Value, size graphql.PageSize) !LikeQuery {
+	page := graphql.list_args(args, size)!
 	mut next := q.graphql_where(args)!
 	if o := args['orderBy'] {
 		orders := like_order(o, false)!
@@ -3676,15 +3665,11 @@ fn (q LikeQuery) graphql_args(args map[string]graphql.Value) !LikeQuery {
 			next = next.order_by(...orders)
 		}
 	}
-	if limit := args['limit'] {
-		if limit is int {
-			next = next.limit(limit)
-		}
+	if limit := page.limit {
+		next = next.limit(limit)
 	}
-	if offset := args['offset'] {
-		if offset is int {
-			next = next.offset(offset)
-		}
+	if offset := page.offset {
+		next = next.offset(offset)
 	}
 	return next
 }
@@ -3874,8 +3859,9 @@ fn (q LoginQuery) graphql_where(args map[string]graphql.Value) !LoginQuery {
 }
 
 // graphql_args applies the arguments of a `Login` list: `where`, `orderBy`,
-// `limit` and `offset`.
-fn (q LoginQuery) graphql_args(args map[string]graphql.Value) !LoginQuery {
+// and `limit` and `offset`, bounded by `size`.
+fn (q LoginQuery) graphql_args(args map[string]graphql.Value, size graphql.PageSize) !LoginQuery {
+	page := graphql.list_args(args, size)!
 	mut next := q.graphql_where(args)!
 	if o := args['orderBy'] {
 		orders := login_order(o, false)!
@@ -3883,15 +3869,11 @@ fn (q LoginQuery) graphql_args(args map[string]graphql.Value) !LoginQuery {
 			next = next.order_by(...orders)
 		}
 	}
-	if limit := args['limit'] {
-		if limit is int {
-			next = next.limit(limit)
-		}
+	if limit := page.limit {
+		next = next.limit(limit)
 	}
-	if offset := args['offset'] {
-		if offset is int {
-			next = next.offset(offset)
-		}
+	if offset := page.offset {
+		next = next.offset(offset)
 	}
 	return next
 }
@@ -4060,8 +4042,9 @@ fn (q NodeQuery) graphql_where(args map[string]graphql.Value) !NodeQuery {
 }
 
 // graphql_args applies the arguments of a `ListNode` list: `where`, `orderBy`,
-// `limit` and `offset`.
-fn (q NodeQuery) graphql_args(args map[string]graphql.Value) !NodeQuery {
+// and `limit` and `offset`, bounded by `size`.
+fn (q NodeQuery) graphql_args(args map[string]graphql.Value, size graphql.PageSize) !NodeQuery {
+	page := graphql.list_args(args, size)!
 	mut next := q.graphql_where(args)!
 	if o := args['orderBy'] {
 		orders := node_order(o, false)!
@@ -4069,15 +4052,11 @@ fn (q NodeQuery) graphql_args(args map[string]graphql.Value) !NodeQuery {
 			next = next.order_by(...orders)
 		}
 	}
-	if limit := args['limit'] {
-		if limit is int {
-			next = next.limit(limit)
-		}
+	if limit := page.limit {
+		next = next.limit(limit)
 	}
-	if offset := args['offset'] {
-		if offset is int {
-			next = next.offset(offset)
-		}
+	if offset := page.offset {
+		next = next.offset(offset)
 	}
 	return next
 }
@@ -4281,8 +4260,9 @@ fn (q OwnedPetQuery) graphql_where(args map[string]graphql.Value) !OwnedPetQuery
 }
 
 // graphql_args applies the arguments of a `OwnedPet` list: `where`, `orderBy`,
-// `limit` and `offset`.
-fn (q OwnedPetQuery) graphql_args(args map[string]graphql.Value) !OwnedPetQuery {
+// and `limit` and `offset`, bounded by `size`.
+fn (q OwnedPetQuery) graphql_args(args map[string]graphql.Value, size graphql.PageSize) !OwnedPetQuery {
+	page := graphql.list_args(args, size)!
 	mut next := q.graphql_where(args)!
 	if o := args['orderBy'] {
 		orders := owned_pet_order(o, false)!
@@ -4290,15 +4270,11 @@ fn (q OwnedPetQuery) graphql_args(args map[string]graphql.Value) !OwnedPetQuery 
 			next = next.order_by(...orders)
 		}
 	}
-	if limit := args['limit'] {
-		if limit is int {
-			next = next.limit(limit)
-		}
+	if limit := page.limit {
+		next = next.limit(limit)
 	}
-	if offset := args['offset'] {
-		if offset is int {
-			next = next.offset(offset)
-		}
+	if offset := page.offset {
+		next = next.offset(offset)
 	}
 	return next
 }
@@ -4455,8 +4431,9 @@ fn (q PetQuery) graphql_where(args map[string]graphql.Value) !PetQuery {
 }
 
 // graphql_args applies the arguments of a `Pet` list: `where`, `orderBy`,
-// `limit` and `offset`.
-fn (q PetQuery) graphql_args(args map[string]graphql.Value) !PetQuery {
+// and `limit` and `offset`, bounded by `size`.
+fn (q PetQuery) graphql_args(args map[string]graphql.Value, size graphql.PageSize) !PetQuery {
+	page := graphql.list_args(args, size)!
 	mut next := q.graphql_where(args)!
 	if o := args['orderBy'] {
 		orders := pet_order(o, false)!
@@ -4464,15 +4441,11 @@ fn (q PetQuery) graphql_args(args map[string]graphql.Value) !PetQuery {
 			next = next.order_by(...orders)
 		}
 	}
-	if limit := args['limit'] {
-		if limit is int {
-			next = next.limit(limit)
-		}
+	if limit := page.limit {
+		next = next.limit(limit)
 	}
-	if offset := args['offset'] {
-		if offset is int {
-			next = next.offset(offset)
-		}
+	if offset := page.offset {
+		next = next.offset(offset)
 	}
 	return next
 }
@@ -4700,8 +4673,9 @@ fn (q UserQuery) graphql_where(args map[string]graphql.Value) !UserQuery {
 }
 
 // graphql_args applies the arguments of a `User` list: `where`, `orderBy`,
-// `limit` and `offset`.
-fn (q UserQuery) graphql_args(args map[string]graphql.Value) !UserQuery {
+// and `limit` and `offset`, bounded by `size`.
+fn (q UserQuery) graphql_args(args map[string]graphql.Value, size graphql.PageSize) !UserQuery {
+	page := graphql.list_args(args, size)!
 	mut next := q.graphql_where(args)!
 	if o := args['orderBy'] {
 		orders := user_order(o, false)!
@@ -4709,15 +4683,11 @@ fn (q UserQuery) graphql_args(args map[string]graphql.Value) !UserQuery {
 			next = next.order_by(...orders)
 		}
 	}
-	if limit := args['limit'] {
-		if limit is int {
-			next = next.limit(limit)
-		}
+	if limit := page.limit {
+		next = next.limit(limit)
 	}
-	if offset := args['offset'] {
-		if offset is int {
-			next = next.offset(offset)
-		}
+	if offset := page.offset {
+		next = next.offset(offset)
 	}
 	return next
 }

@@ -9,7 +9,7 @@ import orm
 // ordered load by `T`'s key isn't split, as its order runs across keys (callers
 // split it by parent: `parent_groups`). It calls `orm.Connection.select`
 // directly: `orm.new_query`, which could do this, leaves the standard library
-// after 2027-08-17 (PLAN.md, Q17). Fields may be `int`, `i64`, `f64`, `bool`,
+// after 2027-08-17. Fields may be `int`, `i64`, `f64`, `bool`,
 // `string` or `time.Time`, or options of those.
 pub fn select_in[T](conn orm.Connection, column string, ids []string, opts Options) ![]T {
 	if ids.len <= max_keys || (column == primary_key[T]() && opts.query.all_orders().len > 0) {

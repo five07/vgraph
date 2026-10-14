@@ -5,6 +5,7 @@ import sqlite as vsqlite
 import orm
 import time
 import v.migrations
+import graphql
 
 enum Mood {
 	calm
@@ -348,4 +349,47 @@ fn test_global_ids_keep_their_ranges() {
 		return
 	}
 	assert false
+}
+
+@[table: 'pages']
+struct PageTable {
+	id int @[primary; sql: serial]
+}
+
+fn (p PageTable) graphql() GraphqlTable {
+	return GraphqlTable{
+		default_page: 10
+		max_page:     5
+	}
+}
+
+fn test_page_sizes() {
+	mut s := Schema{}
+	s.add[PageTable]()!
+	if _ := s.validate() {
+		assert false
+	} else {
+		assert err.msg() == 'pages.graphql: `default_page` is more than `max_page`'
+	}
+	if _ := s.page_sizes() {
+		assert false
+	} else {
+		assert err.msg() == '`pages`: the default page size, 10, is more than the maximum, 5'
+	}
+	if _ := Schema{}.page_sizes(max_page: -1) {
+		assert false
+	} else {
+		assert err.msg() == 'GraphqlOptions: a page size cannot be less than zero'
+	}
+	mut ok := Schema{}
+	ok.add[Writer2]()!
+	assert ok.page_sizes(default_page: 20, max_page: 40)!['writers2'] == graphql.PageSize{
+		default_size: 20
+		max_size:     40
+	}
+}
+
+@[table: 'writers2']
+struct Writer2 {
+	id int @[primary; sql: serial]
 }

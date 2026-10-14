@@ -390,7 +390,37 @@ caps wait for G6, whose example shows a request check, and the docs say how. The
 other choice adds a cap now: `max_page` on `GraphqlTable`, and a schema-wide
 default in the generated server, which clamps `first`, `last` and `limit`, or
 fails the request.
-> A:
+> A: Both: negatives return errors, and page sizes get configurable defaults.
+> Add them before moving on; hold the full test suite until after G6.
+
+**Result (2026-10-14): done.**
+- `graphql` module (`relay.v`): `PageSize{default_size, max_size}` (0 is no
+  bound) with `check()`. `page_args(args, size)` refuses `first` / `last` past
+  the maximum (`` `first` on a connection cannot be more than 100. ``), and with
+  neither, pages `first: default` (or the maximum). `list_args(args, size)` does
+  the same for lists, and refuses a negative `limit` or `offset`
+  (`` `limit` on a list cannot be less than zero. ``, same wording as `first`).
+  `size` is `@[params]`, so `page_args(args)` still compiles.
+- `vgraph`: `GraphqlTable.default_page` and `max_page`, per table (`validate`
+  reports negatives, or a default past the maximum), and `GraphqlOptions`, for
+  every other table. `Schema.page_sizes(opts)` resolves them by table: the
+  table's own value wins, each of the two on its own.
+- Generator: `g.graphql(r, default_page: 20, max_page: 50)` (the options are
+  optional); it resolves the sizes once, failing on bad ones, and each root and
+  nested list and connection passes its target table's size. All three examples
+  regenerated.
+- A maximum with no default is also the size of a page that asks for none, so
+  the maximum always holds. Without either, nothing changes.
+- `examples/pagination`: books have `max_page: 100` in their model, the server
+  runs with `default_page: 20, max_page: 50`, and `check_page_sizes` covers the
+  negatives (root and nested), the defaults and maximums (root and per parent),
+  the table's override, and options that can't hold. The README's "Page sizes"
+  section, and the root README's GraphQL list, document them.
+- Tests run (the full suite is held until after G6, as asked): `schema_test.v`
+  (validation, `page_sizes`), `graphql/`, `examples/service`,
+  `examples/relations/main_test.v`, `examples/pagination/main_test.v`,
+  `cmd/vgraph/gen_test.v`: all pass. PostgreSQL not run: nothing in the change
+  touches SQL.
 
 ### G6. Auth example: a JWT and access rules
 

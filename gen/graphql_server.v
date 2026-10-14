@@ -37,9 +37,11 @@ pub const schema_sdl = ${v_string(sdl)}
 // graphql returns a GraphQL server for the graph. Its resolvers read through
 // the client, one query per edge per level of a request, and a request\'s
 // mutations run in one transaction when the client can begin one; `r` resolves
-// the fields the project\'s .graphql files add.
-pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
+// the fields the project\'s .graphql files add. `opts` bounds the pages of
+// lists and connections, for the tables whose `graphql()` doesn\'t.
+pub fn (g Graph) graphql(r Resolvers, opts vgraph.GraphqlOptions) !&graphql.Server {
 	mut s := graphql.Server.new(schema_sdl)!
+	sizes := g.client.schema.page_sizes(opts)!
 	if g.client.can_begin() {
 		s.transaction = vgraph.GraphqlTransaction{
 			client: g.client
@@ -85,6 +87,12 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 		b.writeln('	})')
 	}
 	b.writeln('	return s\n}')
+	if !b.after(0).contains('sizes[') {
+		// no lists: the sizes are only checked
+		mut code := b.str()
+		code = code.replace('	sizes := g.client.schema.page_sizes(opts)!', '	g.client.schema.page_sizes(opts)!')
+		b.write_string(code)
+	}
 	if nodes.len > 0 {
 		write_nodes_fn(mut b, nodes)!
 	}
@@ -131,14 +139,14 @@ fn write_resolvers(mut b strings.Builder, info Info, infos map[string]Info) ! {
 	b.writeln('\n	// ${t}')
 	if root != '' {
 		if info.relay() {
-			b.writeln('	s.resolve(\'Query\', \'${root}\', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		page := ${p}_connection(g.with_ctx(ctx).${info.table.name}().graphql_where(info.args)!, info)!
+			b.writeln('	s.resolve(\'Query\', \'${root}\', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		page := ${p}_connection(g.with_ctx(ctx).${info.table.name}().graphql_where(info.args)!, info, sizes[\'${info.table.name}\'])!
 		result := graphql.obj(page)
 		return parents.map(result)
 	})')
 		} else {
-			b.writeln('	s.resolve(\'Query\', \'${root}\', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.with_ctx(ctx).${info.table.name}().graphql_args(info.args)!.all()!
+			b.writeln('	s.resolve(\'Query\', \'${root}\', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).${info.table.name}().graphql_args(info.args, sizes[\'${info.table.name}\'])!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
@@ -162,9 +170,9 @@ fn write_resolvers(mut b strings.Builder, info Info, infos map[string]Info) ! {
 		rows := 'parents.map((it as ${info.node()}).${info.field()})'
 		tp := target.prefix()
 		if is_list_edge(e) && target.relay() {
-			b.writeln('	s.resolve(\'${t}\', \'${camel(e.name)}\', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+			b.writeln('	s.resolve(\'${t}\', \'${camel(e.name)}\', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		p := graphql.page_args(info.args)!
+		p := graphql.page_args(info.args, sizes[\'${target.table.name}\'])!
 		orders := ${tp}_order(info.arg(\'orderBy\'), true)!
 		where := cg.${target.table.name}().graphql_where(info.args)!
 		sub := where.graphql_paged(orders, p)!
@@ -187,9 +195,9 @@ fn write_resolvers(mut b strings.Builder, info Info, infos map[string]Info) ! {
 		return out
 	})')
 		} else if is_list_edge(e) {
-			b.writeln('	s.resolve(\'${t}\', \'${camel(e.name)}\', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+			b.writeln('	s.resolve(\'${t}\', \'${camel(e.name)}\', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.${target.table.name}().graphql_args(info.args)!
+		sub := cg.${target.table.name}().graphql_args(info.args, sizes[\'${target.table.name}\'])!
 		loaded := cg.${info.table.name}().with_${e.name}(fn [sub] (_ ${target.query()}) ${target.query()} {
 			return sub
 		}).nodes(${rows})!
@@ -414,8 +422,9 @@ fn (q ${q}) graphql_where(args map[string]graphql.Value) !${q} {
 }
 
 // graphql_args applies the arguments of a `${t}` list: `where`, `orderBy`,
-// `limit` and `offset`.
-fn (q ${q}) graphql_args(args map[string]graphql.Value) !${q} {
+// and `limit` and `offset`, bounded by `size`.
+fn (q ${q}) graphql_args(args map[string]graphql.Value, size graphql.PageSize) !${q} {
+	page := graphql.list_args(args, size)!
 	mut next := q.graphql_where(args)!
 	if o := args[\'orderBy\'] {
 		orders := ${p}_order(o, false)!
@@ -423,15 +432,11 @@ fn (q ${q}) graphql_args(args map[string]graphql.Value) !${q} {
 			next = next.order_by(...orders)
 		}
 	}
-	if limit := args[\'limit\'] {
-		if limit is int {
-			next = next.limit(limit)
-		}
+	if limit := page.limit {
+		next = next.limit(limit)
 	}
-	if offset := args[\'offset\'] {
-		if offset is int {
-			next = next.offset(offset)
-		}
+	if offset := page.offset {
+		next = next.offset(offset)
 	}
 	return next
 }
@@ -589,9 +594,10 @@ fn write_relay(mut b strings.Builder, info Info, infos map[string]Info) ! {
 	key := info.table.column(info.table.key)!
 	b.writeln('
 // ${p}_connection returns the page of `q` that a `${t}Connection`\'s arguments
-// ask for, and how many rows `q` matches when `totalCount` is asked for.
-fn ${p}_connection(q ${q}, info graphql.FieldInfo) !graphql.Connection {
-	p := graphql.page_args(info.args)!
+// ask for, bounded by `size`, and how many rows `q` matches when `totalCount`
+// is asked for.
+fn ${p}_connection(q ${q}, info graphql.FieldInfo, size graphql.PageSize) !graphql.Connection {
+	p := graphql.page_args(info.args, size)!
 	orders := ${p}_order(info.arg(\'orderBy\'), true)!
 	rows := q.graphql_paged(orders, p)!.all()!
 	total := if info.selected(\'totalCount\') { q.count()! } else { 0 }

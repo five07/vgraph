@@ -489,6 +489,11 @@ pub fn (s Schema) validate() ! {
 	for name in s.order {
 		table := s.tables[name]
 		check_options(mut problems, table, s.options[name] or { [] })
+		if table.graphql.default_page < 0 || table.graphql.max_page < 0 {
+			problems << '${name}.graphql: `default_page` and `max_page` cannot be less than zero'
+		} else if table.graphql.max_page > 0 && table.graphql.default_page > table.graphql.max_page {
+			problems << '${name}.graphql: `default_page` is more than `max_page`'
+		}
 		if table.graphql.node {
 			key := table.column(table.key) or { Column{} }
 			if key.typ != 'i64' || !key.serial {

@@ -286,9 +286,11 @@ scalar Cursor'
 // graphql returns a GraphQL server for the graph. Its resolvers read through
 // the client, one query per edge per level of a request, and a request's
 // mutations run in one transaction when the client can begin one; `r` resolves
-// the fields the project's .graphql files add.
-pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
+// the fields the project's .graphql files add. `opts` bounds the pages of
+// lists and connections, for the tables whose `graphql()` doesn't.
+pub fn (g Graph) graphql(r Resolvers, opts vgraph.GraphqlOptions) !&graphql.Server {
 	mut s := graphql.Server.new(schema_sdl)!
+	sizes := g.client.schema.page_sizes(opts)!
 	if g.client.can_begin() {
 		s.transaction = vgraph.GraphqlTransaction{
 			client: g.client
@@ -297,8 +299,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	s.scalar('Cursor', graphql.cursor_scalar)
 
 	// Author
-	s.resolve('Query', 'authors', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		found := g.with_ctx(ctx).authors().graphql_args(info.args)!.all()!
+	s.resolve('Query', 'authors', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		found := g.with_ctx(ctx).authors().graphql_args(info.args, sizes['authors'])!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
@@ -309,9 +311,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	for name in ['id', 'name', 'born'] {
 		s.resolve('Author', name, resolve_author_field)
 	}
-	s.resolve('Author', 'books', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('Author', 'books', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		p := graphql.page_args(info.args)!
+		p := graphql.page_args(info.args, sizes['books'])!
 		orders := book_order(info.arg('orderBy'), true)!
 		where := cg.books().graphql_where(info.args)!
 		sub := where.graphql_paged(orders, p)!
@@ -354,8 +356,8 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	})
 
 	// Book
-	s.resolve('Query', 'books', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
-		page := book_connection(g.with_ctx(ctx).books().graphql_where(info.args)!, info)!
+	s.resolve('Query', 'books', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		page := book_connection(g.with_ctx(ctx).books().graphql_where(info.args)!, info, sizes['books'])!
 		result := graphql.obj(page)
 		return parents.map(result)
 	})
@@ -363,9 +365,9 @@ pub fn (g Graph) graphql(r Resolvers) !&graphql.Server {
 	for name in ['id', 'title', 'year', 'pages'] {
 		s.resolve('Book', name, resolve_book_field)
 	}
-	s.resolve('Book', 'authors', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('Book', 'authors', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
-		sub := cg.authors().graphql_args(info.args)!
+		sub := cg.authors().graphql_args(info.args, sizes['authors'])!
 		loaded := cg.books().with_authors(fn [sub] (_ AuthorQuery) AuthorQuery {
 			return sub
 		}).nodes(parents.map((it as BookNode).book))!
@@ -422,8 +424,9 @@ fn (q AuthorQuery) graphql_where(args map[string]graphql.Value) !AuthorQuery {
 }
 
 // graphql_args applies the arguments of a `Author` list: `where`, `orderBy`,
-// `limit` and `offset`.
-fn (q AuthorQuery) graphql_args(args map[string]graphql.Value) !AuthorQuery {
+// and `limit` and `offset`, bounded by `size`.
+fn (q AuthorQuery) graphql_args(args map[string]graphql.Value, size graphql.PageSize) !AuthorQuery {
+	page := graphql.list_args(args, size)!
 	mut next := q.graphql_where(args)!
 	if o := args['orderBy'] {
 		orders := author_order(o, false)!
@@ -431,15 +434,11 @@ fn (q AuthorQuery) graphql_args(args map[string]graphql.Value) !AuthorQuery {
 			next = next.order_by(...orders)
 		}
 	}
-	if limit := args['limit'] {
-		if limit is int {
-			next = next.limit(limit)
-		}
+	if limit := page.limit {
+		next = next.limit(limit)
 	}
-	if offset := args['offset'] {
-		if offset is int {
-			next = next.offset(offset)
-		}
+	if offset := page.offset {
+		next = next.offset(offset)
 	}
 	return next
 }
@@ -641,8 +640,9 @@ fn (q BookQuery) graphql_where(args map[string]graphql.Value) !BookQuery {
 }
 
 // graphql_args applies the arguments of a `Book` list: `where`, `orderBy`,
-// `limit` and `offset`.
-fn (q BookQuery) graphql_args(args map[string]graphql.Value) !BookQuery {
+// and `limit` and `offset`, bounded by `size`.
+fn (q BookQuery) graphql_args(args map[string]graphql.Value, size graphql.PageSize) !BookQuery {
+	page := graphql.list_args(args, size)!
 	mut next := q.graphql_where(args)!
 	if o := args['orderBy'] {
 		orders := book_order(o, false)!
@@ -650,15 +650,11 @@ fn (q BookQuery) graphql_args(args map[string]graphql.Value) !BookQuery {
 			next = next.order_by(...orders)
 		}
 	}
-	if limit := args['limit'] {
-		if limit is int {
-			next = next.limit(limit)
-		}
+	if limit := page.limit {
+		next = next.limit(limit)
 	}
-	if offset := args['offset'] {
-		if offset is int {
-			next = next.offset(offset)
-		}
+	if offset := page.offset {
+		next = next.offset(offset)
 	}
 	return next
 }
@@ -784,9 +780,10 @@ fn book_where(w map[string]graphql.Value) ![]load.Cond {
 }
 
 // book_connection returns the page of `q` that a `BookConnection`'s arguments
-// ask for, and how many rows `q` matches when `totalCount` is asked for.
-fn book_connection(q BookQuery, info graphql.FieldInfo) !graphql.Connection {
-	p := graphql.page_args(info.args)!
+// ask for, bounded by `size`, and how many rows `q` matches when `totalCount`
+// is asked for.
+fn book_connection(q BookQuery, info graphql.FieldInfo, size graphql.PageSize) !graphql.Connection {
+	p := graphql.page_args(info.args, size)!
 	orders := book_order(info.arg('orderBy'), true)!
 	rows := q.graphql_paged(orders, p)!.all()!
 	total := if info.selected('totalCount') { q.count()! } else { 0 }

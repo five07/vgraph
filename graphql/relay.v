@@ -60,29 +60,103 @@ pub:
 	before ?string
 }
 
+// PageSize bounds the pages of a list or a connection. A request that asks
+// for no size gets `default_size` items, or `max_size` when there is no
+// default, and one that asks for more than `max_size` is an error. 0 is no
+// bound.
+@[params]
+pub struct PageSize {
+pub:
+	default_size int
+	max_size     int
+}
+
+// check reports a bound below zero, or a default past the maximum.
+pub fn (s PageSize) check() ! {
+	if s.default_size < 0 || s.max_size < 0 {
+		return error('a page size cannot be less than zero')
+	}
+	if s.max_size > 0 && s.default_size > s.max_size {
+		return error('the default page size, ${s.default_size}, is more than the maximum, ${s.max_size}')
+	}
+}
+
+// fallback returns the size of a page a request gives no size for, or none
+// when the page is unbounded.
+fn (s PageSize) fallback() ?int {
+	if s.default_size > 0 {
+		return s.default_size
+	}
+	if s.max_size > 0 {
+		return s.max_size
+	}
+	return none
+}
+
 // page_args reads a connection's arguments, and refuses `first` and `last`
-// together, or below zero, as entgql does.
-pub fn page_args(args map[string]Value) !PageArgs {
-	first := int_arg(args, 'first')
+// together, or below zero, as entgql does, or past `size.max_size`. With
+// neither, the page is `first: size.default_size` (or `max_size`).
+pub fn page_args(args map[string]Value, size PageSize) !PageArgs {
+	mut first := int_arg(args, 'first')
 	last := int_arg(args, 'last')
 	if first != none && last != none {
 		return error('Passing both `first` and `last` to paginate a connection is not supported.')
 	}
 	if n := first {
-		if n < 0 {
-			return error('`first` on a connection cannot be less than zero.')
-		}
+		check_size('`first` on a connection', n, size)!
 	}
 	if n := last {
-		if n < 0 {
-			return error('`last` on a connection cannot be less than zero.')
-		}
+		check_size('`last` on a connection', n, size)!
+	}
+	if first == none && last == none {
+		first = size.fallback()
 	}
 	return PageArgs{
 		first:  first
 		after:  string_arg(args, 'after')
 		last:   last
 		before: string_arg(args, 'before')
+	}
+}
+
+// ListArgs are a plain list's arguments: at most `limit` items, after
+// skipping `offset`.
+pub struct ListArgs {
+pub:
+	limit  ?int
+	offset ?int
+}
+
+// list_args reads a list's `limit` and `offset`, and refuses either below
+// zero, or a `limit` past `size.max_size`. Without one, the limit is
+// `size.default_size` (or `max_size`).
+pub fn list_args(args map[string]Value, size PageSize) !ListArgs {
+	mut limit := int_arg(args, 'limit')
+	offset := int_arg(args, 'offset')
+	if n := limit {
+		check_size('`limit` on a list', n, size)!
+	} else {
+		limit = size.fallback()
+	}
+	if n := offset {
+		if n < 0 {
+			return error('`offset` on a list cannot be less than zero.')
+		}
+	}
+	return ListArgs{
+		limit:  limit
+		offset: offset
+	}
+}
+
+// check_size refuses `n`, the size `what` asks for, below zero or past
+// `size.max_size`.
+fn check_size(what string, n int, size PageSize) ! {
+	if n < 0 {
+		return error('${what} cannot be less than zero.')
+	}
+	if size.max_size > 0 && n > size.max_size {
+		return error('${what} cannot be more than ${size.max_size}.')
 	}
 }
 

@@ -55,9 +55,11 @@ pub fn (b Book) edges() []vgraph.Edge {
 }
 
 // graphql makes lists of books, at the root and on `author.books`, Relay
-// connections.
+// connections, of at most 100 books a page, whatever the server's own
+// maximum.
 pub fn (b Book) graphql() vgraph.GraphqlTable {
 	return vgraph.GraphqlTable{
-		relay: true
+		relay:    true
+		max_page: 100
 	}
 }

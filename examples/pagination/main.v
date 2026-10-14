@@ -36,13 +36,14 @@ fn main() {
 // new_app migrates and seeds `db`, and returns the app that serves its
 // GraphQL schema. It reads through vgraph's SQLite driver, which runs what
 // the ORM can't: connections ordered by a field, and pages per parent cut by
-// a window function.
+// a window function. A page without a size has 20 rows, and none may ask for
+// more than 50, but books, whose model allows 100.
 fn new_app(mut db sqlite.DB) !&App {
 	catalog.migrate(mut db, .sqlite, 'schema_migrations')!
 	g := graph.Graph.new(vsqlite.new(db))!
 	catalog.seed(g)!
 	return &App{
-		gql: g.graphql(graph.Resolvers{})!
+		gql: g.graphql(graph.Resolvers{}, default_page: 20, max_page: 50)!
 	}
 }
 
