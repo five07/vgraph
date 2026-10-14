@@ -8,7 +8,7 @@ on:
 env:
   # The V commit vgraph is built against: V master, until a 0.5.x release
   # includes `v.migrations`. Bump it on purpose.
-  V_COMMIT: 53dd72c843f46d614acbf13b7f737be6890c6578
+  V_COMMIT: 04cb7fa314b95dfc5681768ed0598d53cb87e72e
 
 jobs:
   sqlite:

@@ -2,8 +2,11 @@
 
 ## Install
 
-vgraph needs V master (it is built against commit `53dd72c`), with SQLite, and
-PostgreSQL if you use it. Until it is on VPM, install it from GitHub:
+vgraph needs V master (it is built against commit `04cb7fa`, 2026-10-14), with
+SQLite, and PostgreSQL if you use it. That build still reports `V 0.5.2`, so
+`v.mod`'s `min_v` says `0.5.2`; the 0.5.2 release itself is too old (it lacks
+`v.migrations`), so use master at that commit or later. Until vgraph is on VPM,
+install it from GitHub:
 
 ```sh
 git clone https://github.com/five07/vgraph ~/.vmodules/five07/vgraph

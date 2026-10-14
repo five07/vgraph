@@ -58,7 +58,7 @@ body:
     attributes:
       label: V version
       description: The output of `v version`, with its commit.
-      placeholder: V 0.5.2 53dd72c
+      placeholder: V 0.5.2 04cb7fa
     validations:
       required: true
 

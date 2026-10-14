@@ -7,7 +7,8 @@ hooks and privacy rules, and serves it all over GraphQL with
 [entgql](https://entgo.io/docs/graphql)'s conventions. It runs on V's ORM, on
 SQLite and PostgreSQL.
 
-**Status:** early, and not on VPM yet. Built against V master (`53dd72c`).
+**Status:** early, and not on VPM yet. Built against V master at `04cb7fa`
+(2026-10-14), a daily build that still reports `V 0.5.2`.
 
 ## Quick start
 
