@@ -169,6 +169,41 @@ own, and the rest is refused with an error naming the drivers. Edge predicates
 and traversals apply the target table's privacy rules and interceptors, as edge
 loads do.
 
+### No N+1 queries
+
+Every read runs a fixed list of statements, whatever the number of rows. These
+paths are checked on SQLite and PostgreSQL, with and without a driver, and with an
+interceptor and a privacy rule that add subqueries: each runs on a seed, then on
+many more rows of every table, and must run the same statements
+(`examples/relations/selects.v`, and `examples/service`'s
+`test_queries_run_a_fixed_set_of_selects`).
+
+- root queries, `first`, `only`, `ids`, `count`, `exist`;
+- `with_<edge>` for every edge kind (one to one, one to many and many to many; of
+  two types or the same type; bidirectional; through a join table or an edge schema;
+  polymorphic; on int and UUID keys; from a view), nested, named, and with a
+  per-parent `limit` and `offset`: a select per edge per level, two through a join
+  table, and a keys-first statement before each with a driver's per-parent limit;
+- traversals (`query_<edge>`) from a query and from a node, any number of hops: a
+  select per hop without a driver; with one, a statement for the keys, then the
+  rows;
+- edge predicates (`has_<edge>`, `has_<edge>_with`, nested): a select per predicate
+  without a driver; with one, a subquery in the keys statement;
+- aggregates (`sum_`, `min_`, `max_`, `mean_`), `group_by`, and orders by an edge's
+  count or field;
+- interceptors and privacy rules on queries, including ones that add edge
+  predicates: they apply to root queries, edge loads, traversals and counts alike;
+- GraphQL: lists and counts at the root, every edge field, nested fields, `where`
+  with edge predicates, per-parent `limit` / `offset`, connections at the root and
+  on edges (with `totalCount`, `pageInfo` and cursors), and `node` / `nodes`, one
+  select per table among the ids.
+
+An edge whose keys come back empty skips the select of its rows, so a request can
+run fewer statements than this, never more. Writes aren't on the list: a create
+writes a row and then its edges, and runs hooks per row (see Writes); a bulk
+create on SQLite is one insert per row. Resolvers an app writes itself
+(`Resolvers`) run what they run.
+
 ## Writes
 
 The generated client writes too. Each table gets builders, as Ent's:

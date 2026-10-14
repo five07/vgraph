@@ -64,7 +64,8 @@ from GitHub issues. Each goal lists its tasks, then its questions.
 release: G1 N+1 audit → G2 coverage → G3 polymorphic foreign keys → G4 schema check →
 G5 pagination example → G6 auth example → G7 OpenTelemetry → G8 Federation → G9 docs
 → G10 README sections → G11 issue templates → G13 release. G12 (fixes in V) runs
-alongside, and doesn't hold up the release.
+alongside, and doesn't hold up the release. G14 (a spike: select only the requested
+fields) goes where Q139 puts it.
 
 
 ### G1. No N+1 queries, verified
@@ -89,6 +90,40 @@ and hooks run per row. **Default:** reads are fixed; writes are documented as
 statements per row or per edge, and the audit only checks that they don't grow with
 rows they don't touch. The other choice is batching SQLite's bulk writes too.
 > A: No, writes (or any queries post-write in a transaction) are not included
+
+**Result (2026-10-13): done; nothing grew, so nothing needed fixing.**
+- `examples/relations/selects.v` (`test_fixed_selects`, on SQLite and PostgreSQL):
+  18 cases, each run on four clients: on the ORM's connection and on a driver, each
+  plain and with an interceptor on pets and a privacy rule on users that add edge
+  predicates (so subqueries, or keys-first selects without a driver). It records
+  each case's statements, grows every table (20 users, each with a card, three pets
+  with one soft-deleted, a group, a device with two logins and two groups, a gadget
+  with likers, follows, friends, a spouse every other user, a list node and a
+  category), and asserts the same statements in the same order. Cases: root
+  results, every edge kind, a three-level nesting, named edges, limits per parent,
+  traversals from a query and a node, edge predicates, counts and aggregates,
+  `group_by` and edge orders (driver only), and GraphQL: every edge field, counts
+  and filters, limits per parent, root and nested connections, edge orders, and
+  `node` / `nodes` over every gadget id.
+- `examples/service`'s test gained a post's polymorphic comments, every user edge
+  as a nested connection, `where` with edge predicates, and `nodes` over every id of
+  all four tables; its growth now adds users, posts and replies too.
+- A case that loops (`query_pets()` per user) fails it: 4 selects become 24.
+- One thing to know when writing cases: an edge whose keys come back empty skips
+  its row select, so a case must reach rows on every edge on the seed too, or it
+  runs more statements after growth. That is fewer, never more, so not an N+1.
+- The README's "No N+1 queries" section lists the paths, and what isn't covered
+  (writes, per Q122; the app's own resolvers).
+
+**Q137. Long key lists.** An edge load puts every parent key in one `IN (...)`, and
+nothing splits it: past the database's limit on parameters (65,535 on PostgreSQL,
+32,766 on SQLite since 3.32) the select fails. **Default:** split the keys into
+chunks of 10,000 inside `select_in` and `link_pairs`, so a load stays one select per
+edge up to 10,000 parents, and one more per 10,000 after that. A per-parent limit's
+keys-first statement is split the same way. The other choices: (a) PostgreSQL's
+`= ANY($1)` with one array parameter (no limit, but the ORM path can't send arrays,
+so it needs the driver), or (b) document the limit and leave it.
+> A:
 
 ### G2. Coverage
 
@@ -256,6 +291,44 @@ clear (the `db.pg` decode, `[]u8` on SQLite), and `RawConnection` proposed in an
 first. vgraph drops a workaround only once its fix is in the V commit it pins. None
 holds up v0.1.0.
 > A: agreed, but we'll touch back on this last
+
+### G14. Spike: select only the fields a request asks for
+
+Today every select reads every column of the struct: `{ users { pets { name } } }`
+runs `SELECT id, name, owner_id, deleted_at FROM pets WHERE owner_id IN (...)`. The
+spike: from the GraphQL selection set, read only the columns it needs, here
+`SELECT id, name, owner_id FROM pets WHERE owner_id IN (...)`. The client already has
+part of this: `select('name')` reads the named columns and the key, and leaves the
+rest at zero.
+
+The columns a level needs, beyond its selected fields:
+- the key, always (cursors, `node`, the next level's `IN`);
+- the foreign key of the edge it was loaded through (`owner_id`), to group rows by
+  parent, and those of the edges selected below it (`pet { owner }` needs
+  `owner_id`); a polymorphic edge's type column too;
+- the columns of `orderBy`, which connection cursors encode;
+- a field a model maps to another name or computes, and a fragment's fields on each
+  type (`... on Gadget`).
+
+Tasks: map a selection set to columns in the generated resolvers, pass them through
+`with_<edge>` and connections, and measure the gain on a wide table (time and bytes
+read, SQLite and PostgreSQL). Write up what works, what it costs, and whether to
+ship it.
+
+**Q138. What may read a column the request didn't select?** Hooks only run on
+writes, but privacy rules, interceptors and hand-written resolvers (`Resolvers`)
+receive the rows, and could read any field. **Default:** narrow only the rows the
+generated resolvers return to GraphQL; a model or table that declares a policy,
+interceptor or hand-written resolver that reads rows opts in with
+`graphql: {select_all: true}`, or the spike finds which fields each reads. The
+other choice is narrowing everywhere, documented as "rows in a resolver have only
+the requested columns".
+> A:
+
+**Q139. When.** **Default:** after G2 (coverage), before the features, so it lands
+with its tests while the read paths are fresh from G1; it ships in v0.1.0 only if
+the spike says yes and its tests pass. The other choice is after v0.1.0.
+> A:
 
 ### G13. Release v0.1.0
 

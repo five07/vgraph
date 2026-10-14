@@ -109,6 +109,10 @@ fn test_mutations() {
 	check_mutations(fixture()!)!
 }
 
+fn test_fixed_selects() {
+	check_fixed_selects(fixture()!)!
+}
+
 // A GraphQL request's mutations on a pool: they run on the connection of the
 // request's transaction, so a failure rolls back every one of them (Q103).
 fn test_graphql_transaction_on_a_pool() {

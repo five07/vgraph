@@ -85,3 +85,7 @@ fn test_where_input() {
 fn test_mutations() {
 	check_mutations(fixture()!)!
 }
+
+fn test_fixed_selects() {
+	check_fixed_selects(fixture()!)!
+}

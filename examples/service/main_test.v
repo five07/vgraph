@@ -456,16 +456,59 @@ fn test_queries_run_a_fixed_set_of_selects() {
 		data(base, query)!
 		assert log.take() == want, query
 	}
+	// the other paths, whose selects are recorded on this data: a post's
+	// comments, each user edge as a connection, edge predicates, and `nodes`
+	// across every table
+	others := [
+		'{ posts { totalCount edges { node { body author { name } comments { totalCount edges { node { body post { body } replies { totalCount } } } } } } } }',
+		'{ users(first: 10) { totalCount edges { node { name articles(first: 2) { totalCount edges { node { title } } } posts(last: 1) { totalCount edges { node { body } } } comments(first: 1) { totalCount edges { node { body article { title } post { body } } } } } } } }',
+		'{ comments(where: {hasArticle: true, hasAuthorWith: [{name: "Ada"}]}) { totalCount edges { node { body } } } articles(where: {hasCommentsWith: [{hasReplies: true}]}) { edges { node { title } } } }',
+		'{ nodes(ids: ${all_ids(base)!}) { id ... on User { name } ... on Article { author { name } } ... on Post { comments { totalCount } } ... on Comment { article { title } post { body } } } }',
+	]
+	mut recorded := map[string][]string{}
+	for query in others {
+		log.take()
+		data(base, query)!
+		recorded[query] = log.take()
+		assert recorded[query].len > 0
+	}
 	// more rows, the same selects
 	for i in 0 .. 5 {
-		more := create_article(base, bob, 'More ${i}')!
-		create_comment(base, ada, 'Article', more, '', 'and ${i}')!
+		user := create_user(base, 'User ${i}', 'user${i}@example.com')!
+		more := create_article(base, user, 'More ${i}')!
+		first_on := create_comment(base, ada, 'Article', more, '', 'and ${i}')!
+		create_comment(base, user, 'Article', more, first_on, 'reply ${i}')!
+		more_post := create_post(base, user, 'post ${i}')!
+		on_post := create_comment(base, bob, 'Post', more_post, '', 'on post ${i}')!
+		create_comment(base, user, 'Post', more_post, on_post, 'reply on post ${i}')!
 	}
 	for query, want in queries {
 		log.take()
 		data(base, query)!
 		assert log.take() == want, query
 	}
+	for query in others {
+		// `nodes` gets every id there is now
+		now := if query.starts_with('{ nodes') {
+			query.replace(query.find_between('nodes(ids: ', ') {'), all_ids(base)!)
+		} else {
+			query
+		}
+		log.take()
+		data(base, now)!
+		assert log.take() == recorded[query], query
+	}
+}
+
+// all_ids returns the ids of every user, article, post and comment, as a
+// GraphQL list.
+fn all_ids(base string) !string {
+	got := data(base, '{ users { edges { node { id } } } articles { edges { node { id } } } posts { edges { node { id } } } comments { edges { node { id } } } }')!
+	mut ids := []string{}
+	for table in ['users', 'articles', 'posts', 'comments'] {
+		ids << nodes(got, table).map('"${at(it, 'id').as_string()}"')
+	}
+	return '[${ids.join(', ')}]'
 }
 
 // A request's mutations run in one transaction: when one fails, the ones

@@ -40,6 +40,19 @@ fn (f Fixture) queries() []string {
 	return tables
 }
 
+// log_to returns a tracer that adds the table of each select to `log`, and
+// `sql` for each statement of the driver's own.
+fn log_to(log &Log) vgraph.Tracer {
+	return fn [log] (e vgraph.TraceEvent) {
+		mut l := unsafe { log }
+		if e.kind == .select {
+			l.tables << e.table
+		} else if e.kind == .raw {
+			l.tables << 'sql'
+		}
+	}
+}
+
 // initial is the example's one migration: the tables, from their structs, and
 // the indexes their edges need.
 const initial = migrations.Migration{
@@ -227,16 +240,8 @@ fn seed(db orm.Connection, driver orm.Connection) !Fixture {
 		}!
 	}
 	log := &Log{}
-	tracer := fn [log] (e vgraph.TraceEvent) {
-		mut l := unsafe { log }
-		if e.kind == .select {
-			l.tables << e.table
-		} else if e.kind == .raw {
-			l.tables << 'sql'
-		}
-	}
-	g := graph.Graph.new(vgraph.trace(db, tracer))!
-	t := graph.Graph.new(vgraph.trace(driver, tracer))!
+	g := graph.Graph.new(vgraph.trace(db, log_to(log)))!
+	t := graph.Graph.new(vgraph.trace(driver, log_to(log)))!
 	return Fixture{
 		g:       g
 		w:       graph.Graph.new(driver)!
