@@ -1,0 +1,29 @@
+// An `sql` block on a value of type `orm.TransactionalConnection` is rejected:
+// "`orm.TransactionalConnection` doesn't implement method `select` of interface
+// `orm.Connection`", though `TransactionalConnection` embeds `Connection`.
+// Passing an interface that embeds another to a function taking the embedded
+// one works outside `sql` blocks.
+// Run: `v run sql_transactional_connection.vv`. Expect `ok`.
+// Worked around in `examples/relations/checks.v`: `migrate` takes the
+// `TransactionalConnection` that `v.migrations` needs, and `seed` an
+// `orm.Connection`, given the same database.
+module main
+
+import db.sqlite
+import orm
+
+struct Row {
+	id int @[primary; sql: serial]
+}
+
+fn create(mut db orm.TransactionalConnection) ! {
+	sql db {
+		create table Row
+	}!
+}
+
+fn main() {
+	mut db := sqlite.connect(':memory:')!
+	create(mut db)!
+	println('ok')
+}

@@ -1,0 +1,114 @@
+name: CI
+
+# Only on main: pushes, which include merges into it.
+on:
+  push:
+    branches: [main]
+
+env:
+  # The V commit vgraph is built against: V master, until a 0.5.x release
+  # includes `v.migrations`. Bump it on purpose.
+  V_COMMIT: 04cb7fa314b95dfc5681768ed0598d53cb87e72e
+
+jobs:
+  sqlite:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: vgraph
+          persist-credentials: false
+      - name: Install SQLite headers
+        run: sudo apt-get update && sudo apt-get install --quiet -y libsqlite3-dev
+      - name: Build V
+        run: |
+          git clone --filter=blob:none https://github.com/vlang/v vlang
+          git -C vlang checkout "$V_COMMIT"
+          make -C vlang -j4
+          sudo ./vlang/v symlink
+      - name: Install vgraph as five07.vgraph, for the examples
+        run: |
+          mkdir -p ~/.vmodules/five07
+          ln -s "$GITHUB_WORKSPACE/vgraph" ~/.vmodules/five07/vgraph
+      - name: Check formatting
+        run: v fmt -verify vgraph
+      - name: Check doc comments
+        run: v vet vgraph/edge.v vgraph/schema.v vgraph/client.v vgraph/migrate.v vgraph/field.v vgraph/driver.v vgraph/mutation.v vgraph/write.v vgraph/hooks.v vgraph/trace.v vgraph/gql.v vgraph/load vgraph/gen vgraph/cmd/vgraph vgraph/graphql vgraph/sqlite vgraph/pg
+      - name: Build the API docs
+        # the library modules only (`.vdocignore`); fails on a doc that can't build
+        run: v doc -f html -m -o "$RUNNER_TEMP/api" -no-timestamp vgraph
+      - name: Check that the examples' clients are generated from their current models
+        run: |
+          v run vgraph/cmd/vgraph gen vgraph/examples/service
+          v run vgraph/cmd/vgraph gen vgraph/examples/relations
+          v run vgraph/cmd/vgraph gen vgraph/examples/pagination
+          v run vgraph/cmd/vgraph gen vgraph/examples/auth
+          v run vgraph/cmd/vgraph gen vgraph/docs/snippets
+          git -C vgraph diff --exit-code -- examples/service/graph examples/relations/graph examples/pagination/graph examples/auth/graph docs/snippets/graph
+          test -z "$(git -C vgraph status --porcelain -- examples/service/graph examples/relations/graph examples/pagination/graph examples/auth/graph docs/snippets/graph)"
+      - name: Test
+        run: v test vgraph
+
+  # The schemas vgraph gen writes must read, and print, the same in graphql-js,
+  # which Apollo's tools build on.
+  graphql-js:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: vgraph
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install graphql-js
+        run: npm install --prefix "$RUNNER_TEMP/graphql-js" --no-save --no-audit --no-fund graphql@16.11.0
+      - name: Check the generated schemas with graphql-js
+        run: |
+          NODE_PATH="$RUNNER_TEMP/graphql-js/node_modules" node vgraph/graphql/testdata/check_schema.js \
+            vgraph/examples/service/graph/schema.graphql vgraph/examples/relations/graph/schema.graphql \
+            vgraph/examples/pagination/graph/schema.graphql vgraph/examples/auth/graph/schema.graphql \
+            vgraph/docs/snippets/graph/schema.graphql
+
+  postgres:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: 12345678
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=24
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: vgraph
+          persist-credentials: false
+      - name: Install PostgreSQL and SQLite headers
+        run: sudo apt-get update && sudo apt-get install --quiet -y libpq-dev libsqlite3-dev
+      - name: Build V
+        run: |
+          git clone --filter=blob:none https://github.com/vlang/v vlang
+          git -C vlang checkout "$V_COMMIT"
+          make -C vlang -j4
+          sudo ./vlang/v symlink
+      - name: Install vgraph as five07.vgraph, for the examples
+        run: |
+          mkdir -p ~/.vmodules/five07
+          ln -s "$GITHUB_WORKSPACE/vgraph" ~/.vmodules/five07/vgraph
+      - name: Test on PostgreSQL
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: 12345678
+          PGDATABASE: postgres
+        run: v -d vgraph_pg test vgraph/pg_test.v vgraph/examples/relations/pg_test.v vgraph/examples/pagination/pg_test.v

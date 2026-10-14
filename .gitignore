@@ -1,0 +1,11 @@
+*.db
+*.so
+*.dylib
+*.exe
+.env
+
+# V build caches left by `v run` on a .vv file
+.*.v3cc.*/
+
+# the loader `vgraph gen` runs; removed after each run, unless it was interrupted
+.vgraph-gen/

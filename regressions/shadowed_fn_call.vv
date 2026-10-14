@@ -1,0 +1,16 @@
+// A variable initialized by calling a function of the same name generates C that
+// doesn't compile on V master (`called object type 'string' is not a function`),
+// while the older compiler reports it: `ambiguous call to: name`. One or the
+// other should hold, not invalid C.
+// Run: `v run shadowed_fn_call.vv`. Expect a clean V error, not a C error.
+// Worked around in `cmd/vgraph/main.v` by naming the function `v_exe`.
+module main
+
+fn path() string {
+	return '/usr/bin/v'
+}
+
+fn main() {
+	path := path()
+	println(path)
+}

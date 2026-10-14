@@ -1,0 +1,22 @@
+// An array literal of the wrong element type, passed to a generic function that
+// returns a result, is not reported when the call is followed by `.map(...)`:
+// the program compiles and crashes (signal 11) when `ids[0]` is read. Without
+// the `.map`, or with the result assigned first, V reports `invalid array
+// element: expected `string`, not `int``, as it should here.
+// Run: `v run generic_result_map_arg.vv`. Expect that error, not a segfault.
+// Found in `load/load_test.v`, where a `select_in` call still passed `[]int` keys.
+module main
+
+struct A {
+	id int
+}
+
+fn rows[T](ids []string) ![]T {
+	return ids.map(T{
+		id: it.int()
+	})
+}
+
+fn main() {
+	println(rows[A]([1, 4])!.map(it.id))
+}

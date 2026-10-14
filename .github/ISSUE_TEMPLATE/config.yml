@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: The guides
+    url: https://github.com/five07/vgraph/tree/main/docs
+    about: How to declare models, query, write, add rules and serve GraphQL.
+  - name: A bug in V itself
+    url: https://github.com/vlang/v/issues
+    about: The compiler, its ORM or a vlib module, outside vgraph.

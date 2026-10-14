@@ -1,0 +1,4 @@
+extend type Query {
+  """The articles whose title contains `text`."""
+  search(text: String!): [Article!]!
+}

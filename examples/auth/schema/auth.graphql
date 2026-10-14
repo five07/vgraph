@@ -1,0 +1,9 @@
+extend type Query {
+  """The user the request's token names, or null without one."""
+  me: User
+}
+
+extend type Mutation {
+  """Checks an email and password, and returns a token for the user, valid for an hour."""
+  login(email: String!, password: String!): String!
+}
