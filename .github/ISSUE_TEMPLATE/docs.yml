@@ -1,0 +1,20 @@
+name: Docs
+description: Something in the guides, the README or a doc comment is wrong, missing or unclear.
+labels: [docs]
+body:
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: The page and section, or the function.
+      placeholder: docs/queries.md, "Eager loading"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What's wrong
+      description: What it says, and what it should say, or what you looked for and didn't find.
+    validations:
+      required: true

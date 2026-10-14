@@ -35,14 +35,18 @@ jobs:
         run: v fmt -verify vgraph
       - name: Check doc comments
         run: v vet vgraph/edge.v vgraph/schema.v vgraph/client.v vgraph/migrate.v vgraph/field.v vgraph/driver.v vgraph/mutation.v vgraph/write.v vgraph/hooks.v vgraph/trace.v vgraph/gql.v vgraph/load vgraph/gen vgraph/cmd/vgraph vgraph/graphql vgraph/sqlite vgraph/pg
+      - name: Build the API docs
+        # the library modules only (`.vdocignore`); fails on a doc that can't build
+        run: v doc -f html -m -o "$RUNNER_TEMP/api" -no-timestamp vgraph
       - name: Check that the examples' clients are generated from their current models
         run: |
           v run vgraph/cmd/vgraph gen vgraph/examples/service
           v run vgraph/cmd/vgraph gen vgraph/examples/relations
           v run vgraph/cmd/vgraph gen vgraph/examples/pagination
           v run vgraph/cmd/vgraph gen vgraph/examples/auth
-          git -C vgraph diff --exit-code -- examples/service/graph examples/relations/graph examples/pagination/graph examples/auth/graph
-          test -z "$(git -C vgraph status --porcelain -- examples/service/graph examples/relations/graph examples/pagination/graph examples/auth/graph)"
+          v run vgraph/cmd/vgraph gen vgraph/docs/snippets
+          git -C vgraph diff --exit-code -- examples/service/graph examples/relations/graph examples/pagination/graph examples/auth/graph docs/snippets/graph
+          test -z "$(git -C vgraph status --porcelain -- examples/service/graph examples/relations/graph examples/pagination/graph examples/auth/graph docs/snippets/graph)"
       - name: Test
         run: v test vgraph
 
@@ -65,7 +69,8 @@ jobs:
         run: |
           NODE_PATH="$RUNNER_TEMP/graphql-js/node_modules" node vgraph/graphql/testdata/check_schema.js \
             vgraph/examples/service/graph/schema.graphql vgraph/examples/relations/graph/schema.graphql \
-            vgraph/examples/pagination/graph/schema.graphql vgraph/examples/auth/graph/schema.graphql
+            vgraph/examples/pagination/graph/schema.graphql vgraph/examples/auth/graph/schema.graphql \
+            vgraph/docs/snippets/graph/schema.graphql
 
   postgres:
     runs-on: ubuntu-24.04

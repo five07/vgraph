@@ -1,0 +1,104 @@
+name: Bug report
+description: Something in vgraph does the wrong thing, or fails.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. The smaller the model and query that show it, the
+        sooner it can be fixed. If it turns out to be a bug in V itself, it gets
+        the `upstream` label and an issue on vlang/v.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, and what went wrong. Paste the full error.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: model
+    attributes:
+      label: The model
+      description: The structs involved, with their `edges()`, `fields()` and any other method that matters, cut down to what shows the bug.
+      render: v
+    validations:
+      required: true
+
+  - type: textarea
+    id: query
+    attributes:
+      label: The query or write
+      description: The code that fails, or the GraphQL request.
+      render: v
+    validations:
+      required: true
+
+  - type: textarea
+    id: sql
+    attributes:
+      label: The SQL
+      description: |
+        The statements it runs, from `vgraph.trace(conn, fn (e vgraph.TraceEvent) { println(e) })`.
+        Events carry no values, so this is safe to paste.
+      render: text
+    validations:
+      required: false
+
+  - type: input
+    id: v-version
+    attributes:
+      label: V version
+      description: The output of `v version`, with its commit.
+      placeholder: V 0.5.2 53dd72c
+    validations:
+      required: true
+
+  - type: input
+    id: vgraph-version
+    attributes:
+      label: vgraph version
+      description: The release, or the commit you are on (`git -C ~/.vmodules/five07/vgraph rev-parse --short HEAD`).
+    validations:
+      required: true
+
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database
+      options:
+        - SQLite
+        - PostgreSQL
+        - MySQL
+        - other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Connection
+      description: What the graph runs on.
+      options:
+        - vgraph's SQLite driver (five07.vgraph.sqlite)
+        - vgraph's PostgreSQL driver (five07.vgraph.pg)
+        - V's ORM connection alone
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: The output of `v doctor`, and the database's version.
+      render: text
+    validations:
+      required: false

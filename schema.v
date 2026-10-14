@@ -214,6 +214,17 @@ pub fn (mut s Schema) add[T]() ! {
 					policy = policy.merged(record.$(field.name).$method())
 				}
 			}
+		} $else $if field.typ is $enum {
+			// before the test for a relation: in this module, an enum named
+			// as a struct of a module it imports, such as `Status`
+			// (`v.migrations.Status`), passes `is $struct` too
+			// (regressions/comptime_enum_struct_name/)
+			mut enum_values := []string{}
+			$for v in field.typ.values {
+				enum_values << v.name
+			}
+			columns << new_column(field.name, field.attrs, 'enum', typeof(field.typ).name.all_after_last('.'),
+				enum_values, '')
 		} $else $if field.typ is $struct && field.unaliased_typ !is time.Time && field.typ !is ?time.Time {
 			// a relation
 		} $else {

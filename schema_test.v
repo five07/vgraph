@@ -393,3 +393,24 @@ fn test_page_sizes() {
 struct Writer2 {
 	id int @[primary; sql: serial]
 }
+
+// Status has the name of a struct of `v.migrations`, which vgraph imports: its
+// column must still be an enum (regressions/comptime_enum_struct_name).
+enum Status {
+	draft
+	published
+}
+
+@[table: 'statuses']
+struct WithStatus {
+	id     int @[primary; sql: serial]
+	status Status
+}
+
+fn test_an_enum_named_as_an_imported_struct() {
+	mut s := Schema{}
+	s.add[WithStatus]()!
+	column := s.tables['statuses'].column('status') or { panic('no status column') }
+	assert column.typ == 'enum'
+	assert column.enum_values == ['draft', 'published']
+}

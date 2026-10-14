@@ -33,7 +33,7 @@ to that version. This plan's questions start at Q121.
   parent (G5). `examples/auth/`: JWT logins, privacy rules and hooks by viewer
   (G6).
 - `regressions/`: one small program per V compiler bug vgraph works around, or
-  meets (9 so far).
+  meets (10 so far).
 
 **How to work here.**
 - **Never commit.** The user makes every commit, on `develop`; `main` gets merges.
@@ -498,6 +498,9 @@ dependency:
   Collector in Docker.
 > A: I like that idea. We'll hold this idea until we create the `five07.vgraph.otel` package - it looks like no package exists.
 
+**Skipped for now (2026-10-14):** held until `five07.vgraph.otel` exists, per the
+answer; the user moved on to G9–G11. `vgraph.trace` stays the hook it builds on.
+
 ### G8. Federation v2 subgraphs
 
 **Q130. Scope.** **Default:** a `vgraph gen --federation` flag makes the schema an
@@ -510,6 +513,9 @@ Apollo Federation v2 subgraph:
 - tested by composing `examples/service` with a second small subgraph through
   `@apollo/composition` from npm in CI, and once by hand behind Apollo Router.
 > A: agreed
+
+**Skipped for now (2026-10-14):** the user moved on to G9–G11. The docs list
+Federation among what vgraph doesn't do yet.
 
 ### G9. Docs
 
@@ -525,6 +531,36 @@ Apollo Federation v2 subgraph:
   drift.
 > A: agreed
 
+**Result (2026-10-14): done.**
+- `docs/`: an index (`README.md`) and eleven guides: getting started, schema,
+  queries, writes, transactions, hooks/interceptors/privacy, GraphQL (schema,
+  server, lists and connections, page sizes, filters, mutations, Node, options,
+  your own fields, operations folders, introspection, the `graphql` module),
+  migrations, drivers, tracing, differences from Ent. OpenTelemetry and
+  Federation are left out (G7, G8 skipped), and named under "not there yet".
+- Code that can't drift: `docs/snippets/`, a project with a blog (users,
+  articles, comments, tags; a mixin, an enum, soft deletes, Nodes, a connection,
+  a hand-written `search` field), whose tests run every snippet. A guide's ```v
+  block follows `<!-- snippet: <path>#<name> -->` and must equal the region
+  between `// snippet: <name>` and `// end snippet` (a path alone is the whole
+  file, as for `schema/blog.graphql`). `docs_test.v` fails on a difference or an
+  unmarked ```v block, in `docs/*.md` and the README; `UPDATE_SNIPPETS=1`
+  rewrites the blocks instead. 42 blocks are checked.
+- The README is an overview, a quick start (three snippets), what vgraph does,
+  links to the guides and examples, Contributing and Credits (G10): 676 lines to
+  about 220. Everything it said moved to a guide.
+- API docs: `.vdocignore` leaves out `examples/`, `docs/`, `regressions/` and
+  `cmd/`, so `v doc -f html -m` builds the six library modules; CI builds them
+  (it fails on a doc that doesn't build; `v doc` prints no warnings of its own,
+  and `v vet` already checks doc comments).
+- CI: `docs/snippets` in the generated-code check and graphql-js.
+- Found along the way: a V compiler bug. In a generic function of a module that
+  imports `v.migrations`, a field whose type is the caller's enum named `Status`
+  passes `$if field.typ is $struct` (`migrations.Status` is a struct), so
+  `Schema.add` took an app's `Status` enum for a relation and dropped the column.
+  `regressions/comptime_enum_struct_name/` shows it; `schema.v` now tests for an
+  enum first; `schema_test.v` checks it (and fails without the fix).
+
 ### G10. README: Contributing and Credits
 
 **Q132. Content.** **Default:**
@@ -538,6 +574,15 @@ Apollo Federation v2 subgraph:
   Anyone else to name?
 > A: graphql.org and vlang.io
 
+**Result (2026-10-14): done.** In the README:
+- Contributing: issues and PRs (the forms of G11), setup (V commit, the
+  `~/.vmodules/five07/vgraph` link), tests (SQLite, PostgreSQL, graphql-js,
+  coverage), layout, branches, regenerating the examples and `docs/snippets`,
+  the snippet workflow, a `regressions/` program per V bug, style.
+- Credits: Ent and entgql, graphql-js, graphql.org with the GraphQL and Relay
+  specs, V (vlang.io), its ORM and `v.migrations`, and `rest-api` (not linked:
+  it has no public home that I know of).
+
 ### G11. GitHub issue templates
 
 **Q133. Which.** **Default:** adapted from `vlang/v`'s `.github/ISSUE_TEMPLATE/`:
@@ -549,6 +594,15 @@ Apollo Federation v2 subgraph:
 - labels as in `vlang/v` where they fit (`bug`, `feature request`, `docs`), and
   `upstream` for a V bug.
 > A: agreed
+
+**Result (2026-10-14): done.** `.github/ISSUE_TEMPLATE/`: `bug_report.yml` (what
+happened, expected, model, query, the SQL from `vgraph.trace`, V and vgraph
+versions, database, connection, `v doctor`), `feature_request.yml` (what it's for,
+the proposal, the Ent or entgql feature), `docs.yml`, and `config.yml` (blank
+issues off; links to the guides and to V's issues). `.github/pull_request_template.md`:
+tests, generated code, docs and snippets, fmt and vet, regressions. The forms set
+the labels `bug`, `feature request` and `docs`; with `upstream`, they must be
+created on the repository (GitHub ignores a form's label that doesn't exist).
 
 ### G12. Fixes in V
 
@@ -568,7 +622,8 @@ vgraph works around these; fixing them in V lets it drop code.
   found in G2): a `u16` field reads back as 0 whenever the stack is reused, as under
   `v -coverage`. The fix in `db.pg` is to convert (`u16(str.u64())`), not reinterpret;
   the fix in V, to copy the value into the sum type.
-- **The 9 compiler bugs in `regressions/`.**
+- **The 10 compiler bugs in `regressions/`**, the latest an enum named as an
+  imported module's struct (`comptime_enum_struct_name/`).
 
 **Q134. How far.** **Default:** an issue for each, with a fix PR where the fix is
 clear (the `db.pg` decode, `[]u8` on SQLite), and `RawConnection` proposed in an issue
