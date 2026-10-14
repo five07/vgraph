@@ -375,14 +375,14 @@ fn test_comments_errors() {
 	on_other := create_comment(base, ada, 'Article', other, '', 'there')!
 	comment := 'mutation { createComment(input: {userID: "${ada}", body: "x", '
 	assert failure(base, comment + 'ownerType: "Page", ownerID: "${article}"}) { id } }')! == '`ownerType` is one of Article, Post'
-	assert failure(base, comment + 'ownerType: "Post", ownerID: "${article}"}) { id } }')! == 'Post ${article} not found'
-	assert failure(base, comment + 'ownerType: "Article", ownerID: "${post}"}) { id } }')! == 'Article ${post} not found'
+	assert failure(base, comment + 'ownerType: "Post", ownerID: "${article}"}) { id } }')! == '`comments.owner_id`: no `Post` has the key `${article}`'
+	assert failure(base, comment + 'ownerType: "Article", ownerID: "${post}"}) { id } }')! == '`comments.owner_id`: no `Article` has the key `${post}`'
 	assert failure(base, comment + 'ownerType: "Article", ownerID: "${article}", parentID: "${on_other}"}) { id } }')! == 'a reply is on the owner of the comment it answers'
 	assert failure(base, comment + 'ownerType: "Article", ownerID: "${article}", parentID: "${post}"}) { id } }')! == 'the parent comment ${post} not found'
 	assert failure(base, 'mutation { createComment(input: {userID: "${ada}", ownerType: "Article", ownerID: "${article}", body: "  "}) { id } }')! == '`comments.body`: is blank'
 	// a deleted owner takes no new comments, and its comments still show it
 	data(base, 'mutation { deleteArticle(id: "${other}") }')!
-	assert failure(base, comment + 'ownerType: "Article", ownerID: "${other}"}) { id } }')! == 'Article ${other} not found'
+	assert failure(base, comment + 'ownerType: "Article", ownerID: "${other}"}) { id } }')! == '`comments.owner_id`: no `Article` has the key `${other}`'
 	assert at(data(base, '{ node(id: "${on_other}") { ... on Comment { article { title } } } }')!, 'node.article.title').as_string() == 'Two'
 }
 
@@ -574,7 +574,10 @@ fn test_startup_migrates() {
 	new_app_on(cfg, db, none)!
 	new_app_on(cfg, db, none)!
 	mut m := migrations.new(mut db)!
-	assert m.status()!.map('${it.version} ${it.name} ${it.state}') == ['1 initial applied']
+	assert m.status()!.map('${it.version} ${it.name} ${it.state}') == [
+		'1 initial applied',
+		'2 polymorphic_checks applied',
+	]
 	indexes := [
 		'articles_user_id_idx',
 		'comments_owner_type_owner_id_idx',
@@ -591,11 +594,28 @@ fn test_startup_migrates() {
 		'4 users',
 	]
 
-	m.rollback(1)!
-	assert m.status()!.map('${it.version} ${it.name} ${it.state}') == ['1 initial pending']
+	// the database checks a comment's owner too, for writes outside the app
+	triggers := "SELECT name FROM sqlite_master WHERE type = 'trigger' ORDER BY name"
+	assert db.exec(triggers)!.map(it.vals[0]) == ['comments_owner_id_poly_insert',
+		'comments_owner_id_poly_update']
+	// (the trigger runs before the row's other checks, so the user can be any)
+	if _ := db.exec_param_many('INSERT INTO comments ("Stamps.created_at", "Stamps.updated_at", user_id, owner_type, owner_id, body) VALUES (?, ?, ?, ?, ?, ?)',
+		['2026-10-14 00:00:00', '2026-10-14 00:00:00', '1', 'Article', '9', 'x'])
+	{
+		assert false, 'article 9 does not exist'
+	} else {
+		assert err.msg().contains('comments.owner_id: no row of the type in owner_type has this key')
+	}
+
+	m.rollback(2)!
+	assert m.status()!.map('${it.version} ${it.name} ${it.state}') == [
+		'1 initial pending',
+		'2 polymorphic_checks pending',
+	]
 	tables := "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('users', 'articles', 'posts', 'comments', 'vgraph_types')"
 	assert db.exec(tables)!.len == 0
 	assert edge_indexes(db)! == []
+	assert db.exec(triggers)!.len == 0
 
 	m.migrate()!
 	assert db.exec(tables)!.len == 5

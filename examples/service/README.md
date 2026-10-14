@@ -34,16 +34,19 @@ Startup runs the pending migrations of `migrations/` through V's `v.migrations`,
 which records them in `schema_migrations`. The first, `1 initial`, creates the
 tables from the schema (`vgraph.create_table`), the indexes their edges need
 (`vgraph.add_edge_indexes`) and each table's range of global ids
-(`vgraph.global_ids`). A schema change is a new migration. A database file from
+(`vgraph.global_ids`). The second, `2 polymorphic_checks`, adds the triggers
+that check a comment's `owner_type` and `owner_id` in the database too
+(`vgraph.add_polymorphic_checks`), for writes made outside the app. A schema
+change is a new migration. A database file from
 before Phase 7, with slugs and integer ids, doesn't fit: delete it.
 
 ## Layout
 
 ```
 main.v, app.v, seed.v      startup, wiring, example data
-hooks.v                    the hook that checks a new comment's owner and parent:
-                           it reads other tables through `graph`, which `models`
-                           can't import
+hooks.v                    the hook that checks a new reply's parent: it reads
+                           other tables through `graph`, which `models` can't
+                           import
 models/                    one file per model: the struct, its edges, field
                            options, hooks and GraphQL options; `stamps.v` has the
                            Stamps mixin and what the models share
@@ -131,7 +134,10 @@ Each is in the models, so every write follows it, whoever makes it:
   2,000 (posts) or 5,000 (comments). Field options check them (`fields()`), after
   the hooks that normalize (`hooks()`).
 - A comment's owner exists and isn't deleted, and is of the type `ownerType`
-  names; a reply is on its parent's owner (`hooks.v`).
+  names: vgraph checks this on every write that sets `ownerType` or `ownerID`,
+  from the polymorphic `article` and `post` edges, such as
+  `` `comments.owner_id`: no `Article` has the key `4294967297` ``. A reply is on
+  its parent's owner (`hooks.v`).
 - **Soft delete.** A delete sets `deletedAt`, and the record is then left out of
   every query: lists, counts, `node`. Lists on edges (a user's articles, an
   article's comments, a comment's replies) leave it out too. A record that refers

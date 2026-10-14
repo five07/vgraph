@@ -55,6 +55,7 @@ fn (c Client) create_all(t Table, ms []MutationData) ![]string {
 			data.op = .create
 			apply_defaults(t, options, mut data)
 			row := prepare_create(t, options, data)!
+			c.check_polymorphic(t, [], row)!
 			c.free_partners(t, '', row)!
 			rows << row
 		}
@@ -142,6 +143,7 @@ fn (c Client) write(t Table, mut m MutationData) ! {
 	match m.op {
 		.create {
 			row := prepare_create(t, options, m)!
+			c.check_polymorphic(t, [], row)!
 			c.free_partners(t, '', row)!
 			keys := c.insert_rows(t, [row], m)!
 			m.row_key = keys[0]
@@ -176,6 +178,7 @@ fn (c Client) update_rows(t Table, set Row, conds []load.Cond, m MutationData) !
 	if keys.len == 0 {
 		return 0
 	}
+	c.check_polymorphic(t, keys, set)!
 	for key in keys {
 		c.free_partners(t, key, set)!
 	}
@@ -684,10 +687,77 @@ fn (c Client) write_edges(t Table, key string, m MutationData) ! {
 				set[e.column] = key_value(ids[0], target_typ)
 				if e.type_col != '' {
 					set[e.type_col] = e.type_val
+					c.check_target(t, e.column, target, ids[0], e.type_val)!
 				}
 				where := load.where_data([load.in_keys(t.key, [key], typ)]) or { continue }
 				conn.update(orm.Table{ name: t.name }, query_data(set), where)!
 			}
+		}
+	}
+}
+
+// check_polymorphic checks each polymorphic column pair of `t` (`polymorphics`)
+// that `values` sets: its key column must name a row of the table its type
+// column names. On an update, `keys` are the rows written: a pair that
+// `values` sets only half of takes the other half from each stored row.
+fn (c Client) check_polymorphic(t Table, keys []string, values Row) ! {
+	for p in c.schema.polymorphics() {
+		if p.table != t.name || (p.column !in values && p.type_col !in values) {
+			continue
+		}
+		if keys.len == 0 || (p.column in values && p.type_col in values) {
+			c.check_pair(t, p, values)!
+			continue
+		}
+		for key in keys {
+			mut row := c.select_row(t, key)!
+			for name, value in values {
+				row[name] = value
+			}
+			c.check_pair(t, p, row)!
+		}
+	}
+}
+
+// check_pair checks the polymorphic column pair `p` of `row`: a null key
+// names no row, and passes.
+fn (c Client) check_pair(t Table, p Polymorphic, row Row) ! {
+	value := row[p.column] or { orm.Primitive(orm.Null{}) }
+	if value is orm.Null {
+		return
+	}
+	type_value := row[p.type_col] or { orm.Primitive(orm.Null{}) }
+	name := if type_value is string { type_value } else { '' }
+	table := p.targets[name] or {
+		mut known := p.targets.keys()
+		known.sort()
+		return ValidationError{
+			table:   t.name
+			field:   p.type_col
+			message: if name == '' {
+				'is required with `${p.column}`'
+			} else {
+				'is `${name}`, not one of ${known.map('`${it}`').join(', ')}'
+			}
+		}
+	}
+	c.check_target(t, p.column, c.schema.table(table)!, key_text(value), name)!
+}
+
+// check_target checks that `key`, which the column `column` of `t` is set to,
+// names a row of `target`, whose type is `name`. It reads through `target`'s
+// root query, so its privacy rules and interceptors apply: a soft-deleted row
+// counts as missing.
+fn (c Client) check_target(t Table, column string, target Table, key string, name string) ! {
+	typ := key_type(target)!
+	q := c.prepare_query(target.name, load.Query{
+		conds: [load.in_keys(target.key, [key], typ)]
+	})!
+	if load.select_keys_where(c.conn, target.name, target.key, typ, q, false)!.len == 0 {
+		return ValidationError{
+			table:   t.name
+			field:   column
+			message: 'no `${name}` has the key `${key}`'
 		}
 	}
 }

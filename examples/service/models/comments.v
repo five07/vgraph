@@ -6,9 +6,10 @@ import five07.vgraph
 // Comment is a comment by a user on another record, its owner: `owner_type`
 // is the owner's type (`Article`, `Post`), and `owner_id` its id. The owner
 // can be in either table, so the database can't check it with a foreign key:
-// a hook of the app does (`register_comment_checks`, in `hooks.v`). A reply
-// has the id of the comment it answers in `parent_id`, which must have the
-// same owner.
+// vgraph's writes do, from the `article` and `post` edges, and so do the
+// triggers of the second migration. A reply has the id of the comment it
+// answers in `parent_id`, which must have the same owner: a hook of the app
+// checks that (`register_comment_checks`, in `hooks.v`).
 @[table: 'comments']
 pub struct Comment {
 	Stamps

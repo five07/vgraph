@@ -239,6 +239,14 @@ g.tx(fn (tx graph.Graph) ! {
   `set_<edge>_id` / `set_<edge>` / `clear_<edge>` for unique edges, and
   `add_` / `remove_<edge>_ids`, `add_` / `remove_<edge>` and `clear_<edge>` for the
   others. A polymorphic edge sets its type column as well.
+- **Polymorphic keys:** no foreign key can check a column that holds keys of
+  several tables (`owner_id`, with `owner_type` naming the table), so writes do:
+  a create or update that sets either column reads the target by key through
+  that table's root query, and fails with a `vgraph.ValidationError` when there
+  is none, such as `` `comments.owner_id`: no `Article` has the key `9` ``. Its
+  privacy rules and interceptors apply, so a soft-deleted target counts as
+  missing. A type no edge declares fails too; a null key passes. One select per
+  row written (`schema.polymorphics()` lists the pairs and their types).
 - **Transactions:** a write and its edge writes run in one transaction when the
   connection can run one; `g.tx` runs several, and writes inside it join it.
   `save()` and `exec()` on one row return `graph.NotFoundError` when it is missing.
@@ -545,7 +553,13 @@ vgraph gives them what the declared edges need, as `v.migrations` values:
 - `schema.join_table(table, edge)`: a many_to_many edge's join table, for
   `ctx.create_table`;
 - `vgraph.add_edge_indexes(mut ctx, schema)` and `remove_edge_indexes`, for a
-  migration's `up` and `down`.
+  migration's `up` and `down`;
+- `vgraph.add_polymorphic_checks(mut ctx, schema)` and
+  `remove_polymorphic_checks`: a trigger on each polymorphic column pair, on
+  SQLite and PostgreSQL, that checks on insert and update that the key names a
+  row of the table the type names, for apps that also write outside vgraph. It
+  sees rows as stored (a soft-deleted target still counts), and doesn't stop a
+  target's delete.
 
 ```v ignore
 import v.migrations

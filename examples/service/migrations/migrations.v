@@ -19,6 +19,12 @@ pub fn all() []vm.Migration {
 			up:      initial_up
 			down:    initial_down
 		},
+		vm.Migration{
+			version: 2
+			name:    'polymorphic_checks'
+			up:      polymorphic_checks_up
+			down:    polymorphic_checks_down
+		},
 	]
 }
 
@@ -50,4 +56,17 @@ fn initial_down(mut ctx vm.Context) ! {
 	for table in ['comments', 'posts', 'articles', 'users', 'vgraph_types'] {
 		ctx.drop_table(table)!
 	}
+}
+
+// polymorphic_checks_up adds the triggers that check, in the database, that a
+// comment's `owner_id` names a row of the table its `owner_type` names, which
+// no foreign key can: vgraph's writes check it already, and the triggers
+// catch writes made outside the app.
+fn polymorphic_checks_up(mut ctx vm.Context) ! {
+	vgraph.add_polymorphic_checks(mut ctx, graph.schema()!)!
+}
+
+// polymorphic_checks_down removes the triggers.
+fn polymorphic_checks_down(mut ctx vm.Context) ! {
+	vgraph.remove_polymorphic_checks(mut ctx, graph.schema()!)!
 }

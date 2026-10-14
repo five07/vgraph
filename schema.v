@@ -422,6 +422,66 @@ pub fn (s Schema) edge(table string, name string) !Edge {
 	return error('`${table}` has no edge `${name}`')
 }
 
+// Polymorphic is a pair of columns that polymorphic edges use: `column` holds
+// a key of one of several tables, and `type_col` names which, such as a
+// comment's `owner_id` and `owner_type`. No foreign key can check it, so the
+// writes do (`Client.create`), and `add_polymorphic_checks` adds triggers
+// that do.
+pub struct Polymorphic {
+pub:
+	table    string // the table that holds both columns
+	column   string
+	type_col string
+	// targets: the table each value of `type_col` names, such as `Article`:
+	// `articles`
+	targets map[string]string
+}
+
+// polymorphics returns the schema's polymorphic column pairs, sorted by table
+// and column, with the targets that its edges declare on either side: a
+// many_to_one edge's target, and the table of a one_to_many or one_to_one
+// edge to the holder. A view's columns are left out.
+pub fn (s Schema) polymorphics() []Polymorphic {
+	mut found := map[string]Polymorphic{}
+	for table in s.tables() {
+		for edge in table.edges {
+			if edge.type_col == '' || edge.kind == .many_to_many {
+				continue
+			}
+			holder, target := if edge.kind == .many_to_one {
+				table.name, edge.to
+			} else {
+				edge.to, table.name
+			}
+			if t := s.tables[holder] {
+				if t.view {
+					continue
+				}
+			}
+			id := '${holder}.${edge.column}.${edge.type_col}'
+			mut p := found[id] or {
+				Polymorphic{
+					table:    holder
+					column:   edge.column
+					type_col: edge.type_col
+				}
+			}
+			if edge.type_val !in p.targets {
+				mut targets := p.targets.clone()
+				targets[edge.type_val] = target
+				p = Polymorphic{
+					...p
+					targets: targets
+				}
+			}
+			found[id] = p
+		}
+	}
+	mut ids := found.keys()
+	ids.sort()
+	return ids.map(found[it])
+}
+
 // validate checks every edge against the registered tables, and returns every
 // problem it finds in one error, one per line.
 pub fn (s Schema) validate() ! {
@@ -500,8 +560,35 @@ pub fn (s Schema) validate() ! {
 			}
 		}
 	}
+	check_polymorphic_types(mut problems, s)
 	if problems.len > 0 {
 		return error(problems.join('\n'))
+	}
+}
+
+// check_polymorphic_types reports a value of a polymorphic edge's `type_col`
+// that names two tables, so a write couldn't tell which to check.
+fn check_polymorphic_types(mut problems []string, s Schema) {
+	mut seen := map[string]string{}
+	for table in s.tables() {
+		for edge in table.edges {
+			if edge.type_col == '' || edge.kind == .many_to_many {
+				continue
+			}
+			holder, target := if edge.kind == .many_to_one {
+				table.name, edge.to
+			} else {
+				edge.to, table.name
+			}
+			id := '`${holder}.${edge.type_col}` = `${edge.type_val}`'
+			if other := seen['${id} ${edge.column}'] {
+				if other != target {
+					problems << '${table.name}.${edge.name}: ${id} names both `${other}` and `${target}`'
+				}
+				continue
+			}
+			seen['${id} ${edge.column}'] = target
+		}
 	}
 }
 

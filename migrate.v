@@ -436,3 +436,84 @@ pub fn global_ids(mut ctx migrations.Context, s Schema) ! {
 		ctx.execute("INSERT INTO vgraph_types (id, name) VALUES (${index}, '${name}')")!
 	}
 }
+
+// polymorphic_check_name returns the name of the trigger, and on PostgreSQL
+// of its function, that checks the polymorphic pair `p`:
+// `<table>_<column>_poly`.
+fn polymorphic_check_name(p Polymorphic) string {
+	return '${p.table}_${p.column}_poly'
+}
+
+// polymorphic_missing returns a condition, on the row being written (`NEW`),
+// that is true when its pair `p` names no row: the key column is set, and no
+// target of the type the type column names has that key. A type no edge
+// declares names no row.
+fn (s Schema) polymorphic_missing(p Polymorphic) !string {
+	mut types := p.targets.keys()
+	types.sort()
+	mut parts := []string{}
+	for typ in types {
+		target := s.table(p.targets[typ])!
+		parts << "SELECT 1 FROM ${quote_name(target.name)} WHERE NEW.${quote_name(p.type_col)} = '${typ.replace("'", "''")}' AND ${quote_name(target.name)}.${quote_name(target.key)} = NEW.${quote_name(p.column)}"
+	}
+	return 'NEW.${quote_name(p.column)} IS NOT NULL AND NOT EXISTS (${parts.join(' UNION ALL ')})'
+}
+
+// add_polymorphic_checks checks the schema `s`, and adds, for each of its
+// `polymorphics()`, a trigger that checks the pair on insert and on an update
+// of either column, for a migration's `up`, on SQLite and PostgreSQL: the key
+// column must be null or name a row of the table the type column names. The
+// writes check this already (`Client.create`); the triggers are for an app
+// that also writes outside vgraph. They see rows as the database has them: a
+// soft-deleted target still counts, and a deleted target leaves its
+// references as they are.
+//
+// A failed check aborts the statement with `<table>.<column>: no row of the
+// type in <type_col> has this key`; on PostgreSQL its SQLSTATE is 23503
+// (`foreign_key_violation`).
+pub fn add_polymorphic_checks(mut ctx migrations.Context, s Schema) ! {
+	s.validate()!
+	for p in s.polymorphics() {
+		name := polymorphic_check_name(p)
+		missing := s.polymorphic_missing(p)!
+		message := '${p.table}.${p.column}: no row of the type in ${p.type_col} has this key'.replace("'", "''")
+		columns := '${quote_name(p.type_col)}, ${quote_name(p.column)}'
+		match ctx.dialect {
+			.sqlite {
+				for event in ['INSERT', 'UPDATE OF ${columns}'] {
+					suffix := if event == 'INSERT' { 'insert' } else { 'update' }
+					ctx.execute("CREATE TRIGGER ${quote_name('${name}_${suffix}')} BEFORE ${event} ON ${quote_name(p.table)} WHEN ${missing} BEGIN SELECT RAISE(ABORT, '${message}'); END")!
+				}
+			}
+			.pg {
+				ctx.execute("CREATE FUNCTION ${quote_name(name)}() RETURNS trigger LANGUAGE plpgsql AS \$\$ BEGIN IF ${missing} THEN RAISE EXCEPTION '${message}' USING ERRCODE = 'foreign_key_violation'; END IF; RETURN NEW; END \$\$")!
+				ctx.execute('CREATE TRIGGER ${quote_name(name)} BEFORE INSERT OR UPDATE OF ${columns} ON ${quote_name(p.table)} FOR EACH ROW EXECUTE FUNCTION ${quote_name(name)}()')!
+			}
+			else {
+				return error('polymorphic checks run on SQLite and PostgreSQL')
+			}
+		}
+	}
+}
+
+// remove_polymorphic_checks removes the triggers of `add_polymorphic_checks`,
+// and on PostgreSQL their functions, for the `down` of a migration that added
+// them.
+pub fn remove_polymorphic_checks(mut ctx migrations.Context, s Schema) ! {
+	for p in s.polymorphics().reverse() {
+		name := polymorphic_check_name(p)
+		match ctx.dialect {
+			.sqlite {
+				ctx.execute('DROP TRIGGER IF EXISTS ${quote_name('${name}_update')}')!
+				ctx.execute('DROP TRIGGER IF EXISTS ${quote_name('${name}_insert')}')!
+			}
+			.pg {
+				ctx.execute('DROP TRIGGER IF EXISTS ${quote_name(name)} ON ${quote_name(p.table)}')!
+				ctx.execute('DROP FUNCTION IF EXISTS ${quote_name(name)}()')!
+			}
+			else {
+				return error('polymorphic checks run on SQLite and PostgreSQL')
+			}
+		}
+	}
+}

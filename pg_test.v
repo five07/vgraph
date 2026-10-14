@@ -268,8 +268,10 @@ fn test_postgres_migration_helpers() {
 					}
 				}
 				add_edge_indexes(mut ctx, s)!
+				add_polymorphic_checks(mut ctx, s)!
 			}
 			down:    fn [s] (mut ctx migrations.Context) ! {
+				remove_polymorphic_checks(mut ctx, s)!
 				remove_edge_indexes(mut ctx, s)!
 			}
 		},
@@ -285,8 +287,56 @@ fn test_postgres_migration_helpers() {
 		'vg_comments_parent_id_fkey',
 	]
 	assert s.foreign_keys()!.map(it.name) == keys.map(it.vals[0] or { '' })
+	// a comment's owner is checked by a trigger
+	triggers := "SELECT tgname FROM pg_trigger WHERE tgname LIKE 'vg_%_poly' ORDER BY tgname"
+	assert db.exec(triggers)!.map(it.vals[0] or { '' }) == ['vg_comments_owner_id_poly']
+	db.exec("INSERT INTO vg_users (name) VALUES ('ada')")!
+	db.exec("INSERT INTO vg_articles (user_id, title) VALUES (1, 'a')")!
+	comment := 'INSERT INTO vg_comments (owner_type, owner_id, body, created_at) VALUES'
+	db.exec("${comment} ('Article', 1, 'ok', now())")!
+	for values in ["'Article', 9", "'Post', 1"] {
+		if _ := db.exec("${comment} (${values}, 'bad', now())") {
+			assert false, values
+		} else {
+			assert err.msg().contains('vg_comments.owner_id: no row of the type in owner_type has this key')
+		}
+	}
+	if _ := db.exec('UPDATE vg_comments SET owner_id = 9') {
+		assert false
+	}
 	m.rollback(1)!
 	assert db.exec(indexes)!.len == 0
+	assert db.exec(triggers)!.len == 0
+	assert db.exec("SELECT 1 FROM pg_proc WHERE proname = 'vg_comments_owner_id_poly'")!.len == 0
+}
+
+// The writes check a polymorphic edge's key against the table its type
+// names, through the driver.
+fn test_postgres_polymorphic_writes() {
+	c := Client.new(vpg.pool(pg_seeded()!), pg_schema()!)!
+	comment := fn [c] (typ string, owner int) !string {
+		return c.create(MutationData{
+			op:     .create
+			table:  'vg_comments'
+			values: {
+				'owner_type': orm.Primitive(typ)
+				'owner_id':   owner
+				'body':       'new'
+				'created_at': time.now()
+			}
+		})
+	}
+	assert comment('Article', 2)! == '4'
+	if _ := comment('Article', 9) {
+		assert false
+	} else {
+		assert err.msg() == '`vg_comments.owner_id`: no `Article` has the key `9`'
+	}
+	if _ := comment('Post', 1) {
+		assert false
+	} else {
+		assert err.msg() == '`vg_comments.owner_type`: is `Post`, not one of `Article`'
+	}
 }
 
 // Writes through the driver on a pool: a multi-row insert returns its keys in

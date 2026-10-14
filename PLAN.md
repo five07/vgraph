@@ -227,6 +227,42 @@ nothing in vgraph checks that `owner_id` names a row of the table `owner_type` n
 - (c) Only (a).
 > A: default
 
+**Result (2026-10-14): done, (a) and (b).**
+- `Schema.polymorphics()` (`schema.v`): each polymorphic column pair
+  (`table`, `column`, `type_col`) with the table each type value names, from the
+  edges on both sides: a many_to_one edge's target, and the table of a
+  one_to_many or one_to_one edge to the holder. So a type declared only on the
+  target's side (a `Clip` with notes, but no `clip` edge on notes) counts.
+  `validate` now reports a type value that names two tables.
+- (a) `write.v`: `check_polymorphic` runs after the other checks, before the
+  SQL, on a create (both the hooks and the no-hooks bulk paths), an update, and
+  `added` on a polymorphic many_to_one edge. It reads the target by key through
+  `prepare_query`, so the target's privacy rules and interceptors apply:
+  soft-deleted is missing, `skip('soft_delete')` or `privileged()` see it, and a
+  query rule that denies makes the write a `PrivacyError`. An update that sets
+  half a pair reads the other half from each stored row (`select_row`). Errors are
+  `ValidationError`s: `` `notes.owner_id`: no `Doc` has the key `9` ``,
+  `` `notes.owner_type`: is `Video`, not one of `Clip`, `Doc`, `Pic` ``, or
+  `` `notes.owner_type`: is required with `owner_id` ``. A null key passes. One select per row written,
+  per pair it sets (writes are per row anyway, Q122).
+- (b) `migrate.v`: `add_polymorphic_checks` / `remove_polymorphic_checks`. SQLite:
+  `BEFORE INSERT` and `BEFORE UPDATE OF <type_col>, <column>` triggers
+  (`<table>_<column>_poly_insert`, `_update`) that `RAISE(ABORT, ...)`.
+  PostgreSQL: a plpgsql function and one `BEFORE INSERT OR UPDATE OF` trigger,
+  both `<table>_<column>_poly`, raising SQLSTATE 23503. The condition is
+  `NEW.column IS NOT NULL AND NOT EXISTS (SELECT 1 FROM t1 WHERE NEW.type = 'A'
+  AND t1.key = NEW.column UNION ALL ...)`, so an unknown or null type with a key
+  fails. They see stored rows: a soft-deleted target still counts, and deleting a
+  target leaves its references (Q124 asked for insert and update only).
+- `examples/service`: the hook keeps only the reply's parent check
+  (`check_parent`); the owner errors are vgraph's now. A second migration,
+  `2 polymorphic_checks`, adds the triggers, and the startup test checks them.
+- Tests: `polymorphic_test.v` (creates, bulk, updates of one and many rows, the
+  edge setter, a soft-deleted target, the SQLite triggers up and down; on both
+  clients), `pg_test.v` (the triggers in the migration test, and the write
+  check through the driver). `v test .`, PostgreSQL, `v fmt -verify` pass; the
+  generated examples are unchanged.
+
 ### G4. Schema discovery and validation
 
 **Q125. What this means.** **Default:** (a) now; (b) after v0.1.0, if an issue asks.
