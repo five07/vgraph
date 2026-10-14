@@ -86,6 +86,8 @@ Check out the [examples](./examples) in this repo for various examples and use-c
 - [`examples/pagination`](./examples/pagination): lists paged by `limit` and
   `offset` beside Relay connections paged by cursor, at the root and per parent,
   and when to use which.
+- [`examples/auth`](./examples/auth): JWT logins, privacy rules by viewer, and
+  hooks that run one way for an admin and another for a member.
 
 ## Typed client: `vgraph gen`
 

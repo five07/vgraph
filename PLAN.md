@@ -30,7 +30,8 @@ to that version. This plan's questions start at Q121.
 - `examples/relations/`: every Ent relationship kind and schema option, tested on
   SQLite and PostgreSQL. `examples/service/`: a GraphQL API on vgraph alone.
   `examples/pagination/`: lists and Relay connections, paged at the root and per
-  parent (G5).
+  parent (G5). `examples/auth/`: JWT logins, privacy rules and hooks by viewer
+  (G6).
 - `regressions/`: one small program per V compiler bug vgraph works around, or
   meets (9 so far).
 
@@ -49,7 +50,8 @@ to that version. This plan's questions start at Q121.
   tables, so use a throwaway database. graphql-js: `graphql/testdata/check_schema.js`,
   with `graphql@16.11.0` from npm on `NODE_PATH`.
 - **After changing the generator or a model:** run `v run cmd/vgraph gen` on
-  `examples/service`, `examples/relations` and `examples/pagination`; CI fails when the checked-in output is
+  `examples/service`, `examples/relations`, `examples/pagination` and
+  `examples/auth`; CI fails when the checked-in output is
   stale. A change to `examples/service`'s schema needs `testdata/introspection.json`
   re-recorded from graphql-js (`graphql/testdata/README.md`).
 - **CI** (`.github/workflows/ci.yml`) runs only on pushes to `main`: `v fmt -verify`,
@@ -441,6 +443,42 @@ fails the request.
 authentication. The other choices: a small `five07.vgraph.auth` module, or a VPM
 package.
 > A: just scaffold what is needed in the example. I don't want to rely on external VPM deps but have a look at `https://vpm.vlang.io/packages/deatil.vjwt` for fitness.
+
+**Result (2026-10-14): done.** `examples/auth`, on veb and SQLite:
+- `deatil.vjwt` (looked at, per Q128): HS256 and the time claims are there, but
+  it is a VPM dependency, with no version history or sign of maintenance, and an
+  example in its docs that doesn't run. `auth/jwt.v` is ~100 lines on
+  `crypto.hmac`, `crypto.sha256`, `encoding.base64` and `json2` (V master
+  removed `json`): `sign`, `issue`, `verify` (HS256 only, so `alg: none` is
+  refused; constant-time compare; expiry), checked against Python's `hmac` by
+  hand. `auth/viewer.v`: `Viewer`, `viewer_of(ctx)`, and bcrypt from
+  `crypto.bcrypt`, its cost from `BCRYPT_COST` (the tests use 4).
+- Models: users (`email` and `password` sensitive; `admin` defaults to false)
+  and posts (relay). Privacy: `visible_posts` (published, own drafts, all for an
+  admin), `allow_admin`, `deny_anonymous`, `user_writes` (anyone signs up, a user
+  updates only their own account, else admin only). Hooks, the same write by
+  different viewers (Q127's answer): `set_author` (a member posts as themselves,
+  naming another fails; an admin posts as anyone), `admin_only` (only an admin
+  grants or changes `admin`), `hash_password` (length check, then bcrypt).
+- `main.v`: `JWT_SECRET` (at least 32 bytes), `Authorization: Bearer`; no
+  header is anonymous, a token that doesn't verify a 401 with
+  `WWW-Authenticate`. `owner_only`, registered on the graph, reads post authors
+  through `g.privileged()`. The seed runs as an admin viewer, through the same
+  rules. Page sizes: `default_page: 20, max_page: 100`.
+- `schema/auth.graphql`: `me` and `login`, resolved in `graph/resolvers.v`;
+  `login` reads through a privileged graph, and gives one error for a wrong
+  email or password.
+- Found along the way: rules registered on the graph run before the model's,
+  so an app rule that should defer to `allow_admin` has to skip admins itself.
+  The README says so.
+- Tests: `auth/jwt_test.v`; `main_test.v` over HTTP: login, tokens (expired,
+  forged, malformed, `Basic`), reading by viewer (lists, counts, edges, nested
+  connections, sensitive fields absent), creating, changing, users (signup,
+  roles, own account, deletes, password change), stored hashes, config. SQLite
+  only: the rules add plain conditions, which the other examples run on
+  PostgreSQL.
+- README: the rules table, where each lives, tokens, and a curl walkthrough
+  from the running server. CI checks the example's generated code and schema.
 
 ### G7. OpenTelemetry
 
