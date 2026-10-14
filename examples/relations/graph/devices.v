@@ -986,19 +986,22 @@ fn (q DeviceQuery) load_groups(rows []models.Device, fns []fn (GroupQuery) Group
 	}
 	pairs := load.link_pairs(q.graph.client.conn, 'device_groups', 'device_id',
 		'group_id', rows.map(it.id.str()), .string, .int)!
-	targets := sub.nodes(load.select_in[models.Group](q.graph.client.conn, 'id',
-		load.unique(pairs.map(it[1])),
-		query: q.graph.client.prepare_edge_query('groups', sub.query)!
-	)!)!
-	// each parent's targets in the order of the query
-	mut parents_of := map[string][]string{}
-	for pair in pairs {
-		parents_of[pair[1]] << pair[0]
-	}
+	// each parent's targets in the order of the query: one select per group of
+	// parents, so each parent's order comes from one statement
 	mut linked := map[string][]GroupNode{}
-	for target in targets {
-		for parent in parents_of[target.group.id.str()] or { [] } {
-			linked[parent] << target
+	for group in load.parent_groups(pairs) {
+		targets := sub.nodes(load.select_in[models.Group](q.graph.client.conn, 'id',
+			load.unique(group.map(it[1])),
+			query: q.graph.client.prepare_edge_query('groups', sub.query)!
+		)!)!
+		mut parents_of := map[string][]string{}
+		for pair in group {
+			parents_of[pair[1]] << pair[0]
+		}
+		for target in targets {
+			for parent in parents_of[target.group.id.str()] or { [] } {
+				linked[parent] << target
+			}
 		}
 	}
 	return linked

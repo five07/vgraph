@@ -4,11 +4,26 @@ import orm
 
 // select_in returns the `T` records whose `column` is one of `ids`, keys in their
 // string form, narrowed and ordered by `opts`: one query, or two through a
-// vgraph driver when the ORM can't run it. It calls `orm.Connection.select`
+// vgraph driver when the ORM can't run it, per `max_keys` ids. Split, rows come
+// in each part's order, so each value of `column` keeps its rows' order; an
+// ordered load by `T`'s key isn't split, as its order runs across keys (callers
+// split it by parent: `parent_groups`). It calls `orm.Connection.select`
 // directly: `orm.new_query`, which could do this, leaves the standard library
 // after 2027-08-17 (PLAN.md, Q17). Fields may be `int`, `i64`, `f64`, `bool`,
 // `string` or `time.Time`, or options of those.
 pub fn select_in[T](conn orm.Connection, column string, ids []string, opts Options) ![]T {
+	if ids.len <= max_keys || (column == primary_key[T]() && opts.query.all_orders().len > 0) {
+		return select_part[T](conn, column, ids, opts)
+	}
+	mut rows := []T{}
+	for part in chunks(ids) {
+		rows << select_part[T](conn, column, part, opts)!
+	}
+	return rows
+}
+
+// select_part is `select_in` over one part of the ids.
+fn select_part[T](conn orm.Connection, column string, ids []string, opts Options) ![]T {
 	mut conds := [in_keys(column, ids, key_type[T](column)!)]
 	if opts.type_col != '' {
 		conds << eq(opts.type_col, opts.type_val)
@@ -33,13 +48,27 @@ fn select_rows[T](conn orm.Connection, table string, conds []Cond, q Query, limi
 		rows, _ := run_select[T](conn, table, orm_where(p.root), q, limit, '')!
 		return rows
 	}
-	if p.keys.len == 0 {
+	return rows_by_keys[T](conn, table, key, p.kind, p.keys, q.columns)!
+}
+
+// rows_by_keys returns the `T` records of `table` whose `key` is one of `keys`,
+// in the order of `keys`: one select per `max_keys` keys. Only the columns of
+// `columns` are read, when it names some.
+fn rows_by_keys[T](conn orm.Connection, table string, key string, kind KeyType, keys []string, columns []string) ![]T {
+	if keys.len == 0 {
 		return []T{}
 	}
-	rows, keys := run_select[T](conn, table, orm_where(in_keys(key, p.keys, p.kind)), Query{
-		columns: q.columns
-	}, false, key)!
-	return in_order(rows, keys, p.keys)
+	mut rows := []T{}
+	mut got := []string{}
+	for part in chunks(keys) {
+		part_rows, part_keys := run_select[T](conn, table, orm_where(in_keys(key, part, kind)),
+			Query{
+				columns: columns
+			}, false, key)!
+		rows << part_rows
+		got << part_keys
+	}
+	return in_order(rows, got, keys)
 }
 
 // in_order returns `rows`, whose keys are `keys`, in the order of `order`.
@@ -69,12 +98,7 @@ pub fn select_into[T](conn orm.Connection, table string, key string, kind KeyTyp
 		rows, _ := run_select[T](conn, table, orm_where(p.root), q, true, '')!
 		return rows
 	}
-	if p.keys.len == 0 {
-		return []T{}
-	}
-	rows, keys := run_select[T](conn, table, orm_where(in_keys(key, p.keys, kind)), Query{},
-		false, key)!
-	sorted := in_order(rows, keys, p.keys)
+	sorted := rows_by_keys[T](conn, table, key, kind, p.keys, []string{})!
 	if !q.distinct {
 		return sorted
 	}

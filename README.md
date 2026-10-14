@@ -199,7 +199,10 @@ many more rows of every table, and must run the same statements
   select per table among the ids.
 
 An edge whose keys come back empty skips the select of its rows, so a request can
-run fewer statements than this, never more. Writes aren't on the list: a create
+run fewer statements than this, never more. An edge load lists at most 10,000 keys
+(`load.max_keys`) in one statement, under the databases' caps on parameters: past
+that, each of its statements runs once per 10,000 parents (or targets), and each
+parent's rows still come in the query's order. Writes aren't on the list: a create
 writes a row and then its edges, and runs hooks per row (see Writes); a bulk
 create on SQLite is one insert per row. Resolvers an app writes itself
 (`Resolvers`) run what they run.

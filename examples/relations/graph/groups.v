@@ -720,19 +720,22 @@ fn (q GroupQuery) load_users(rows []models.Group, fns []fn (UserQuery) UserQuery
 	}
 	pairs := load.link_pairs(q.graph.client.conn, 'group_users', 'group_id',
 		'user_id', rows.map(it.id.str()), .int, .int)!
-	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
-		load.unique(pairs.map(it[1])),
-		query: q.graph.client.prepare_edge_query('users', sub.query)!
-	)!)!
-	// each parent's targets in the order of the query
-	mut parents_of := map[string][]string{}
-	for pair in pairs {
-		parents_of[pair[1]] << pair[0]
-	}
+	// each parent's targets in the order of the query: one select per group of
+	// parents, so each parent's order comes from one statement
 	mut linked := map[string][]UserNode{}
-	for target in targets {
-		for parent in parents_of[target.user.id.str()] or { [] } {
-			linked[parent] << target
+	for group in load.parent_groups(pairs) {
+		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
+			load.unique(group.map(it[1])),
+			query: q.graph.client.prepare_edge_query('users', sub.query)!
+		)!)!
+		mut parents_of := map[string][]string{}
+		for pair in group {
+			parents_of[pair[1]] << pair[0]
+		}
+		for target in targets {
+			for parent in parents_of[target.user.id.str()] or { [] } {
+				linked[parent] << target
+			}
 		}
 	}
 	return linked
@@ -781,19 +784,22 @@ fn (q GroupQuery) load_devices(rows []models.Group, fns []fn (DeviceQuery) Devic
 	}
 	pairs := load.link_pairs(q.graph.client.conn, 'device_groups', 'group_id',
 		'device_id', rows.map(it.id.str()), .int, .string)!
-	targets := sub.nodes(load.select_in[models.Device](q.graph.client.conn, 'id',
-		load.unique(pairs.map(it[1])),
-		query: q.graph.client.prepare_edge_query('devices', sub.query)!
-	)!)!
-	// each parent's targets in the order of the query
-	mut parents_of := map[string][]string{}
-	for pair in pairs {
-		parents_of[pair[1]] << pair[0]
-	}
+	// each parent's targets in the order of the query: one select per group of
+	// parents, so each parent's order comes from one statement
 	mut linked := map[string][]DeviceNode{}
-	for target in targets {
-		for parent in parents_of[target.device.id.str()] or { [] } {
-			linked[parent] << target
+	for group in load.parent_groups(pairs) {
+		targets := sub.nodes(load.select_in[models.Device](q.graph.client.conn, 'id',
+			load.unique(group.map(it[1])),
+			query: q.graph.client.prepare_edge_query('devices', sub.query)!
+		)!)!
+		mut parents_of := map[string][]string{}
+		for pair in group {
+			parents_of[pair[1]] << pair[0]
+		}
+		for target in targets {
+			for parent in parents_of[target.device.id.str()] or { [] } {
+				linked[parent] << target
+			}
 		}
 	}
 	return linked

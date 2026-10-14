@@ -124,7 +124,34 @@ edge up to 10,000 parents, and one more per 10,000 after that. A per-parent limi
 keys-first statement is split the same way. The other choices: (a) PostgreSQL's
 `= ANY($1)` with one array parameter (no limit, but the ORM path can't send arrays,
 so it needs the driver), or (b) document the limit and leave it.
-> A:
+> A: agreed, 10k chunks is a good size.
+
+**Result (2026-10-13): done; tests not yet written (to come with G2's or its own).**
+- `load.max_keys` (10,000) and `chunks` (`load/keys.v`). Split by parent:
+  `select_in` (and so `load_one`, `load_many`), `select_each`'s keys-first window
+  statement, `link_pairs`, `link_each` (both paths), `count_each`, `count_through`,
+  `expr_values`. Split by key, order restored with `in_order`: the rows-by-key
+  statement after any keys-first plan (`rows_by_keys`, also used by `select_into`).
+  Up to 10,000 keys, the statements are the same as before.
+- Order across parts: a split by parent keeps each parent's order exact, since a
+  parent's rows all come from one statement. An ordered load of targets *by key*
+  (many to many, `load_through`, and `link_each` without a driver) can't be split
+  by key without losing the order across parts, so the pairs are split into groups
+  of whole parents with at most 10,000 distinct targets each
+  (`load.parent_groups`), one ordered select per group; a target shared by two
+  groups is read twice. A single parent with more than 10,000 targets keeps them
+  in one statement, as before: it works up to the database's cap.
+- `select_in` therefore doesn't split an ordered load by `T`'s key; `load_one`
+  drops the order (its rows go in a map) so it can split. The generated
+  many_to_one loader still passes the edge query's order, so a load of more than
+  10,000 distinct targets with an order is one statement, as before.
+- The generated many-to-many loader loops over `load.parent_groups(pairs)`;
+  `examples/relations/graph` is regenerated.
+- Not split: conditions the app builds with a long list (`in_keys`, `in_ints`,
+  …, the GraphQL `nodes` ids), a node's `query_<edge>` through a join table, the
+  key lists `resolve` makes of subqueries without a driver, and writes (Q122).
+  A cap applies to a whole statement, so these would need one array or JSON
+  parameter (choice (a)) rather than parts.
 
 ### G2. Coverage
 

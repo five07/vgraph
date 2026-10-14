@@ -1621,19 +1621,22 @@ fn (q UserQuery) load_groups(rows []models.User, fns []fn (GroupQuery) GroupQuer
 	}
 	pairs := load.link_pairs(q.graph.client.conn, 'group_users', 'user_id',
 		'group_id', rows.map(it.id.str()), .int, .int)!
-	targets := sub.nodes(load.select_in[models.Group](q.graph.client.conn, 'id',
-		load.unique(pairs.map(it[1])),
-		query: q.graph.client.prepare_edge_query('groups', sub.query)!
-	)!)!
-	// each parent's targets in the order of the query
-	mut parents_of := map[string][]string{}
-	for pair in pairs {
-		parents_of[pair[1]] << pair[0]
-	}
+	// each parent's targets in the order of the query: one select per group of
+	// parents, so each parent's order comes from one statement
 	mut linked := map[string][]GroupNode{}
-	for target in targets {
-		for parent in parents_of[target.group.id.str()] or { [] } {
-			linked[parent] << target
+	for group in load.parent_groups(pairs) {
+		targets := sub.nodes(load.select_in[models.Group](q.graph.client.conn, 'id',
+			load.unique(group.map(it[1])),
+			query: q.graph.client.prepare_edge_query('groups', sub.query)!
+		)!)!
+		mut parents_of := map[string][]string{}
+		for pair in group {
+			parents_of[pair[1]] << pair[0]
+		}
+		for target in targets {
+			for parent in parents_of[target.group.id.str()] or { [] } {
+				linked[parent] << target
+			}
 		}
 	}
 	return linked
@@ -1682,19 +1685,22 @@ fn (q UserQuery) load_following(rows []models.User, fns []fn (UserQuery) UserQue
 	}
 	pairs := load.link_pairs(q.graph.client.conn, 'follows', 'follower_id',
 		'followee_id', rows.map(it.id.str()), .int, .int)!
-	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
-		load.unique(pairs.map(it[1])),
-		query: q.graph.client.prepare_edge_query('users', sub.query)!
-	)!)!
-	// each parent's targets in the order of the query
-	mut parents_of := map[string][]string{}
-	for pair in pairs {
-		parents_of[pair[1]] << pair[0]
-	}
+	// each parent's targets in the order of the query: one select per group of
+	// parents, so each parent's order comes from one statement
 	mut linked := map[string][]UserNode{}
-	for target in targets {
-		for parent in parents_of[target.user.id.str()] or { [] } {
-			linked[parent] << target
+	for group in load.parent_groups(pairs) {
+		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
+			load.unique(group.map(it[1])),
+			query: q.graph.client.prepare_edge_query('users', sub.query)!
+		)!)!
+		mut parents_of := map[string][]string{}
+		for pair in group {
+			parents_of[pair[1]] << pair[0]
+		}
+		for target in targets {
+			for parent in parents_of[target.user.id.str()] or { [] } {
+				linked[parent] << target
+			}
 		}
 	}
 	return linked
@@ -1743,19 +1749,22 @@ fn (q UserQuery) load_followers(rows []models.User, fns []fn (UserQuery) UserQue
 	}
 	pairs := load.link_pairs(q.graph.client.conn, 'follows', 'followee_id',
 		'follower_id', rows.map(it.id.str()), .int, .int)!
-	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
-		load.unique(pairs.map(it[1])),
-		query: q.graph.client.prepare_edge_query('users', sub.query)!
-	)!)!
-	// each parent's targets in the order of the query
-	mut parents_of := map[string][]string{}
-	for pair in pairs {
-		parents_of[pair[1]] << pair[0]
-	}
+	// each parent's targets in the order of the query: one select per group of
+	// parents, so each parent's order comes from one statement
 	mut linked := map[string][]UserNode{}
-	for target in targets {
-		for parent in parents_of[target.user.id.str()] or { [] } {
-			linked[parent] << target
+	for group in load.parent_groups(pairs) {
+		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
+			load.unique(group.map(it[1])),
+			query: q.graph.client.prepare_edge_query('users', sub.query)!
+		)!)!
+		mut parents_of := map[string][]string{}
+		for pair in group {
+			parents_of[pair[1]] << pair[0]
+		}
+		for target in targets {
+			for parent in parents_of[target.user.id.str()] or { [] } {
+				linked[parent] << target
+			}
 		}
 	}
 	return linked
@@ -1804,19 +1813,22 @@ fn (q UserQuery) load_friends(rows []models.User, fns []fn (UserQuery) UserQuery
 	}
 	pairs := load.link_pairs(q.graph.client.conn, 'friendships', 'user_id',
 		'friend_id', rows.map(it.id.str()), .int, .int)!
-	targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
-		load.unique(pairs.map(it[1])),
-		query: q.graph.client.prepare_edge_query('users', sub.query)!
-	)!)!
-	// each parent's targets in the order of the query
-	mut parents_of := map[string][]string{}
-	for pair in pairs {
-		parents_of[pair[1]] << pair[0]
-	}
+	// each parent's targets in the order of the query: one select per group of
+	// parents, so each parent's order comes from one statement
 	mut linked := map[string][]UserNode{}
-	for target in targets {
-		for parent in parents_of[target.user.id.str()] or { [] } {
-			linked[parent] << target
+	for group in load.parent_groups(pairs) {
+		targets := sub.nodes(load.select_in[models.User](q.graph.client.conn, 'id',
+			load.unique(group.map(it[1])),
+			query: q.graph.client.prepare_edge_query('users', sub.query)!
+		)!)!
+		mut parents_of := map[string][]string{}
+		for pair in group {
+			parents_of[pair[1]] << pair[0]
+		}
+		for target in targets {
+			for parent in parents_of[target.user.id.str()] or { [] } {
+				linked[parent] << target
+			}
 		}
 	}
 	return linked
@@ -1921,19 +1933,22 @@ fn (q UserQuery) load_liked_gadgets(rows []models.User, fns []fn (GadgetQuery) G
 	}
 	pairs := load.link_pairs(q.graph.client.conn, 'likes', 'user_id',
 		'gadget_id', rows.map(it.id.str()), .int, .i64)!
-	targets := sub.nodes(load.select_in[models.Gadget](q.graph.client.conn, 'id',
-		load.unique(pairs.map(it[1])),
-		query: q.graph.client.prepare_edge_query('gadgets', sub.query)!
-	)!)!
-	// each parent's targets in the order of the query
-	mut parents_of := map[string][]string{}
-	for pair in pairs {
-		parents_of[pair[1]] << pair[0]
-	}
+	// each parent's targets in the order of the query: one select per group of
+	// parents, so each parent's order comes from one statement
 	mut linked := map[string][]GadgetNode{}
-	for target in targets {
-		for parent in parents_of[target.gadget.id.str()] or { [] } {
-			linked[parent] << target
+	for group in load.parent_groups(pairs) {
+		targets := sub.nodes(load.select_in[models.Gadget](q.graph.client.conn, 'id',
+			load.unique(group.map(it[1])),
+			query: q.graph.client.prepare_edge_query('gadgets', sub.query)!
+		)!)!
+		mut parents_of := map[string][]string{}
+		for pair in group {
+			parents_of[pair[1]] << pair[0]
+		}
+		for target in targets {
+			for parent in parents_of[target.gadget.id.str()] or { [] } {
+				linked[parent] << target
+			}
 		}
 	}
 	return linked

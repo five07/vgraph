@@ -47,8 +47,8 @@ fn window_bounds(q Query) string {
 // select_each returns the `T` records whose `column` is one of `ids`, as
 // `select_in` does, with `opts.query`'s limit and offset applied to the rows
 // of each value of `column`, in the query's order. Through a vgraph driver,
-// the database cuts them (two queries: the keys, then the rows); without one,
-// every matching row is read and cut here.
+// the database cuts them (two queries: the keys, then the rows, each one per
+// `max_keys`); without one, every matching row is read and cut here.
 pub fn select_each[T](conn orm.Connection, column string, ids []string, opts Options) ![]T {
 	q := opts.query
 	if !paged(q) {
@@ -71,8 +71,20 @@ pub fn select_each[T](conn orm.Connection, column string, ids []string, opts Opt
 	mut r := conn as Raw
 	table := table_name[T]()
 	key := primary_key[T]()
-	kind := key_type[T](key)!
-	mut conds := [in_keys(column, ids, key_type[T](column)!)]
+	column_kind := key_type[T](column)!
+	// each part's parents whole, so the keys keep each parent's order
+	mut keys := []string{}
+	for part in chunks(ids) {
+		keys << each_keys(mut r, table, key, column, column_kind, part, opts)!
+	}
+	return rows_by_keys[T](conn, table, key, key_type[T](key)!, keys, q.columns)!
+}
+
+// each_keys returns the keys of the rows of `table` that `select_each` reads
+// for the values `ids` of `column`, cut per value by a window, in one query.
+fn each_keys(mut r Raw, table string, key string, column string, kind KeyType, ids []string, opts Options) ![]string {
+	q := opts.query
+	mut conds := [in_keys(column, ids, kind)]
 	if opts.type_col != '' {
 		conds << eq(opts.type_col, opts.type_val)
 	}
@@ -82,7 +94,7 @@ pub fn select_each[T](conn orm.Connection, column string, ids []string, opts Opt
 	conds << q.conds
 	root := normalize(and(...conds), false)
 	if root.junction == .false {
-		return []T{}
+		return []string{}
 	}
 	mut p := Params{
 		dialect: r.dialect()
@@ -92,66 +104,24 @@ pub fn select_each[T](conn orm.Connection, column string, ids []string, opts Opt
 		inner += ' WHERE ${render(root, mut p)!}'
 	}
 	text := 'SELECT ${quote('k')} FROM (${inner}) AS ${quote('w')} WHERE ${window_bounds(q)} ORDER BY ${quote('p')}, ${quote('n')}'
-	keys := r.exec_params(text, p.values)!.map(if it.len > 0 { it[0] or { '' } } else { '' })
-	if keys.len == 0 {
-		return []T{}
-	}
-	rows, got := run_select[T](conn, table, orm_where(in_keys(key, keys, kind)), Query{
-		columns: q.columns
-	}, false, key)!
-	return in_order(rows, got, keys)
+	return r.exec_params(text, p.values)!.map(if it.len > 0 { it[0] or { '' } } else { '' })
 }
 
 // link_each returns the `[from_col, to_col]` pairs of the join table `through`
 // whose `from_col` is one of `ids`, and whose `to_col` is a row of `target`
 // (keyed by `target_key`) that matches `q`, in `q`'s order for each parent,
 // with `q`'s limit and offset applied to each parent's pairs. Through a vgraph
-// driver it is one query; without one, three: the pairs, the targets' keys in
-// order, and none more.
+// driver it is one query; without one, two: the pairs, then the targets' keys
+// in order. Past `max_keys` parents (or targets), one more of each per part.
 pub fn link_each(conn orm.Connection, through string, from_col string, to_col string, ids []string, from KeyType, to KeyType, target string, target_key string, q Query) ![][]string {
 	if ids.len == 0 {
 		return [][]string{}
 	}
 	if conn !is Raw {
 		pairs := link_pairs(conn, through, from_col, to_col, ids, from, to)!
-		targets := unique(pairs.map(it[1]))
-		if targets.len == 0 {
-			return [][]string{}
-		}
-		mut conds := [in_keys(target_key, targets, to)]
-		conds << q.conds
-		order := select_keys_where(conn, target, target_key, to, Query{
-			...q
-			conds:  conds
-			limit:  0
-			offset: 0
-		}, false)!
-		mut at := map[string]int{}
-		for i, k in order {
-			at[k] = i
-		}
-		mut by_parent := map[string][]string{}
-		mut parents := []string{}
-		for pair in pairs {
-			if pair[1] !in at {
-				continue
-			}
-			if pair[0] !in by_parent {
-				parents << pair[0]
-			}
-			by_parent[pair[0]] << pair[1]
-		}
 		mut out := [][]string{}
-		for parent in parents {
-			mut list := by_parent[parent]
-			list.sort_with_compare(fn [at] (a &string, b &string) int {
-				return (at[*a] or { 0 }) - (at[*b] or { 0 })
-			})
-			for i, t in list {
-				if i >= q.offset && (q.limit == 0 || i < q.offset + q.limit) {
-					out << [parent, t]
-				}
-			}
+		for group in parent_groups(pairs) {
+			out << cut_pairs(conn, group, to, target, target_key, q)!
 		}
 		return out
 	}
@@ -160,6 +130,63 @@ pub fn link_each(conn orm.Connection, through string, from_col string, to_col st
 	if root.junction == .false {
 		return [][]string{}
 	}
+	mut out := [][]string{}
+	for part in chunks(ids) {
+		out << window_pairs(mut r, through, from_col, to_col, part, from, target, target_key,
+			root, q)!
+	}
+	return out
+}
+
+// cut_pairs returns `pairs`, the `[parent, target]` pairs of whole parents,
+// whose target is a row of `target` that matches `q`, each parent's in `q`'s
+// order and cut by its limit and offset: the targets' keys in one query.
+fn cut_pairs(conn orm.Connection, pairs [][]string, to KeyType, target string, target_key string, q Query) ![][]string {
+	targets := unique(pairs.map(it[1]))
+	if targets.len == 0 {
+		return [][]string{}
+	}
+	mut conds := [in_keys(target_key, targets, to)]
+	conds << q.conds
+	order := select_keys_where(conn, target, target_key, to, Query{
+		...q
+		conds:  conds
+		limit:  0
+		offset: 0
+	}, false)!
+	mut at := map[string]int{}
+	for i, k in order {
+		at[k] = i
+	}
+	mut by_parent := map[string][]string{}
+	mut parents := []string{}
+	for pair in pairs {
+		if pair[1] !in at {
+			continue
+		}
+		if pair[0] !in by_parent {
+			parents << pair[0]
+		}
+		by_parent[pair[0]] << pair[1]
+	}
+	mut out := [][]string{}
+	for parent in parents {
+		mut list := by_parent[parent]
+		list.sort_with_compare(fn [at] (a &string, b &string) int {
+			return (at[*a] or { 0 }) - (at[*b] or { 0 })
+		})
+		for i, t in list {
+			if i >= q.offset && (q.limit == 0 || i < q.offset + q.limit) {
+				out << [parent, t]
+			}
+		}
+	}
+	return out
+}
+
+// window_pairs is `link_each` through a driver over one part of the parents,
+// with `root`, `q`'s conditions normalized: one query.
+fn window_pairs(mut r Raw, through string, from_col string, to_col string, ids []string, from KeyType, target string, target_key string, root Cond, q Query) ![][]string {
 	mut p := Params{
 		dialect: r.dialect()
 	}
@@ -178,12 +205,23 @@ pub fn link_each(conn orm.Connection, through string, from_col string, to_col st
 // count_each returns how many rows of `table` match `q` for each value of
 // `column` among `ids`, keyed by that value; values with none have no entry.
 // Through a vgraph driver it is one GROUP BY; without one, the column of each
-// matching row is read and counted here.
+// matching row is read and counted here. One query per `max_keys` ids.
 pub fn count_each(conn orm.Connection, table string, column string, ids []string, kind KeyType, q Query) !map[string]int {
 	mut counts := map[string]int{}
 	if ids.len == 0 {
 		return counts
 	}
+	for part in chunks(ids) {
+		for value, n in count_part(conn, table, column, part, kind, q)! {
+			counts[value] = n
+		}
+	}
+	return counts
+}
+
+// count_part is `count_each` over one part of the ids.
+fn count_part(conn orm.Connection, table string, column string, ids []string, kind KeyType, q Query) !map[string]int {
+	mut counts := map[string]int{}
 	mut conds := [in_keys(column, ids, kind)]
 	conds << q.conds
 	root := normalize(and(...conds), false)
@@ -225,7 +263,7 @@ pub fn count_each(conn orm.Connection, table string, column string, ids []string
 // is linked to through the join table `through`, keyed by the parent's key;
 // parents with none have no entry. Through a vgraph driver it is one GROUP BY;
 // without one, the pairs and the matching targets' keys are read, and counted
-// here.
+// here. One query of each per `max_keys` parents (or targets).
 pub fn count_through(conn orm.Connection, through string, from_col string, to_col string, ids []string, from KeyType, to KeyType, target string, target_key string, q Query) !map[string]int {
 	mut counts := map[string]int{}
 	if ids.len == 0 {
@@ -233,21 +271,23 @@ pub fn count_through(conn orm.Connection, through string, from_col string, to_co
 	}
 	if conn is Raw {
 		mut r := conn as Raw
-		cond := normalize(and(in_keys(from_col, ids, from), in_sub(to_col, Sub{
-			table:  target
-			column: target_key
-			kind:   to
-			conds:  q.conds
-		})), false)
-		if cond.junction == .false {
-			return counts
-		}
-		mut p := Params{
-			dialect: r.dialect()
-		}
-		text := 'SELECT ${quote(from_col)}, COUNT(*) FROM ${quote(through)} WHERE ${render(cond, mut p)!} GROUP BY ${quote(from_col)}'
-		for row in r.exec_params(text, p.values)! {
-			counts[row[0] or { '' }] = (row[1] or { '0' }).int()
+		for part in chunks(ids) {
+			cond := normalize(and(in_keys(from_col, part, from), in_sub(to_col, Sub{
+				table:  target
+				column: target_key
+				kind:   to
+				conds:  q.conds
+			})), false)
+			if cond.junction == .false {
+				return counts
+			}
+			mut p := Params{
+				dialect: r.dialect()
+			}
+			text := 'SELECT ${quote(from_col)}, COUNT(*) FROM ${quote(through)} WHERE ${render(cond, mut p)!} GROUP BY ${quote(from_col)}'
+			for row in r.exec_params(text, p.values)! {
+				counts[row[0] or { '' }] = (row[1] or { '0' }).int()
+			}
 		}
 		return counts
 	}
@@ -256,14 +296,15 @@ pub fn count_through(conn orm.Connection, through string, from_col string, to_co
 	if targets.len == 0 {
 		return counts
 	}
-	mut conds := [in_keys(target_key, targets, to)]
-	conds << q.conds
-	kept := select_keys_where(conn, target, target_key, to, Query{
-		conds: conds
-	}, false)!
 	mut ok := map[string]bool{}
-	for k in kept {
-		ok[k] = true
+	for part in chunks(targets) {
+		mut conds := [in_keys(target_key, part, to)]
+		conds << q.conds
+		for k in select_keys_where(conn, target, target_key, to, Query{
+			conds: conds
+		}, false)! {
+			ok[k] = true
+		}
 	}
 	for pair in pairs {
 		if pair[1] in ok {
@@ -473,7 +514,8 @@ fn text_value(text string, typ string) !orm.Primitive {
 // expr_values returns, for each of `keys` (a row of `table`, keyed by `key`),
 // the values of the order expressions of `orders`, read as their `typ`, keyed
 // by the row's key: what a cursor needs of an order by an edge. The columns'
-// own orders get null here. It needs a vgraph driver.
+// own orders get null here. It needs a vgraph driver; one query per `max_keys`
+// keys.
 pub fn expr_values(conn orm.Connection, table string, key string, kind KeyType, keys []string, orders []Order) !map[string][]orm.Primitive {
 	mut out := map[string][]orm.Primitive{}
 	exprs := orders.filter(it.expr != '')
@@ -484,6 +526,18 @@ pub fn expr_values(conn orm.Connection, table string, key string, kind KeyType, 
 		return error(needs_driver)
 	}
 	mut r := conn as Raw
+	for part in chunks(keys) {
+		for k, values in expr_part(mut r, table, key, kind, part, orders)! {
+			out[k] = values
+		}
+	}
+	return out
+}
+
+// expr_part is `expr_values` over one part of the keys.
+fn expr_part(mut r Raw, table string, key string, kind KeyType, keys []string, orders []Order) !map[string][]orm.Primitive {
+	mut out := map[string][]orm.Primitive{}
+	exprs := orders.filter(it.expr != '')
 	mut p := Params{
 		dialect: r.dialect()
 	}

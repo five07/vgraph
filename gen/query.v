@@ -657,17 +657,20 @@ fn (q ${q}) load_${e.name}(rows []${info.typ()}, fns []fn (${tq}) ${tq}) !map[st
 	}")
 				b.writeln("	pairs := load.link_pairs(q.graph.client.conn, '${e.through}', '${e.column}',
 		'${e.through_to}', rows.map(it.${key}.str()), .${info.key_type()!}, .${target.key_type()!})!
-	targets := sub.nodes(load.select_in[${target.typ()}](q.graph.client.conn, '${target.table.key}',
-		load.unique(pairs.map(it[1])), ${filters(e, true)})!)!
-	// each parent's targets in the order of the query
-	mut parents_of := map[string][]string{}
-	for pair in pairs {
-		parents_of[pair[1]] << pair[0]
-	}
+	// each parent's targets in the order of the query: one select per group of
+	// parents, so each parent's order comes from one statement
 	mut linked := map[string][]${tn}{}
-	for target in targets {
-		for parent in parents_of[target.${target.field()}.${target_key}.str()] or { [] } {
-			linked[parent] << target
+	for group in load.parent_groups(pairs) {
+		targets := sub.nodes(load.select_in[${target.typ()}](q.graph.client.conn, '${target.table.key}',
+			load.unique(group.map(it[1])), ${filters(e, true)})!)!
+		mut parents_of := map[string][]string{}
+		for pair in group {
+			parents_of[pair[1]] << pair[0]
+		}
+		for target in targets {
+			for parent in parents_of[target.${target.field()}.${target_key}.str()] or { [] } {
+				linked[parent] << target
+			}
 		}
 	}
 	return linked

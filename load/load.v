@@ -25,7 +25,7 @@ pub:
 
 // load_one returns the `P` records that `children` refer to through their `fk`
 // column, keyed by the `P` primary key's string form (`'3'`, or a UUID), in one
-// query. Children whose `fk` is null, and repeated keys, are skipped, and there
+// query (one per `max_keys` keys). Children whose `fk` is null, and repeated keys, are skipped, and there
 // is no query when no key is left.
 pub fn load_one[C, P](conn orm.Connection, children []C, fk string, opts Options) !map[string]P {
 	mut ids := []string{}
@@ -50,15 +50,22 @@ pub fn load_one[C, P](conn orm.Connection, children []C, fk string, opts Options
 		return found
 	}
 	key := primary_key[P]()
-	for row in select_in[P](conn, key, ids, soft_del: opts.soft_del, query: opts.query)! {
+	// unordered, so a long list of keys is split: the rows go in a map
+	query := Query{
+		...opts.query
+		order:  ''
+		desc:   false
+		orders: []Order{}
+	}
+	for row in select_in[P](conn, key, ids, soft_del: opts.soft_del, query: query)! {
 		found[key_column[P](row, key) or { '' }] = row
 	}
 	return found
 }
 
 // load_many returns the `C` records whose `fk` column holds the primary key of one
-// of `parents`, keyed by that key's string form, in one query. Parents with none
-// have no entry.
+// of `parents`, keyed by that key's string form, in one query (one per
+// `max_keys` parents). Parents with none have no entry.
 pub fn load_many[P, C](conn orm.Connection, parents []P, fk string, opts Options) !map[string][]C {
 	ids := keys_of[P](parents)!
 	mut grouped := map[string][]C{}
@@ -74,7 +81,7 @@ pub fn load_many[P, C](conn orm.Connection, parents []P, fk string, opts Options
 // load_through returns the `C` records linked to each of `parents` through the
 // join table `through`, whose `from_col` holds a parent's key and `to_col` a `C`
 // key, keyed by the parent key's string form, in two queries: the join table,
-// then `C`.
+// then `C` (more past `max_keys` parents or targets).
 pub fn load_through[P, C](conn orm.Connection, parents []P, through string, from_col string, to_col string, opts Options) !map[string][]C {
 	ids := keys_of[P](parents)!
 	mut grouped := map[string][]C{}
@@ -88,14 +95,17 @@ pub fn load_through[P, C](conn orm.Connection, parents []P, through string, from
 	if targets.len == 0 {
 		return grouped
 	}
-	// each parent's rows in the order of the query
-	mut parents_of := map[string][]string{}
-	for pair in pairs {
-		parents_of[pair[1]] << pair[0]
-	}
-	for row in select_in[C](conn, key, targets, opts)! {
-		for parent in parents_of[key_column[C](row, key) or { '' }] or { [] } {
-			grouped[parent] << row
+	// each parent's rows in the order of the query: one select per group of
+	// parents, so each parent's order comes from one statement
+	for group in parent_groups(pairs) {
+		mut parents_of := map[string][]string{}
+		for pair in group {
+			parents_of[pair[1]] << pair[0]
+		}
+		for row in select_in[C](conn, key, unique(group.map(it[1])), opts)! {
+			for parent in parents_of[key_column[C](row, key) or { '' }] or { [] } {
+				grouped[parent] << row
+			}
 		}
 	}
 	return grouped

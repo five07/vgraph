@@ -66,12 +66,48 @@ conventions. `GET /health` answers `{"status":"ok"}`.
 - **Lists** are Relay connections: `users`, `articles`, `posts` and `comments` at
   the root, and the edges between them (`articles` of a user, `comments` and
   `replies`), with `first` / `after`, `last` / `before`, `where`, `orderBy` and
-  `totalCount`.
+  `totalCount`. Each model turns them on; see [Lists or connections](#lists-or-connections).
 - **Writes** are the generated mutations: `create<Type>(input:)`,
   `update<Type>(id:, input:)` and `delete<Type>(id:)`, which returns the id. A
   request's mutations run in one transaction: if one fails, none is stored.
 - **Introspection** answers as graphql-js does (`testdata/introspection.json`), so
   GraphiQL, Apollo Sandbox and code generators can read the schema.
+
+### Lists or connections
+
+Each table chooses, in its model's `graphql()` method, how its lists page. The
+choice applies to every list of that table: the root field, and every edge that
+leads to it. A table gets one style or the other, never both, and the choice is
+made when `graph/` is generated, not per query.
+
+```v
+pub fn (u User) graphql() vgraph.GraphqlTable {
+	return vgraph.GraphqlTable{
+		node:  true
+		relay: true // Relay connections; leave it out (false) for plain lists
+	}
+}
+```
+
+| | `relay: true` (this example) | `relay: false` (the default) |
+|-|-|-|
+| Root field | `users(first, after, last, before, where, orderBy): UserConnection!` | `users(where, orderBy, limit, offset): [User!]!` |
+| Edge field | `articles(...): ArticleConnection!` | `articles(where, orderBy, limit, offset): [Article!]` |
+| Count | `totalCount` on the connection | `usersCount(where): Int!` at the root |
+| Paging | cursors: `after` continues from the last row | `offset` skips rows |
+| Query | `{ users { edges { node { name } } } }` | `{ users { name } }` |
+
+All four models here set `relay: true`, so `{ users { name } }` fails against this
+example as it stands. To try plain lists for a table:
+
+1. remove `relay: true` from its model in `models/`;
+2. regenerate: `v run ../../cmd/vgraph gen .`;
+3. restart the server, and query the plain list.
+
+`main_test.v` and `testdata/introspection.json` expect connections, so the
+tests fail until both are changed to match. The introspection result is recorded
+from graphql-js (`../../graphql/testdata/README.md`). The walkthrough below uses
+connections too.
 
 ### Records
 
