@@ -20,12 +20,17 @@ fn test_discover_finds_the_service_entities() {
 	root := os.join_path(@VMODROOT, 'examples', 'service')
 	found := discover(root, ['graph'])!
 	assert found.map('${it.module_path}.${it.struct_name}') == [
-		'articles.models.Article',
-		'comments.models.Comment',
-		'posts.models.Post',
-		'users.models.User',
+		'models.Article',
+		'models.Comment',
+		'models.Post',
+		'models.User',
 	]
-	assert found[0].alias() == 'articles_models'
+	assert found[0].alias() == 'models'
+	// a nested module gets an alias without dots
+	assert Entity{
+		module_path: 'shop.models'
+		struct_name: 'User'
+	}.alias() == 'shop_models'
 }
 
 fn test_loader_source() {
