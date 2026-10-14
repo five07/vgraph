@@ -360,6 +360,42 @@ fn test_http() {
 		content_type: 'application/json'
 		body:         '{"query": 1}'
 	}, unsafe { nil }).body == '{"errors":[{"message":"The request must have a \\"query\\" string."}]}'
+	// each malformed request, with its status and message
+	for req, want in {
+		'POST {':            '400 The body is not valid JSON'
+		'POST []':           '400 The body must be a JSON object.'
+		'POST op':           '400 operationName\\" must be a string.'
+		'POST vars':         '400 variables\\" must be an object.'
+		'GET variables=%7B': '400 variables is not valid JSON.'
+		'GET a=%':           '400 The query string is malformed.'
+		'PUT':               '405 GraphQL is served with GET and POST.'
+	} {
+		method := req.all_before(' ')
+		rest := req.all_after_first(' ')
+		body := match rest {
+			'op' { '{"query": "{ __typename }", "operationName": 1}' }
+			'vars' { '{"query": "{ __typename }", "variables": []}' }
+			else { rest }
+		}
+		res := s.handle(HttpRequest{
+			method:       method
+			content_type: 'application/json; charset=utf-8'
+			query_string: if method == 'GET' { 'query=%7B__typename%7D&' + rest } else { '' }
+			body:         body
+		}, unsafe { nil })
+		assert '${res.status} ${res.body}'.starts_with(want.all_before(' ') + ' '), req
+		assert res.body.contains(want.all_after_first(' ')), req
+	}
+	put := s.handle(HttpRequest{
+		method: 'PUT'
+	}, unsafe { nil })
+	assert put.headers['Allow'] == 'GET, POST'
+	// a named operation by GET, with variables
+	named := s.handle(HttpRequest{
+		method:       'GET'
+		query_string: 'query=query%20A(%24n%3A%20Boolean!)%20%7B%20__typename%20%40include(if%3A%20%24n)%20%7D&operationName=A&variables=%7B%22n%22%3Afalse%7D'
+	}, unsafe { nil })
+	assert named.body == '{"data":{}}'
 }
 
 // Relay connections: `Server.connection` resolves a `Connection`; a resolver
@@ -419,4 +455,138 @@ input I { f: Int @tag(name: "f") }')!
 	assert with.contains('input I {\n  f: Int @tag(name: "f")\n}')
 	// and it reads back the same
 	assert print_schema_with(build_schema(with)!, applied_directives: true) == with
+}
+
+// The limits on depth and size (Q31): they count through inline fragments and
+// named ones, each spread of a fragment again, and a validation error stops the
+// request before it runs.
+fn test_depth_and_size_limits() {
+	mut s := library()!
+	s.validation = ValidateOptions{
+		max_depth:      3
+		max_selections: 6
+	}
+	ok := s.execute(Request{
+		query: '{ books { author { name } } }'
+	}, unsafe { nil })
+	assert ok.errors.len == 0
+	deep := s.execute(Request{
+		query: 'query Deep { books { author { books { title } } } }'
+	}, unsafe { nil })
+	assert deep.request_error
+	assert deep.errors.map(it.message) == [
+		'Operation "Deep" is nested 4 levels deep, more than the limit of 3.',
+	]
+	// an inline fragment and a named one add no level of their own
+	via := s.execute(Request{
+		query: '{ books { ... on Book { author { ...A } } } } fragment A on Author { books { id } }'
+	}, unsafe { nil })
+	assert via.errors.map(it.message) == [
+		'Operation is nested 4 levels deep, more than the limit of 3.',
+	]
+	// each spread counts the fragment's fields again
+	wide := s.execute(Request{
+		query: '{ a: books { ...F } b: books { ...F } } fragment F on Book { id title genre }'
+	}, unsafe { nil })
+	assert wide.errors.map(it.message) == [
+		'Operation selects 8 fields, more than the limit of 6.',
+	]
+	// a fragment cycle is counted once, and reported by its own rule
+	cycle := s.execute(Request{
+		query: '{ books { author { ...X } } } fragment X on Author { books { author { ...X } } }'
+	}, unsafe { nil })
+	assert cycle.errors.any(it.message.contains('Cannot spread fragment "X" within itself'))
+}
+
+const inputs_sdl = '
+enum Genre { SCIFI FANTASY }
+input Filter { genre: Genre, title: String = "any", ids: [ID!], min: Int! }
+input One @oneOf { a: Int, b: String }
+type Query {
+  find(f: Filter): String!
+  one(o: One): String!
+  many(ids: [Int!]): String!
+}
+'
+
+fn inputs() !&Server {
+	mut s := Server.new(inputs_sdl)!
+	for field in ['find', 'one', 'many'] {
+		s.resolve_each('Query', field, fn (_ Context, info FieldInfo, _ Source) !Resolved {
+			return Value(Value(info.args.clone()).json())
+		})
+	}
+	return s
+}
+
+// run_vars executes `query` with `variables`, and returns its data or its
+// errors' messages, as JSON.
+fn run_vars(s &Server, query string, variables map[string]Value) string {
+	r := s.execute(Request{
+		query:     query
+		variables: variables
+	}, unsafe { nil })
+	if r.errors.len > 0 {
+		return r.errors.map(it.message).join('\n')
+	}
+	return (r.data or { null }).json()
+}
+
+// Variables are coerced as graphql-js coerces them: input objects with
+// defaults and required fields, lists (a single value becomes a list of one),
+// enums, scalars and `@oneOf` inputs, each problem with its path.
+fn test_variables_are_coerced() {
+	s := inputs()!
+	mut got := []string{}
+	find := 'query (\$f: Filter) { find(f: \$f) }'
+	got << run_vars(s, find, {
+		'f': Value({
+			'genre': Value('SCIFI')
+			'ids':   '7'
+			'min':   1
+		})
+	})
+	got << run_vars(s, find, {
+		'f': Value({
+			'genre': Value(1)
+			'ids':   Value([Value('1'), null])
+			'mni':   1
+		})
+	})
+	got << run_vars(s, find, {
+		'f': Value('x')
+	})
+	got << run_vars(s, 'query (\$o: One) { one(o: \$o) }', {
+		'o': Value({
+			'a': Value(1)
+			'b': 'x'
+		})
+	})
+	got << run_vars(s, 'query (\$o: One) { one(o: \$o) }', {
+		'o': Value({
+			'a': null
+		})
+	})
+	got << run_vars(s, 'query (\$ids: [Int!] = [1, 2]) { many(ids: \$ids) }', map[string]Value{})
+	got << run_vars(s, 'query (\$ids: [Int!]!) { many(ids: \$ids) }', map[string]Value{})
+	got << run_vars(s, 'query (\$ids: [Int!]!) { many(ids: \$ids) }', {
+		'ids': null
+	})
+	got << run_vars(s, 'query (\$ids: [Int!]) { many(ids: \$ids) }', {
+		'ids': Value([Value('a'), Value(1.5)])
+	})
+	got << run_vars(s, 'query (\$q: Query) { many }', map[string]Value{})
+	// the messages graphql-js 16.11.0 gives for the same requests
+	assert got == [
+		'{"find":"{\\"f\\":{\\"genre\\":\\"SCIFI\\",\\"title\\":\\"any\\",\\"ids\\":[\\"7\\"],\\"min\\":1}}"}',
+		'Variable "\$f" got invalid value 1 at "f.genre"; Enum "Genre" cannot represent non-string value: 1.\nVariable "\$f" got invalid value null at "f.ids[1]"; Expected non-nullable type "ID!" not to be null.\nVariable "\$f" got invalid value { genre: 1, ids: ["1", null], mni: 1 }; Field "min" of required type "Int!" was not provided.\nVariable "\$f" got invalid value { genre: 1, ids: ["1", null], mni: 1 }; Field "mni" is not defined by type "Filter". Did you mean "min"?',
+		'Variable "\$f" got invalid value "x"; Expected type "Filter" to be an object.',
+		'Variable "\$o" got invalid value { a: 1, b: "x" }; Exactly one key must be specified for OneOf type "One".',
+		'Variable "\$o" got invalid value null at "o.a"; Field "a" must be non-null.',
+		'{"many":"{\\"ids\\":[1,2]}"}',
+		'Variable "\$ids" of required type "[Int!]!" was not provided.',
+		'Variable "\$ids" of non-null type "[Int!]!" must not be null.',
+		'Variable "\$ids" got invalid value "a" at "ids[0]"; Int cannot represent non-integer value: "a"\nVariable "\$ids" got invalid value 1.5 at "ids[1]"; Int cannot represent non-integer value: 1.5',
+		'Variable "\$q" cannot be non-input type "Query".\nVariable "\$q" is never used.',
+	]
 }

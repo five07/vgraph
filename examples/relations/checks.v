@@ -759,6 +759,11 @@ fn check_queries(f Fixture) ! {
 		]
 		assert names(g.users().where_name_contains('d').order_by_id().all()!) == ['ada', 'dee']
 		assert names(g.users().where_name_has_prefix('b').all()!) == ['bob']
+		assert names(g.users().where_name_has_suffix('y').all()!) == ['cy']
+		assert names(g.users().where_name_not_in(['ada', 'bob']).order_by_id().all()!) == [
+			'cy',
+			'dee',
+		]
 		assert names(g.users().where_name_ne('ada').where_id_not_in([4]).order_by_id().all()!) == [
 			'bob',
 			'cy',
@@ -817,6 +822,12 @@ fn check_queries(f Fixture) ! {
 			]
 			scanned := g.logins().group_by('device_id').aggregate(vgraph.count(), vgraph.sum('at')).scan[LoginGroup]()!
 			assert scanned == [LoginGroup{phone, 2, 3}, LoginGroup{tablet, 1, 3}]
+			spread := g.logins().group_by('device_id').aggregate(vgraph.mean('at'), vgraph.min_of('at'),
+				vgraph.max_of('at')).all()!
+			assert spread.map('${it.values['mean_at']} ${it.values['min_at']} ${it.values['max_at']}') == [
+				'1.5 1.0 2.0',
+				'3.0 3.0 3.0',
+			]
 		} else {
 			if _ := g.logins().group_by('device_id').all() {
 				assert false
@@ -851,6 +862,11 @@ fn check_queries(f Fixture) ! {
 				'rex',
 				'tom',
 				'stray',
+			]
+			assert g.pets().order_by(vgraph.asc('owner_id').nulls_first(), vgraph.desc('id')).all()!.map(it.pet.name) == [
+				'stray',
+				'tom',
+				'rex',
 			]
 			// a lock needs a transaction, and PostgreSQL
 			if _ := g.users().for_update().all() {
@@ -926,6 +942,7 @@ fn check_schema(f Fixture) ! {
 	w.gadgets().create().set_owner_id(2).set_serial_no('S-2').set_color(.red).set_level(2).set_weight(100).set_parts(1).set_big(1).set_ratio(1.5).set_score(7).set_active(true).set_tags('[]').exec()!
 	assert w.gadgets().where_color(.red).only()!.gadget.serial_no == 'S-2'
 	assert w.gadgets().where_color_in([.green, .blue]).count()! == 1
+	assert w.gadgets().where_id_not_in([g.id]).only()!.gadget.serial_no == 'S-2'
 	assert w.gadgets().where_serial_no(models.Serial('S-1')).count()! == 1
 	assert w.gadgets().where_level_lt(0).count()! == 1
 	assert w.gadgets().where_big_gt(1).count()! == 1

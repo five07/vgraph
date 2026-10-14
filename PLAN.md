@@ -29,7 +29,8 @@ to that version. This plan's questions start at Q121.
 - `sqlite/`, `pg/`: drivers that run vgraph's own parameterized SQL.
 - `examples/relations/`: every Ent relationship kind and schema option, tested on
   SQLite and PostgreSQL. `examples/service/`: a GraphQL API on vgraph alone.
-- `regressions/`: one small program per V compiler bug vgraph works around (8 so far).
+- `regressions/`: one small program per V compiler bug vgraph works around, or
+  meets (9 so far).
 
 **How to work here.**
 - **Never commit.** The user makes every commit, on `develop`; `main` gets merges.
@@ -133,6 +134,53 @@ modules with it, keep the report out of git, add tests where whole features turn
 untested, and record the numbers here. No CI gate for v0.1.0: the number is a guide,
 not a target. The other choice is a minimum, such as 80%, that CI enforces.
 > A: default
+
+**Result (2026-10-13): done.** Measured with `v -no-skip-unused -coverage` over
+`v test .` and the PostgreSQL tests, read with `v cover` (commands in the README's
+Development section). V counts points (statements and branches), not lines. Before
+and after the tests G2 added:
+
+| module       | before | after |
+|--------------|-------:|------:|
+| `vgraph`     | 90.5%  | 96.1% |
+| `load`       | 89.4%  | 91.1% |
+| `graphql`    | 86.8%  | 91.0% |
+| `gen`        | 81.5%  | 81.5% |
+| `sqlite`     | 65.4%  | 80.8% |
+| `pg`         | 68.8%  | 68.8% |
+| `cmd/vgraph` | 56.8%  | 56.8% |
+| all          | 85.8%  | 89.0% |
+
+Features no test ran, now tested:
+- the GraphQL limits on depth and size (Q31's `max_depth`, `max_selections`),
+  through inline and named fragments and cycles;
+- the HTTP handler's errors: a body that isn't JSON or an object, a non-string
+  `operationName`, non-object `variables`, a malformed query string or `variables`
+  on GET, and other methods (405 with `Allow: GET, POST`);
+- variables holding input objects, lists, enums and `@oneOf` inputs, with their
+  defaults and every coercion error; the messages match graphql-js 16.11.0's;
+- every problem `validate_schema` reports (22 more), each checked against
+  graphql-js 16.11.0's message for the same SDL;
+- a hook's view of a write (`table_name`, `changed_columns`, `added_ids`,
+  `removed_ids`, `edge_cleared`), and stacked `only_if`;
+- tracing of every statement kind on the ORM's connection (updates, deletes, table
+  creates and drops, raw SQL, transactions; savepoints pass through unreported), and
+  failures;
+- writes on a connection without transactions, with their `on_commit` and
+  `on_rollback`, and the SQLite driver's ORM transactions;
+- `vgraph.mean`, `min_of`, `max_of` and `desc`, `nulls_first`, `has_suffix`, and
+  `not_in` on strings and `i64` keys.
+
+What's left uncovered is mostly error branches (a database or driver failing
+mid-statement). `gen` and `cmd/vgraph` read low because `cmd/vgraph/gen_test.v` runs
+the generator in a subprocess, which isn't instrumented; the generated examples and
+CI's check that they're up to date cover it. `pg` is the driver's error branches.
+
+Found along the way: under `-coverage`, a `u16` field read back as 0 on PostgreSQL.
+The cause is in V, not coverage: `orm.Primitive(*unsafe { &u16(&data) })` in
+`db.pg` compiles to a pointer to a local that dangles once the function returns
+(`regressions/sum_type_deref_cast.vv`). vgraph now reads `u16` columns as `i64`, as
+it already did `u32` and `u64`; G12 has the fix for V.
 
 ### G3. Polymorphic foreign keys
 
@@ -282,9 +330,14 @@ vgraph works around these; fixing them in V lets it drop code.
 - **`[]u8` columns:** the ORM can bind one, but can't create one on SQLite (`Unknown
   type`) or read one back (`sqlite_select_column`, `db.pg`). Then vgraph can add bytes
   fields.
-- **`db.pg` and `u32` / `u64`:** decoded wrongly (`*unsafe { &u32(&data) }` after
-  `str.int()`); vgraph reads them as `i64`.
-- **The 8 compiler bugs in `regressions/`.**
+- **`db.pg` and `u16` / `u32` / `u64`:** decoded wrongly (`*unsafe { &u32(&data) }`
+  after `str.int()`); vgraph reads them as `i64`, `u16` too since G2. Worse, V compiles
+  `orm.Primitive(*unsafe { &u16(&data) })` to a pointer to the local `data`, which
+  dangles once `val_to_primitive` returns (`regressions/sum_type_deref_cast.vv`,
+  found in G2): a `u16` field reads back as 0 whenever the stack is reused, as under
+  `v -coverage`. The fix in `db.pg` is to convert (`u16(str.u64())`), not reinterpret;
+  the fix in V, to copy the value into the sum type.
+- **The 9 compiler bugs in `regressions/`.**
 
 **Q134. How far.** **Default:** an issue for each, with a fix PR where the fix is
 clear (the `db.pg` decode, `[]u8` on SQLite), and `RawConnection` proposed in an issue

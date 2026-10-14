@@ -537,3 +537,146 @@ fn test_trace_reports_statements_without_values() {
 		assert log.events.last().failed
 	}
 }
+
+// A hook sees what a write changes: its table, its columns, and the keys it
+// adds to, removes from or clears on each edge. `only_if` conditions stack.
+fn test_hooks_see_the_changes() {
+	for c in hook_clients()! {
+		seen := &Events{}
+		c.use_on('authors', only_if(only_if(Hook{
+			run: fn [seen] (next Mutate) Mutate {
+				return fn [seen, next] (ctx graphql.Context, mut m Mutation) ! {
+					seen.add('${m.table_name()} ${m.changed_columns()} +${m.added_ids('posts')} -${m.removed_ids('posts')} ${m.edge_cleared('posts')}')
+					next(ctx, mut m)!
+				}
+			}
+		}, fn (_ graphql.Context, m Mutation) bool {
+			return m.operation() == .update_one
+		}), fn (_ graphql.Context, m Mutation) bool {
+			return 'name' in m.changed_columns()
+		}))
+		a := c.create(MutationData{
+			table:  'authors'
+			values: {
+				'name': orm.Primitive('ann')
+			}
+		})!
+		p1 := new_post(c, 'one')!
+		p2 := new_post(c, 'two')!
+		// skipped: no name
+		c.update_one(MutationData{
+			table:   'authors'
+			row_key: a
+			added:   {
+				'posts': [p1]
+			}
+		})!
+		mut m := MutationData{
+			table:   'authors'
+			row_key: a
+			values:  {
+				'name': orm.Primitive('ann b')
+			}
+		}
+		m.add_ids('posts', p2)
+		m.remove_ids('posts', p1)
+		c.update_one(m)!
+		m = MutationData{
+			table:   'authors'
+			row_key: a
+			values:  {
+				'name': orm.Primitive('ann c')
+			}
+		}
+		m.clear_edge('posts')
+		c.update_one(m)!
+		assert seen.items == ["authors ['name'] +['${p2}'] -['${p1}'] false",
+			"authors ['name'] +[] -[] true"]
+		assert posts(c)!.map(it.author_id) == [?int(none), none]
+	}
+}
+
+// Every kind of statement is traced on the ORM's connection: writes, table
+// creates and drops, raw SQL and transactions. Savepoints pass through
+// unreported.
+fn test_trace_reports_every_kind() {
+	log := &TraceLog{}
+	mut traced := trace(hook_db()!, fn [log] (e TraceEvent) {
+		mut l := unsafe { log }
+		l.events << e
+	})
+	table := orm.Table{
+		name: 'notes'
+	}
+	traced.create(table, [
+		orm.TableField{
+			name:  'id'
+			typ:   orm.type_idx['int']
+			attrs: [VAttribute{
+				name: 'primary'
+			}]
+		},
+		orm.TableField{
+			name: 'body'
+			typ:  orm.type_string
+		},
+	])!
+	traced.insert(table, orm.QueryData{
+		fields: ['id', 'body']
+		data:   [orm.Primitive(1), orm.Primitive('x')]
+	})!
+	traced.update(table, orm.QueryData{
+		fields: ['body']
+		data:   [orm.Primitive('y')]
+	}, orm.QueryData{
+		fields: ['id']
+		data:   [orm.Primitive(1)]
+		kinds:  [.eq]
+	})!
+	traced.execute('SELECT 1')!
+	mut tx := traced as orm.TransactionalConnection
+	tx.orm_begin()!
+	tx.orm_savepoint('s')!
+	tx.delete(table, orm.QueryData{
+		fields: ['id']
+		data:   [orm.Primitive(1)]
+		kinds:  [.eq]
+	})!
+	tx.orm_rollback_to('s')!
+	tx.orm_release_savepoint('s')!
+	tx.orm_commit()!
+	tx.orm_begin()!
+	tx.orm_rollback()!
+	traced.drop(table)!
+	// failures are reported too
+	traced.insert(table, orm.QueryData{
+		fields: ['id']
+		data:   [orm.Primitive(1)]
+	}) or {}
+	traced.update(table, orm.QueryData{}, orm.QueryData{}) or {}
+	traced.delete(table, orm.QueryData{}) or {}
+	traced.drop(table) or {}
+	traced.execute('nonsense') or {}
+	kinds := log.events.map('${it.kind} ${it.table}'.trim_space() + if it.failed {
+		' failed'
+	} else {
+		''
+	})
+	assert kinds == [
+		'ddl notes',
+		'insert notes',
+		'update notes',
+		'raw',
+		'begin',
+		'delete notes',
+		'commit',
+		'begin',
+		'rollback',
+		'ddl notes',
+		'insert notes failed',
+		'update notes failed',
+		'delete notes failed',
+		'ddl notes failed',
+		'raw failed',
+	]
+}

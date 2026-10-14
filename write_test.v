@@ -1,6 +1,7 @@
 module vgraph
 
 import db.sqlite as sq
+import graphql
 import load
 import orm
 import sqlite
@@ -757,4 +758,114 @@ fn test_unique_fields_get_an_index() {
 		"story_labels_story_id_idx ['story_id'] false",
 		"writers_email_idx ['email'] true",
 	]
+}
+
+@[heap]
+struct WriteEvents {
+mut:
+	items []string
+}
+
+fn (e &WriteEvents) add(item string) {
+	mut events := unsafe { e }
+	events.items << item
+}
+
+// Plain is a connection with no transactions: only `orm.Connection`.
+struct Plain {
+mut:
+	db sq.DB
+}
+
+fn (mut p Plain) select(config orm.SelectConfig, data orm.QueryData, where orm.QueryData) ![][]orm.Primitive {
+	return p.db.select(config, data, where)
+}
+
+fn (mut p Plain) insert(table orm.Table, data orm.QueryData) ! {
+	p.db.insert(table, data)!
+}
+
+fn (mut p Plain) update(table orm.Table, data orm.QueryData, where orm.QueryData) ! {
+	p.db.update(table, data, where)!
+}
+
+fn (mut p Plain) delete(table orm.Table, where orm.QueryData) ! {
+	p.db.delete(table, where)!
+}
+
+fn (mut p Plain) create(table orm.Table, fields []orm.TableField) ! {
+	p.db.create(table, fields)!
+}
+
+fn (mut p Plain) drop(table orm.Table) ! {
+	p.db.drop(table)!
+}
+
+fn (mut p Plain) last_id() int {
+	return p.db.last_id()
+}
+
+fn (mut p Plain) execute(query string) ![]orm.Row {
+	return p.db.execute(query)
+}
+
+// On a connection without transactions, a write's statements run one by one,
+// and its `on_commit` and `on_rollback` callbacks follow the write's own
+// success or failure. Outside a write, `on_commit` runs at once.
+fn test_writes_without_transactions() {
+	c := Client.new(&Plain{
+		db: write_db()!
+	}, write_schema()!)!
+	assert !c.can_begin()
+	events := &WriteEvents{}
+	c.use_on('writers', Hook{
+		run: fn [events] (next Mutate) Mutate {
+			return fn [events, next] (ctx graphql.Context, mut m Mutation) ! {
+				name := (m.field_value('name') or { orm.Primitive('') }) as string
+				m.on_commit(fn [events, name] () {
+					events.add('commit ${name}')
+				})
+				m.on_rollback(fn [events, name] () {
+					events.add('rollback ${name}')
+				})
+				next(ctx, mut m)!
+			}
+		}
+	})
+	create(c, 'writers', {
+		'name':  orm.Primitive('ada')
+		'email': 'ada@example.com'
+	})!
+	// too long a name, checked after the hooks
+	create(c, 'writers', {
+		'name': orm.Primitive('bob the builder')
+	}) or { events.add('failed') }
+	c.on_commit(fn [events] () {
+		events.add('at once')
+	})
+	c.on_rollback(fn [events] () {
+		events.add('never')
+	})
+	assert events.items == ['commit ada', 'rollback bob the builder', 'failed', 'at once']
+	assert writers(c)!.map(it.name) == ['ada']
+}
+
+// The SQLite driver runs the ORM's transactions too, as `v.migrations` does.
+fn test_the_sqlite_driver_runs_orm_transactions() {
+	mut d := sqlite.new(write_db()!)
+	c := Client.new(d, write_schema()!)!
+	for commit in [false, true] {
+		d.orm_begin()!
+		d.insert(orm.Table{ name: 'writers' }, orm.QueryData{
+			fields: ['name', 'score', 'created_at', 'updated_at']
+			data:   [orm.Primitive('ada'), orm.Primitive(1), orm.Primitive(time.now()),
+				orm.Primitive(time.now())]
+		})!
+		if commit {
+			d.orm_commit()!
+		} else {
+			d.orm_rollback()!
+		}
+		assert writers(c)!.len == if commit { 1 } else { 0 }
+	}
 }

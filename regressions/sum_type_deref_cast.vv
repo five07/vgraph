@@ -1,0 +1,33 @@
+// A sum type made from a dereferenced pointer keeps the pointer, not the value:
+// `Prim(*unsafe { &u16(&data) })` becomes `._u16 = (u16*)(&data)`, so the
+// function returns a pointer into its own stack frame, and the value is lost
+// once the stack is reused. `db.pg` decodes `u16`, `u32` and `u64` columns this
+// way (`val_to_primitive` in `vlib/db/pg/orm.v`): a `u16` field reads back as 0
+// under `v -coverage`, whose counters reuse that stack slot.
+// Run: `v run sum_type_deref_cast.vv`. It prints Prim(500) once fixed; now
+// Prim(0).
+// Worked around in `vgraph/load/fields.v`: a `u16` column is read as an `i64`,
+// as `u32` and `u64` columns already were.
+module main
+
+type Prim = i64 | string | u16
+
+fn decode(s string) Prim {
+	data := s.i16()
+	return Prim(*unsafe { &u16(&data) })
+}
+
+@[noinline]
+fn clobber() int {
+	mut a := [64]i64{}
+	for i in 0 .. 64 {
+		a[i] = 7
+	}
+	return int(a[3])
+}
+
+fn main() {
+	p := decode('500')
+	clobber()
+	println(p)
+}

@@ -589,6 +589,17 @@ The examples import vgraph as `five07.vgraph`, so link this checkout there first
 `-d vgraph_pg`, read `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD` and `PGDATABASE`,
 and drop and recreate their tables.
 
+Coverage, from V's own tool; keep the counters out of the repository:
+
+```sh
+v -no-skip-unused -coverage /tmp/vgraph-cov test .
+v -no-skip-unused -coverage /tmp/vgraph-cov -d vgraph_pg test pg_test.v examples/relations/pg_test.v
+v cover /tmp/vgraph-cov --filter vgraph/    # per file; --lcov <file> for an LCOV report
+```
+
+`-no-skip-unused` counts functions no test calls. The generator's command
+(`cmd/vgraph`) runs in a subprocess in its tests, so it reads lower than it is.
+
 ## Requirements
 
 V master (built against `53dd72c`, 2026-10-12). It will pin to a `0.5.x` release

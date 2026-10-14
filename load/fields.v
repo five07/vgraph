@@ -41,7 +41,9 @@ fn select_columns[T](only []string) !([]string, []int) {
 						} $else $if sub.typ is ?u8 || sub.unaliased_typ is u8 {
 							types << orm.type_idx['u8']
 						} $else $if sub.typ is ?u16 || sub.unaliased_typ is u16 {
-							types << orm.type_idx['u16']
+							// read as an i64: db.pg decodes a u16 cell through a pointer
+							// that dangles (regressions/sum_type_deref_cast.vv)
+							types << orm.type_idx['i64']
 						} $else $if sub.typ is ?u32 || sub.unaliased_typ is u32 {
 							// read as an i64: db.pg decodes a u32 cell as 0
 							types << orm.type_idx['i64']
@@ -84,7 +86,9 @@ fn select_columns[T](only []string) !([]string, []int) {
 				} $else $if field.typ is ?u8 || field.unaliased_typ is u8 {
 					types << orm.type_idx['u8']
 				} $else $if field.typ is ?u16 || field.unaliased_typ is u16 {
-					types << orm.type_idx['u16']
+					// read as an i64: db.pg decodes a u16 cell through a pointer
+					// that dangles (regressions/sum_type_deref_cast.vv)
+					types << orm.type_idx['i64']
 				} $else $if field.typ is ?u32 || field.unaliased_typ is u32 {
 					// read as an i64: db.pg decodes a u32 cell as 0
 					types << orm.type_idx['i64']
