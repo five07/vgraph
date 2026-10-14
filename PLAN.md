@@ -275,6 +275,63 @@ nothing in vgraph checks that `owner_id` names a row of the table `owner_type` n
   foreign keys, as Ent's `entimport` does.
 > A: Sorry, this was my fault for the ambiguity. What I mean is Introspection - https://graphql.org/learn/introspection/
 
+**Where introspection stands (2026-10-14).** It works: `__schema`, `__type` and
+`__typename` answer as graphql-js 16.11.0 does, and `examples/service` checks the
+full introspection query against a recording from graphql-js
+(`testdata/introspection.json`). What's missing is around it:
+- **Descriptions.** A field can have one (`Field.comment`), and so can
+  `@deprecated` (`Field.deprecated`). Tables, edges, enum values and the
+  mutations' arguments can't, so the generated types have only the Relay and
+  entgql boilerplate descriptions ("An edge in a connection."). The service's
+  schema has no descriptions of its own.
+- **Turning it off.** `server.validation.no_introspection = true` rejects
+  introspection queries with graphql-js's message, but it is for the whole
+  server, the generated server doesn't expose it, and no doc mentions it.
+- **Tools.** Nothing serves GraphiQL. The schema SDL is only the file
+  `vgraph gen` writes; nothing serves it over HTTP.
+- **Coverage.** Only `examples/service`'s schema is checked against graphql-js.
+  `examples/relations`, which has every edge kind and schema option, isn't.
+
+**Q140. What G4 does.** **Default:** (a), (b), (c) and (e); not (d).
+- (a) **Descriptions:** add `comment` to `GraphqlTable` (the object type),
+  `Edge` (its field) and enum values (on `Field`, by value), and pass them to
+  the generated SDL, so introspection returns them. Give the service's models
+  descriptions, and re-record `testdata/introspection.json`.
+- (b) **Turning it off, per request:** a `Server.introspection` field taking
+  `fn (ctx Context) bool`. When it returns false, the request is validated with
+  `no_introspection`. Unset, introspection is allowed, as today. The app sets it
+  on the server that `g.graphql(r)` returns, so G6's example can allow it only
+  for an `admin` claim, or a production config can turn it off.
+  `graphql.no_introspection_for_all` is the function that always returns false.
+  `__typename` stays allowed, as graphql-js does.
+- (c) **Coverage:** record `examples/relations`' introspection from graphql-js,
+  as the service's is, and check it in its tests; extend
+  `check_schema.js` to rebuild each schema from its introspection
+  (`buildClientSchema`) and compare it with the SDL, so a description or a
+  default value lost on the way shows up.
+- (d) **GraphiQL:** `graphql.graphiql_page(endpoint)` returns an HTML page that
+  loads GraphiQL from a CDN, and the service serves it at `GET /graphiql` when
+  a config flag allows it. It isn't in the default because it adds a page that
+  pulls third-party scripts; Apollo Sandbox and other tools can read the
+  schema through introspection already.
+- (e) **Docs:** a README section: what introspection answers, how to describe
+  types and fields, how to turn it off in production, and `schema.graphql` for
+  tools that read SDL.
+
+The first reading of Q125, a `vgraph check` that compares a database with the
+schema, would move to after v0.1.0, if an issue asks for it.
+> A: Introspection is working; make sure it's in `docs/` (G9), but for now just a
+> simple addition to the top-level README.
+
+**Result (2026-10-14): done, as the answer says; (a)–(d) not taken.**
+- The README's GraphQL section has an "Introspection" part: what the server
+  answers, a `__type` query, where descriptions and `@deprecated` come from,
+  `graph/schema.graphql` for SDL tools, and turning it off with
+  `server.validation = graphql.ValidateOptions{no_introspection: true}` (checked
+  by hand: `__schema` fails with graphql-js's message, `__typename` still works).
+- G9's GraphQL guide covers introspection (added to its list).
+- A `vgraph check` against a database waits until after v0.1.0, if an issue asks.
+
 ### G5. Pagination example
 
 GraphQL lists already page two ways: `limit` / `offset` lists, and, per table with
@@ -349,7 +406,7 @@ Apollo Federation v2 subgraph:
 - a `docs/` folder of Markdown guides, linked from the README: getting started;
   schema (fields, edges, options, mixins, views, global ids); queries; writes; hooks,
   interceptors and privacy; transactions; GraphQL (schema, connections, mutations,
-  options, operations folders, federation); migrations; drivers; tracing and
+  options, operations folders, introspection, federation); migrations; drivers; tracing and
   OpenTelemetry; differences from Ent;
 - the README cut down to an overview, a quick start and links;
 - API docs from doc comments (`v doc`), built in CI without warnings;

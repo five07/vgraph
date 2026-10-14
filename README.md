@@ -531,6 +531,37 @@ mutation. Operations and fragments go in `operations/` folders: `vgraph gen`
 checks them against the schema, so a schema change that breaks a client's query
 fails there, at its file and line.
 
+### Introspection
+
+The server answers [introspection](https://graphql.org/learn/introspection/)
+queries (`__schema`, `__type`, `__typename`) as graphql-js does, so GraphiQL,
+Apollo Sandbox and code generators can read the schema from it:
+
+```graphql
+{ __type(name: "Article") { fields { name description type { name kind ofType { name kind } } } } }
+```
+
+A non-null or list type is a wrapper with no name: `title: String!` comes back as
+`{"name": null, "kind": "NON_NULL", "ofType": {"name": "String", "kind": "SCALAR"}}`,
+and only a nullable field, such as `deletedAt: Time`, has its type's name at the
+first level. Go one `ofType` deeper per wrapper (`[Tag!]!` has three).
+
+Descriptions come from `Field.comment`, and `@deprecated` from
+`Field.deprecated`; `isDeprecated` and `deprecationReason` report them. Tools that
+read SDL rather than introspection can use `graph/schema.graphql`. To turn
+introspection off, as for a public API in production, set the server's
+validation options:
+
+```v ignore
+mut server := g.graphql(graph.Resolvers{})!
+server.validation = graphql.ValidateOptions{
+	no_introspection: true // `__schema` and `__type` fail; `__typename` still works
+}
+```
+
+`examples/service` checks the full introspection query against graphql-js's
+answer for the same schema (`testdata/introspection.json`).
+
 The GraphQL implementation is the `graphql` module (`five07.vgraph.graphql`), which
 doesn't depend on the rest of vgraph: a lexer and parser for the whole language,
 schemas built from SDL, every validation rule of the spec, an executor that hands
