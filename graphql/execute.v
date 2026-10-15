@@ -1,6 +1,7 @@
 module graphql
 
 import context
+import five07.otel
 
 // Source is an object being resolved: the root value, or whatever a resolver
 // returned for an object field. Any V value can be one; resolvers smartcast it
@@ -178,6 +179,9 @@ pub mut:
 	validation     ValidateOptions
 	parse_options  ParseOptions
 	transaction    ?Transaction
+	// tracer, when set, records a span per operation, `query Name` or
+	// `mutation Name`, which the operation's resolvers run under
+	tracer ?otel.Tracer
 }
 
 // Server.new builds a schema from SDL, and returns a server with no resolvers.
@@ -222,16 +226,28 @@ pub fn (mut s Server) scalar(name string, scalar Scalar) {
 // resolver gets `ctx`, or for a mutation in a transaction, what `begin` made of it.
 pub fn (s &Server) execute(req Request, ctx context.Context) Response {
 	doc := parse(req.query, s.parse_options) or {
+		s.record_failed_request(ctx)
 		return request_failed(err)
 	}
 	errors := validate(&s.schema, &doc, s.validation)
 	if errors.len > 0 {
+		s.record_failed_request(ctx)
 		return Response{
 			errors:        errors
 			request_error: true
 		}
 	}
 	return s.execute_document(doc, req.operation_name, req.variables, ctx)
+}
+
+// record_failed_request records a request that couldn't be parsed or
+// validated, when the server has a tracer: a span with no operation, as the
+// semantic conventions name it, which failed.
+fn (s &Server) record_failed_request(ctx context.Context) {
+	tracer := s.tracer or { return }
+	_, span := tracer.start(ctx, 'GraphQL Operation', kind: .server)
+	span.set_status(code: .error)
+	span.end()
 }
 
 fn request_failed(err IError) Response {
@@ -275,8 +291,34 @@ pub fn operation_of(doc &Document, name string) !OperationDefinition {
 	}
 }
 
-// execute_document runs an operation of a validated document.
+// execute_document runs an operation of a validated document. With a tracer,
+// it runs in a span named after the operation, with its type and name: an
+// error when any of its fields failed.
 pub fn (s &Server) execute_document(doc &Document, operation_name string, inputs map[string]Value, ctx context.Context) Response {
+	tracer := s.tracer or { return s.run_document(doc, operation_name, inputs, ctx) }
+	mut name := 'GraphQL Operation'
+	mut attrs := []otel.KeyValue{}
+	if op := operation_of(doc, operation_name) {
+		kind := op.operation.str()
+		attrs << otel.string_attr('graphql.operation.type', kind)
+		name = kind
+		if n := op.name {
+			attrs << otel.string_attr('graphql.operation.name', n.value)
+			name = '${kind} ${n.value}'
+		}
+	}
+	span_ctx, span := tracer.start(ctx, name, kind: .server, attributes: attrs)
+	defer {
+		span.end()
+	}
+	response := s.run_document(doc, operation_name, inputs, span_ctx)
+	if response.errors.len > 0 {
+		span.set_status(code: .error)
+	}
+	return response
+}
+
+fn (s &Server) run_document(doc &Document, operation_name string, inputs map[string]Value, ctx context.Context) Response {
 	op := operation_of(doc, operation_name) or { return request_failed(err) }
 	variables := s.schema.coerce_variable_values(doc, op.variable_definitions, inputs) or {
 		return Response{

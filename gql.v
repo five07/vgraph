@@ -3,6 +3,7 @@ module vgraph
 import context
 import graphql
 import orm
+import five07.otel
 
 // GraphQL options, as entgql's annotations, and the transaction of a GraphQL
 // request's mutations.
@@ -145,4 +146,48 @@ pub fn (t GraphqlTransaction) rollback(ctx context.Context) ! {
 // driver or an `orm.TransactionalConnection`, or runs in one already.
 pub fn (c Client) can_begin() bool {
 	return c.in_tx || c.conn is Driver || c.conn is orm.TransactionalConnection
+}
+
+// traced_resolver returns `r`, the resolver of `type_name.field`, with a span
+// around each call, `resolve Type.field`, when the client records the `full`
+// spans of a model of level `level`; `r` itself otherwise. The span covers the
+// field for every parent at its level, and its context goes to `r`, so its
+// queries are the span's children. The generated server wraps the resolvers of
+// the types of `full` and `default` models.
+pub fn (c Client) traced_resolver(level OtelLevel, type_name string, field string, r graphql.Resolver) graphql.Resolver {
+	if !c.records(level, .full) {
+		return r
+	}
+	tracer := c.tracer
+	name := 'resolve ${type_name}.${field}'
+	path := '${type_name}.${field}'
+	return fn [tracer, name, path, r] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		span_ctx, span := tracer.start(ctx, name,
+			attributes: [otel.string_attr(vgraph_field, path),
+				otel.int_attr(vgraph_batch_size, parents.len)]
+		)
+		defer {
+			span.end()
+		}
+		return r(span_ctx, info, parents) or {
+			span_failed(span, err)
+			return err
+		}
+	}
+}
+
+// graphql_tracer returns the tracer of the GraphQL server's operation spans:
+// the client's, when it has a provider.
+pub fn (c Client) graphql_tracer() ?otel.Tracer {
+	return if c.has_tracer_provider { c.tracer } else { none }
+}
+
+// tracing_notice returns the line a GraphQL server prints at its start when
+// its client has no tracer provider, or none when it has one. Passing
+// `otel.noop_tracer_provider()` silences it.
+pub fn (c Client) tracing_notice() ?string {
+	if c.has_tracer_provider {
+		return none
+	}
+	return 'vgraph: GraphQL server has no tracer provider; no spans will be recorded (pass tracer_provider to Client.new)'
 }

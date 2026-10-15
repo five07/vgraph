@@ -1438,6 +1438,11 @@ scalar Time @specifiedBy(url: "https://scalars.graphql.org/chillicream/date-time
 // lists and connections, for the tables whose `graphql()` doesn't.
 pub fn (g Graph) graphql(r Resolvers, opts vgraph.GraphqlOptions) !&graphql.Server {
 	mut s := graphql.Server.new(schema_sdl)!
+	// with a tracer provider, a span per operation; without one, a notice
+	s.tracer = g.client.graphql_tracer()
+	if notice := g.client.tracing_notice() {
+		println(notice)
+	}
 	sizes := g.client.schema.page_sizes(opts)!
 	if g.client.can_begin() {
 		s.transaction = vgraph.GraphqlTransaction{
@@ -1681,19 +1686,19 @@ pub fn (g Graph) graphql(r Resolvers, opts vgraph.GraphqlOptions) !&graphql.Serv
 	})
 
 	// Group
-	s.resolve('Query', 'groups', fn [g, sizes] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('Query', 'groups', g.client.traced_resolver(.full, 'Query', 'groups', fn [g, sizes] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		found := g.with_ctx(ctx).groups().graphql_args(info.args, sizes['groups'])!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
-	})
-	s.resolve('Query', 'groupsCount', fn [g] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	}))
+	s.resolve('Query', 'groupsCount', g.client.traced_resolver(.full, 'Query', 'groupsCount', fn [g] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		n := g.with_ctx(ctx).groups().graphql_where(info.args)!.count()!
 		return parents.map(graphql.Resolved(graphql.Value(n)))
-	})
+	}))
 	for name in ['id', 'name'] {
 		s.resolve('Group', name, resolve_group_field)
 	}
-	s.resolve('Group', 'users', fn [g, sizes] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve('Group', 'users', g.client.traced_resolver(.full, 'Group', 'users', fn [g, sizes] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
 		sub := cg.users().graphql_args(info.args, sizes['users'])!
 		loaded := cg.groups().with_users(fn [sub] (_ UserQuery) UserQuery {
@@ -1704,8 +1709,8 @@ pub fn (g Graph) graphql(r Resolvers, opts vgraph.GraphqlOptions) !&graphql.Serv
 			out << graphql.list(n.users.map(graphql.obj(it)))
 		}
 		return out
-	})
-	s.resolve('Group', 'devices', fn [g, sizes] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	}))
+	s.resolve('Group', 'devices', g.client.traced_resolver(.full, 'Group', 'devices', fn [g, sizes] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
 		sub := cg.devices().graphql_args(info.args, sizes['devices'])!
 		loaded := cg.groups().with_devices(fn [sub] (_ DeviceQuery) DeviceQuery {
@@ -1716,26 +1721,26 @@ pub fn (g Graph) graphql(r Resolvers, opts vgraph.GraphqlOptions) !&graphql.Serv
 			out << graphql.list(n.devices.map(graphql.obj(it)))
 		}
 		return out
-	})
-	s.resolve('Mutation', 'createGroup', fn [g] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	}))
+	s.resolve('Mutation', 'createGroup', g.client.traced_resolver(.full, 'Mutation', 'createGroup', fn [g] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		input := group_create_input(info.arg('input'))!
 		node := g.with_ctx(ctx).groups().create().set_input(input).save()!
 		result := graphql.obj(node)
 		return parents.map(result)
-	})
-	s.resolve('Mutation', 'updateGroup', fn [g] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	}))
+	s.resolve('Mutation', 'updateGroup', g.client.traced_resolver(.full, 'Mutation', 'updateGroup', fn [g] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		id := gql_int_id(info.arg('id'))!
 		input := group_update_input(info.arg('input'))!
 		node := g.with_ctx(ctx).groups().update_one_id(id).set_input(input).save()!
 		result := graphql.obj(node)
 		return parents.map(result)
-	})
-	s.resolve('Mutation', 'deleteGroup', fn [g] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	}))
+	s.resolve('Mutation', 'deleteGroup', g.client.traced_resolver(.full, 'Mutation', 'deleteGroup', fn [g] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		id := gql_int_id(info.arg('id'))!
 		g.with_ctx(ctx).groups().delete_one_id(id).exec()!
 		result := graphql.Resolved(graphql.Value(id.str()))
 		return parents.map(result)
-	})
+	}))
 
 	// Like
 	s.resolve('Query', 'likes', fn [g, sizes] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {

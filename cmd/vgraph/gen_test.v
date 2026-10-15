@@ -466,6 +466,34 @@ fn test_spans_by_level() {
 	assert is_child(span_named(spans, \'query tags\')!, root)
 }
 
+// A request is a span; a full model\'s resolvers are spans under it, and the
+// queries they run are theirs. An ops model\'s resolvers have none, nor do
+// columns.
+fn test_resolver_spans() {
+	provider, exporter := recorder()!
+	g, _ := setup_with(tracer_provider: provider)!
+	s := g.graphql(graph.Resolvers{})!
+	res := s.execute(graphql.Request{
+		query: \'query Titles { articles(orderBy: {field: ID}) { title author { name } } users { name } }\'
+	}, context.background())
+	assert res.errors.len == 0
+	spans := exporter.spans()
+	names := spans.map(it.name)
+	op := span_named(spans, \'query Titles\')!
+	assert attr(op, \'graphql.operation.type\') == \'query\'
+	assert attr(op, \'graphql.operation.name\') == \'Titles\'
+	articles := span_named(spans, \'resolve Query.articles\')!
+	assert is_child(articles, op)
+	assert attr(articles, \'vgraph.field\') == \'Query.articles\'
+	assert is_child(span_named(spans, \'query articles\')!, articles)
+	author := span_named(spans, \'resolve Article.author\')!
+	assert is_child(author, op)
+	assert attr(author, \'vgraph.batch_size\') != \'\'
+	assert \'resolve Query.users\' !in names
+	assert is_child(span_named(spans, \'query users\')!, op)
+	assert \'resolve Article.title\' !in names
+}
+
 // A default model follows the client: `otel_level: .none` turns its spans off.
 fn test_a_default_model_follows_the_client() {
 	provider, exporter := recorder()!
@@ -754,7 +782,49 @@ fn test_gen_writes_a_working_client() {
 
 	res := os.exec([@VEXE, '-stats', 'test', root])
 	assert res.exit_code == 0, res.output
+
+	// a GraphQL server without a tracer provider says so when it starts; the
+	// no-op provider, passed on purpose, silences it
+	os.mkdir_all(os.join_path(root, 'notice'))!
+	os.write_file(os.join_path(root, 'notice', 'main.v'), notice_program)!
+	bin := os.join_path(root, 'notice_bin')
+	built := os.exec([@VEXE, '-o', bin, os.join_path(root, 'notice')])
+	assert built.exit_code == 0, built.output
+	without := os.exec([bin])
+	assert without.exit_code == 0, without.output
+	assert without.output.split_into_lines() == [
+		'vgraph: GraphQL server has no tracer provider; no spans will be recorded (pass tracer_provider to Client.new)',
+		'started',
+	]
+	with_noop := os.exec([bin, 'noop'])
+	assert with_noop.exit_code == 0, with_noop.output
+	assert with_noop.output.split_into_lines() == ['started']
 }
+
+// notice_program starts the project's GraphQL server, with the no-op tracer
+// provider when it is given `noop`, and without one otherwise.
+const notice_program = "module main
+
+import db.sqlite
+import os
+import five07.otel
+import five07.vgraph
+import graph
+
+fn main() {
+	db := sqlite.connect(':memory:') or { panic(err) }
+	opts := if 'noop' in os.args {
+		vgraph.ClientOptions{
+			tracer_provider: otel.noop_tracer_provider()
+		}
+	} else {
+		vgraph.ClientOptions{}
+	}
+	g := graph.Graph.new(db, opts) or { panic(err) }
+	g.graphql(graph.Resolvers{}) or { panic(err) }
+	println('started')
+}
+"
 
 const api_sdl = 'directive @tag(name: String!) on OBJECT | FIELD_DEFINITION
 

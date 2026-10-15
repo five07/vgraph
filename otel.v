@@ -213,6 +213,7 @@ const vgraph_rows = 'vgraph.rows'
 const vgraph_hook = 'vgraph.hook'
 const vgraph_interceptor = 'vgraph.interceptor'
 const vgraph_decision = 'vgraph.decision'
+const vgraph_field = 'vgraph.field'
 
 // start_span starts the span `name` of the operation `op` on `table`, for a
 // model of level `level`, and returns the client to run the operation with,

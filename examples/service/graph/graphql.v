@@ -822,6 +822,11 @@ scalar Time @specifiedBy(url: "https://scalars.graphql.org/chillicream/date-time
 // lists and connections, for the tables whose `graphql()` doesn't.
 pub fn (g Graph) graphql(r Resolvers, opts vgraph.GraphqlOptions) !&graphql.Server {
 	mut s := graphql.Server.new(schema_sdl)!
+	// with a tracer provider, a span per operation; without one, a notice
+	s.tracer = g.client.graphql_tracer()
+	if notice := g.client.tracing_notice() {
+		println(notice)
+	}
 	sizes := g.client.schema.page_sizes(opts)!
 	if g.client.can_begin() {
 		s.transaction = vgraph.GraphqlTransaction{

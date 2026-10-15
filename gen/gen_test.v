@@ -171,3 +171,14 @@ fn test_instrument_by_level() {
 	assert out.contains('\n// all_untraced is `all`, without its span.\nfn (q ArticleQuery) all_untraced() ![]ArticleNode {\n\treturn q.nodes([])\n}\n')
 	assert out.contains('vgraph.span_rows(span, result.len)')
 }
+
+// A full or default model's resolvers each get a span; an ops model's don't,
+// nor do columns.
+fn test_trace_resolvers() {
+	text := "\ts.resolve('Query', 'articles', fn [g] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {\n\t\treturn fn () {\n\t\t}()\n\t})\n\tfor name in ['title'] {\n\t\ts.resolve('Article', name, resolve_article_field)\n\t}\n"
+	assert trace_resolvers(text, 'ops') == text
+	out := trace_resolvers(text, 'default')
+	assert out.starts_with("\ts.resolve('Query', 'articles', g.client.traced_resolver(.default, 'Query', 'articles', fn [g] (")
+	assert out.contains('\t\t}()\n\t}))\n')
+	assert out.contains("s.resolve('Article', name, resolve_article_field)")
+}

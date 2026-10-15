@@ -2,6 +2,8 @@ module graphql
 
 import context
 import os
+import five07.otel
+import five07.otel.sdk.trace as sdk
 
 const library_sdl = '
 type Query {
@@ -601,4 +603,42 @@ fn test_variables_are_coerced() {
 		'Variable "\$ids" got invalid value "a" at "ids[0]"; Int cannot represent non-integer value: "a"\nVariable "\$ids" got invalid value 1.5 at "ids[1]"; Int cannot represent non-integer value: 1.5',
 		'Variable "\$q" cannot be non-input type "Query".\nVariable "\$q" is never used.',
 	]
+}
+
+// With a tracer, each operation is a span, named after it, that its resolvers
+// run under; one with a failed field is an error, as is a request that can't
+// be parsed.
+fn test_operations_are_spans() {
+	exporter := sdk.InMemoryExporter.new()
+	provider := sdk.TracerProvider.new(processors: [sdk.SimpleSpanProcessor.new(exporter)])!
+	mut calls := &Calls{}
+	mut s := zoo(mut calls)!
+	s.tracer = provider.tracer('test')
+	mut parents := []string{}
+	seen := &parents
+	s.resolve('Query', 'count', fn [seen] (ctx context.Context, _ FieldInfo, parents []Source) ![]Resolved {
+		mut p := unsafe { seen }
+		p << otel.span_from_context(ctx).span_context().span_id.str()
+		return parents.map(Resolved(Value(1)))
+	})
+	r := s.execute(Request{
+		query: 'query Counting { count }'
+	}, context.background())
+	assert r.errors.len == 0
+	op := exporter.spans().last()
+	assert op.name == 'query Counting'
+	assert op.kind == .server
+	assert op.status.code == .unset
+	assert parents == [op.span_context.span_id.str()]
+	s.execute(Request{
+		query: 'mutation { fail }'
+	}, context.background())
+	failed := exporter.spans().last()
+	assert failed.name == 'mutation'
+	assert failed.status.code == .error
+	s.execute(Request{
+		query: '{'
+	}, context.background())
+	assert exporter.spans().last().name == 'GraphQL Operation'
+	assert exporter.spans().last().status.code == .error
 }

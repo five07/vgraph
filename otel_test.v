@@ -6,6 +6,7 @@ import load
 import orm
 import os
 import sqlite
+import five07.otel
 import five07.otel.sdk.trace as sdk
 
 @[table: 'shelves']
@@ -262,4 +263,23 @@ fn test_privacy_and_interceptor_spans_of_a_full_model() {
 	exporter.reset()
 	c.prepare_query('books', load.Query{})!
 	assert exporter.spans().len == 0
+}
+
+// Without a provider, a GraphQL server's start says so; with one, even the
+// no-op provider, it doesn't, and the server records operations.
+fn test_tracing_notice() {
+	plain := Client.new(otel_db()!, otel_schema()!)!
+	notice := plain.tracing_notice() or { '' }
+	assert notice.contains('no tracer provider')
+	if _ := plain.graphql_tracer() {
+		assert false, 'a tracer without a provider'
+	}
+	noop := Client.new(otel_db()!, otel_schema()!, tracer_provider: otel.noop_tracer_provider())!
+	if _ := noop.tracing_notice() {
+		assert false, 'a notice with a provider'
+	}
+	_ := noop.graphql_tracer() or {
+		assert false, 'no tracer with a provider'
+		return
+	}
 }

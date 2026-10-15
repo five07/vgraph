@@ -218,6 +218,32 @@ is recorded and the generated code runs as it does today.
      Full suite 28 passed, 3 skipped; PostgreSQL tests pass locally.
 4. **GraphQL server**: the operation span, resolver spans of `full` and
    `default` types, the startup notice and its test.
+   **Done.**
+   - `graphql.Server.tracer ?otel.Tracer`: with one, each operation is a
+     server span, `query Name` / `mutation Name` (the type alone when
+     unnamed), with `graphql.operation.type` and `.name`; the transaction and
+     resolvers run under it; any error makes it `error`. A request that can't
+     be parsed or validated is a failed `GraphQL Operation` span.
+   - The generated `Graph.graphql()` sets the tracer from the client
+     (`Client.graphql_tracer()`) and prints `Client.tracing_notice()` when the
+     client has no provider; the no-op provider silences it.
+   - Resolver spans: `Client.traced_resolver(level, type, field, r)` wraps a
+     resolver in `resolve Type.field` (`vgraph.field`, `vgraph.batch_size`:
+     the parents at its level), whose context reaches the resolver, so its
+     queries nest. The generator wraps the function-literal resolvers of
+     `full` and `default` types (root fields, edges, mutations, and the
+     project's own fields on those types); columns, which only read the row
+     they're given, have no span. `traced_resolver` returns the resolver as
+     it is when the client wouldn't record it, so a `default` type on an
+     `ops` client costs nothing per call.
+   - Tests: `test_operations_are_spans` (graphql), `test_resolver_spans` and
+     a built program that prints the notice without a provider and not with
+     the no-op one (the `vgraph gen` end-to-end test), `test_trace_resolvers`
+     (gen), `test_tracing_notice` (core).
+   - V bug, for otel's notes: comparing a `?otel.Tracer` with `none` in a
+     program that links otel's SDK makes V emit C that copies otel's `shared`
+     structs wrongly (`initializing ... with an expression of incompatible
+     type '__shared__...'`). The tests use `if x := ...` instead.
 5. **Example `service-otel`**, a copy of `service` with instrumentation.
 6. **Docs**: `docs/tracing.md` (otel and the raw `vgraph.trace` hook), the
    README, getting started, the compiler bug, and the context change in the

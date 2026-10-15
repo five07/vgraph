@@ -266,3 +266,29 @@ fn parse_signature(line string) ?Signature {
 		ret:     ret
 	}
 }
+
+// trace_resolvers returns `text`, the registration of resolvers, with a span
+// around each resolver that is a function literal, when `level` is `full` or
+// `default`: `s.resolve(T, f, fn ...)` becomes `s.resolve(T, f,
+// g.client.traced_resolver(level, T, f, fn ...))`. The resolvers of columns,
+// which read a field of a row they were given, have none.
+fn trace_resolvers(text string, level string) string {
+	if level !in ['full', 'default'] {
+		return text
+	}
+	mut lines := text.split('\n')
+	mut open := false
+	for i, line in lines {
+		if line.starts_with("\ts.resolve('") && line.contains(', fn [') {
+			typ := line.all_after("\ts.resolve('").all_before("'")
+			field := line.all_after("', '").all_before("'")
+			lines[i] = line.replace_once(', fn [',
+				", g.client.traced_resolver(.${level}, '${typ}', '${field}', fn [")
+			open = true
+		} else if open && line == '\t})' {
+			lines[i] = '\t}))'
+			open = false
+		}
+	}
+	return lines.join('\n')
+}

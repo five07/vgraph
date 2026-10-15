@@ -41,6 +41,11 @@ pub const schema_sdl = ${v_string(sdl)}
 // lists and connections, for the tables whose `graphql()` doesn\'t.
 pub fn (g Graph) graphql(r Resolvers, opts vgraph.GraphqlOptions) !&graphql.Server {
 	mut s := graphql.Server.new(schema_sdl)!
+	// with a tracer provider, a span per operation; without one, a notice
+	s.tracer = g.client.graphql_tracer()
+	if notice := g.client.tracing_notice() {
+		println(notice)
+	}
 	sizes := g.client.schema.page_sizes(opts)!
 	if g.client.can_begin() {
 		s.transaction = vgraph.GraphqlTransaction{
@@ -76,15 +81,20 @@ pub fn (g Graph) graphql(r Resolvers, opts vgraph.GraphqlOptions) !&graphql.Serv
 	})')
 	}
 	for info in visible {
-		write_resolvers(mut b, info, infos)!
+		mut rb := strings.new_builder(8192)
+		write_resolvers(mut rb, info, infos)!
+		b.write_string(trace_resolvers(rb.str(), level_of(info)))
 	}
 	if hand.len > 0 {
 		b.writeln("\n	// the fields the project's .graphql files add")
 	}
+	mut levels := map[string]string{}
+	for info in visible {
+		levels[info.gql_type()] = level_of(info)
+	}
 	for h in hand {
-		b.writeln("	s.resolve('${h.typ}', '${h.field}', fn [r] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {")
-		b.writeln('		return r.${h.method}(ctx, info, parents)')
-		b.writeln('	})')
+		resolver := "	s.resolve('${h.typ}', '${h.field}', fn [r] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {\n		return r.${h.method}(ctx, info, parents)\n	})\n"
+		b.write_string(trace_resolvers(resolver, levels[h.typ] or { 'none' }))
 	}
 	b.writeln('	return s\n}')
 	if !b.after(0).contains('sizes[') {
