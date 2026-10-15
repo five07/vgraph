@@ -47,14 +47,16 @@ fn open() !graph.Graph {
 
 // end snippet
 
-// Blog is a seeded graph, and the nodes the snippets refer to.
+// Blog is a seeded graph, and the nodes the snippets refer to. The nodes are
+// references: a struct field of a node type makes V's cgen expand the node
+// types' zero values through their edges, which took ~45 GB and 40 s.
 struct Blog {
 	g     graph.Graph
-	ada   graph.UserNode
-	bob   graph.UserNode
-	hello graph.ArticleNode // by Ada, published, tagged v, with two comments
-	loads graph.ArticleNode // by Ada, a draft, tagged v and sql
-	notes graph.ArticleNode // by Bob, published, no comments
+	ada   &graph.UserNode
+	bob   &graph.UserNode
+	hello &graph.ArticleNode // by Ada, published, tagged v, with two comments
+	loads &graph.ArticleNode // by Ada, a draft, tagged v and sql
+	notes &graph.ArticleNode // by Bob, published, no comments
 }
 
 // blog returns a graph with two users, three articles, comments and tags.
@@ -72,11 +74,11 @@ fn blog() !Blog {
 	g.comments().create().set_article(hello).set_author(ada).set_body('Thanks.').exec()!
 	return Blog{
 		g:     g
-		ada:   ada
-		bob:   bob
-		hello: hello
-		loads: loads
-		notes: notes
+		ada:   &ada
+		bob:   &bob
+		hello: &hello
+		loads: &loads
+		notes: &notes
 	}
 }
 
