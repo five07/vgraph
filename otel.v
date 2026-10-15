@@ -1,5 +1,6 @@
 module vgraph
 
+import context
 import orm
 import os
 import five07.otel
@@ -202,4 +203,111 @@ fn db_system(conn orm.Connection) string {
 		}
 	}
 	return ''
+}
+
+// The attributes of vgraph's own spans.
+const vgraph_operation = 'vgraph.operation'
+const vgraph_edge = 'vgraph.edge'
+const vgraph_batch_size = 'vgraph.batch_size'
+const vgraph_rows = 'vgraph.rows'
+const vgraph_hook = 'vgraph.hook'
+const vgraph_interceptor = 'vgraph.interceptor'
+const vgraph_decision = 'vgraph.decision'
+
+// start_span starts the span `name` of the operation `op` on `table`, for a
+// model of level `level`, and returns the client to run the operation with,
+// whose context holds the span. When the client doesn't record the model's
+// operations, it returns the client as it is and a span that records nothing.
+// The generated code calls it; `end_span` ends the span.
+pub fn (c Client) start_span(level OtelLevel, name string, table string, op string) (Client, otel.Span) {
+	if !c.records(level, .ops) {
+		return c, otel.Span(otel.NoopSpan{})
+	}
+	ctx, span := c.tracer.start(c.ctx, name,
+		attributes: [otel.string_attr(db_collection_name, table),
+			otel.string_attr(vgraph_operation, op)]
+	)
+	return c.with_span_ctx(ctx), span
+}
+
+// start_load_span starts the span of the load of `table`'s edge `edge` for
+// `parents` rows, as `start_span` does.
+pub fn (c Client) start_load_span(level OtelLevel, table string, edge string, parents int) (Client, otel.Span) {
+	if !c.records(level, .ops) {
+		return c, otel.Span(otel.NoopSpan{})
+	}
+	ctx, span := c.tracer.start(c.ctx, 'load ${table}.${edge}',
+		attributes: [otel.string_attr(db_collection_name, table),
+			otel.string_attr(vgraph_operation, 'load'), otel.string_attr(vgraph_edge, edge),
+			otel.int_attr(vgraph_batch_size, parents)]
+	)
+	return c.with_span_ctx(ctx), span
+}
+
+// span_rows records on `span` how many rows its operation returned.
+pub fn span_rows(span otel.Span, rows int) {
+	if span.is_recording() {
+		span.set_attributes(otel.int_attr(vgraph_rows, rows))
+	}
+}
+
+// span_failed records on `span` that its operation failed with `err`: the
+// error's type, not its message, which can quote values.
+pub fn span_failed(span otel.Span, err IError) {
+	if span.is_recording() {
+		span.record_error(err)
+		span.set_status(code: .error)
+	}
+}
+
+// with_span_ctx returns the client with `ctx`, the context of a span it
+// started, in place of its own: unlike `with_ctx`, it doesn't look for a
+// transaction in it, which the client already runs in when there is one.
+fn (c Client) with_span_ctx(ctx context.Context) Client {
+	return Client{
+		...c
+		conn: with_trace_ctx(c.conn, ctx)
+		ctx:  ctx
+	}
+}
+
+// full_spans reports whether the client records the hooks, interceptors and
+// privacy rules of `table`: its model is `full`, or `default` on a `full`
+// client.
+fn (c Client) full_spans(table string) bool {
+	if !c.has_tracer_provider {
+		return false
+	}
+	t := c.schema.tables[table] or { return false }
+	return c.records(t.otel.level, .full)
+}
+
+// traced_run returns the `run` of the hook `h` of `table` with a span around
+// it, which covers the hook and what runs after it: the hooks inside it and
+// the write. The span's context goes on to them, so their queries and
+// statements are its children. A hook that doesn't apply to a write has no span.
+fn (c Client) traced_run(table string, h Hook) fn (Mutate) Mutate {
+	return fn [c, table, h] (next Mutate) Mutate {
+		return c.traced_hook(table, h, h.run(next))
+	}
+}
+
+fn (c Client) traced_hook(table string, h Hook, chain Mutate) Mutate {
+	tracer := c.tracer
+	name := if h.name == 'privacy' { 'privacy ${table}' } else { 'hook ${table}' }
+	return fn [tracer, name, table, h, chain] (ctx context.Context, mut m Mutation) ! {
+		mut attrs := [otel.string_attr(db_collection_name, table),
+			otel.string_attr(vgraph_operation, m.operation().str())]
+		if h.name != '' && h.name != 'privacy' {
+			attrs << otel.string_attr(vgraph_hook, h.name)
+		}
+		span_ctx, span := tracer.start(ctx, name, attributes: attrs)
+		defer {
+			span.end()
+		}
+		chain(span_ctx, mut m) or {
+			span_failed(span, err)
+			return err
+		}
+	}
 }

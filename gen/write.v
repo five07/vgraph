@@ -69,10 +69,11 @@ pub fn generate(out_module string, entities []Entity, tables []Table) !map[strin
 	mut files := map[string]string{}
 	files['graph.v'] = graph_file(out_module, entities)
 	for table in tables {
-		files['${table.name}.v'] = table_file(out_module, infos[table.name], infos)!
+		info := infos[table.name]
+		files['${table.name}.v'] = instrument(table_file(out_module, info, infos)!, info)
 		if !table.view {
-			files['${table.name}_mutation.v'] = mutation_file(out_module, infos[table.name],
-				infos)!
+			files['${table.name}_mutation.v'] = instrument(mutation_file(out_module, info,
+				infos)!, info)
 		}
 	}
 	return files
@@ -264,6 +265,10 @@ fn table_file(out_module string, info Info, infos map[string]Info) !string {
 	b.writeln(header)
 	b.writeln('module ${out_module}\n')
 	mut imports := ['five07.vgraph.load']
+	if level_of(info) != 'none' {
+		// the spans of its queries
+		imports.prepend('five07.vgraph')
+	}
 	if t.columns.any(it.typ.trim_left('?') == 'time.Time') {
 		imports << 'time'
 	}

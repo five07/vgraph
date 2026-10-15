@@ -298,6 +298,24 @@ pub fn (b GroupCreate) on_conflict_columns(columns ...string) GroupCreate {
 // save inserts the row and its edges, in one transaction, and returns it, read
 // back. With `do_nothing`, a row that conflicts returns a `NotFoundError`.
 pub fn (b GroupCreate) save() !GroupNode {
+	client, span := b.graph.client.start_span(.full, 'create groups', 'groups', 'create')
+	defer {
+		span.end()
+	}
+	result := GroupCreate{
+		...b
+		graph: Graph{
+			client: client
+		}
+	}.save_untraced() or {
+		vgraph.span_failed(span, err)
+		return err
+	}
+	return result
+}
+
+// save_untraced is `save`, without its span.
+fn (b GroupCreate) save_untraced() !GroupNode {
 	key := b.graph.client.create(b.data)!
 	if key == '' {
 		return NotFoundError{
@@ -309,6 +327,23 @@ pub fn (b GroupCreate) save() !GroupNode {
 
 // exec inserts the row and its edges, in one transaction.
 pub fn (b GroupCreate) exec() ! {
+	client, span := b.graph.client.start_span(.full, 'create groups', 'groups', 'create')
+	defer {
+		span.end()
+	}
+	GroupCreate{
+		...b
+		graph: Graph{
+			client: client
+		}
+	}.exec_untraced() or {
+		vgraph.span_failed(span, err)
+		return err
+	}
+}
+
+// exec_untraced is `exec`, without its span.
+fn (b GroupCreate) exec_untraced() ! {
 	b.graph.client.create(b.data)!
 }
 
@@ -373,12 +408,48 @@ pub fn (b GroupCreateBulk) on_conflict_columns(columns ...string) GroupCreateBul
 // save inserts the rows and their edges, in one transaction, and returns them,
 // read back, in order. With `do_nothing`, the rows that conflict are left out.
 pub fn (b GroupCreateBulk) save() ![]GroupNode {
+	client, span := b.graph.client.start_span(.full, 'create groups', 'groups', 'create_bulk')
+	defer {
+		span.end()
+	}
+	result := GroupCreateBulk{
+		...b
+		graph: Graph{
+			client: client
+		}
+	}.save_untraced() or {
+		vgraph.span_failed(span, err)
+		return err
+	}
+	vgraph.span_rows(span, result.len)
+	return result
+}
+
+// save_untraced is `save`, without its span.
+fn (b GroupCreateBulk) save_untraced() ![]GroupNode {
 	keys := b.graph.client.create_bulk(b.builders.map(it.data))!
 	return b.graph.groups_by_keys(keys.filter(it != ''))
 }
 
 // exec inserts the rows and their edges, in one transaction.
 pub fn (b GroupCreateBulk) exec() ! {
+	client, span := b.graph.client.start_span(.full, 'create groups', 'groups', 'create_bulk')
+	defer {
+		span.end()
+	}
+	GroupCreateBulk{
+		...b
+		graph: Graph{
+			client: client
+		}
+	}.exec_untraced() or {
+		vgraph.span_failed(span, err)
+		return err
+	}
+}
+
+// exec_untraced is `exec`, without its span.
+fn (b GroupCreateBulk) exec_untraced() ! {
 	b.graph.client.create_bulk(b.builders.map(it.data))!
 }
 
@@ -504,13 +575,48 @@ pub fn (b GroupUpdateOne) clear_devices() GroupUpdateOne {
 // save updates the row and its edges, in one transaction, and returns it, read
 // back, or a `NotFoundError`.
 pub fn (b GroupUpdateOne) save() !GroupNode {
-	b.exec()!
+	client, span := b.graph.client.start_span(.full, 'update groups', 'groups', 'update_one')
+	defer {
+		span.end()
+	}
+	result := GroupUpdateOne{
+		...b
+		graph: Graph{
+			client: client
+		}
+	}.save_untraced() or {
+		vgraph.span_failed(span, err)
+		return err
+	}
+	return result
+}
+
+// save_untraced is `save`, without its span.
+fn (b GroupUpdateOne) save_untraced() !GroupNode {
+	b.exec_untraced()!
 	return b.graph.groups_by_keys([b.data.row_key])![0]
 }
 
 // exec updates the row and its edges, in one transaction, or returns a
 // `NotFoundError`.
 pub fn (b GroupUpdateOne) exec() ! {
+	client, span := b.graph.client.start_span(.full, 'update groups', 'groups', 'update_one')
+	defer {
+		span.end()
+	}
+	GroupUpdateOne{
+		...b
+		graph: Graph{
+			client: client
+		}
+	}.exec_untraced() or {
+		vgraph.span_failed(span, err)
+		return err
+	}
+}
+
+// exec_untraced is `exec`, without its span.
+fn (b GroupUpdateOne) exec_untraced() ! {
 	if !b.graph.client.update_one(b.data)! {
 		return NotFoundError{
 			table: 'groups'
@@ -748,6 +854,25 @@ pub fn (b GroupUpdate) clear_devices() GroupUpdate {
 // exec updates the rows and their edges, in one transaction, and returns how
 // many there were.
 pub fn (b GroupUpdate) exec() !int {
+	client, span := b.graph.client.start_span(.full, 'update groups', 'groups', 'update')
+	defer {
+		span.end()
+	}
+	result := GroupUpdate{
+		...b
+		graph: Graph{
+			client: client
+		}
+	}.exec_untraced() or {
+		vgraph.span_failed(span, err)
+		return err
+	}
+	vgraph.span_rows(span, result)
+	return result
+}
+
+// exec_untraced is `exec`, without its span.
+fn (b GroupUpdate) exec_untraced() !int {
 	return b.graph.client.update(b.data)
 }
 
@@ -779,6 +904,23 @@ pub fn (q GroupQuery) delete_one_id(id int) GroupDeleteOne {
 // exec deletes the row, with its join table rows, in one transaction, or
 // returns a `NotFoundError`.
 pub fn (b GroupDeleteOne) exec() ! {
+	client, span := b.graph.client.start_span(.full, 'delete groups', 'groups', 'delete_one')
+	defer {
+		span.end()
+	}
+	GroupDeleteOne{
+		...b
+		graph: Graph{
+			client: client
+		}
+	}.exec_untraced() or {
+		vgraph.span_failed(span, err)
+		return err
+	}
+}
+
+// exec_untraced is `exec`, without its span.
+fn (b GroupDeleteOne) exec_untraced() ! {
 	if !b.graph.client.delete_one(b.data)! {
 		return NotFoundError{
 			table: 'groups'
@@ -928,6 +1070,25 @@ pub fn (q GroupDelete) has_devices_with(configure fn (DeviceQuery) DeviceQuery) 
 // exec deletes the rows, with their join table rows, in one transaction, and
 // returns how many there were.
 pub fn (b GroupDelete) exec() !int {
+	client, span := b.graph.client.start_span(.full, 'delete groups', 'groups', 'delete')
+	defer {
+		span.end()
+	}
+	result := GroupDelete{
+		...b
+		graph: Graph{
+			client: client
+		}
+	}.exec_untraced() or {
+		vgraph.span_failed(span, err)
+		return err
+	}
+	vgraph.span_rows(span, result)
+	return result
+}
+
+// exec_untraced is `exec`, without its span.
+fn (b GroupDelete) exec_untraced() !int {
 	return b.graph.client.delete(b.data)
 }
 

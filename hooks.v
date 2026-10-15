@@ -2,6 +2,7 @@ module vgraph
 
 import context
 import load
+import five07.otel
 
 // Hooks, interceptors and privacy. A model declares them in `hooks()`,
 // `interceptors()` and `policy()`, beside `edges()`; an app registers more on
@@ -277,20 +278,24 @@ fn (c Client) prepare(table string, q load.Query, edge bool) !load.Query {
 	if c.bypassed {
 		return query
 	}
+	// a `full` model's rules and interceptors each have a span
+	full := c.full_spans(table)
 	if !c.privileged {
-		decide: for p in c.policies_of(table) {
-			for rule in p.query {
-				match rule(c.ctx, table, mut query)! {
-					.allow { break decide }
-					.deny {
-						return PrivacyError{
-							table: table
-							op:    'query'
-						}
-					}
-					.skip {}
-				}
+		policies := c.policies_of(table)
+		if !full || policies.all(it.query.len == 0) {
+			c.decide_query(c.ctx, table, policies, mut query)!
+		} else {
+			ctx, span := c.tracer.start(c.ctx, 'privacy ${table}',
+				attributes: [otel.string_attr(db_collection_name, table),
+					otel.string_attr(vgraph_operation, 'query')]
+			)
+			decision := c.decide_query(ctx, table, policies, mut query) or {
+				span_failed(span, err)
+				span.end()
+				return err
 			}
+			span.set_attributes(otel.string_attr(vgraph_decision, decision))
+			span.end()
 		}
 	}
 	mut all := c.registry.intercepts.clone()
@@ -300,7 +305,21 @@ fn (c Client) prepare(table string, q load.Query, edge bool) !load.Query {
 		if (i.name != '' && i.name in c.skipped) || (edge && !i.edges) {
 			continue
 		}
-		i.run(c.ctx, table, mut query)!
+		if !full {
+			i.run(c.ctx, table, mut query)!
+			continue
+		}
+		mut attrs := [otel.string_attr(db_collection_name, table)]
+		if i.name != '' {
+			attrs << otel.string_attr(vgraph_interceptor, i.name)
+		}
+		ctx, span := c.tracer.start(c.ctx, 'intercept ${table}', attributes: attrs)
+		i.run(ctx, table, mut query) or {
+			span_failed(span, err)
+			span.end()
+			return err
+		}
+		span.end()
 	}
 	if query.lock.mode != .off && !c.in_tx {
 		return error('`for_update` and `for_share` lock rows until a transaction ends: run them in `tx`')
@@ -308,6 +327,29 @@ fn (c Client) prepare(table string, q load.Query, edge bool) !load.Query {
 	// the subqueries of edge predicates and traversals: their tables' rules
 	query.conds = c.prepare_conds(query.conds)!
 	return query
+}
+
+// decide_query runs the query rules of `policies` on `query`, until one allows
+// or denies it, and returns what decided: `allow`, or `skip` when every rule
+// skipped. A rule that denies it is a `PrivacyError`.
+fn (c Client) decide_query(ctx context.Context, table string, policies []Policy, mut query load.Query) !string {
+	for p in policies {
+		for rule in p.query {
+			match rule(ctx, table, mut query)! {
+				.allow {
+					return 'allow'
+				}
+				.deny {
+					return PrivacyError{
+						table: table
+						op:    'query'
+					}
+				}
+				.skip {}
+			}
+		}
+	}
+	return 'skip'
 }
 
 // prepare_conds returns `conds` with each subquery of a registered table

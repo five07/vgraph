@@ -101,6 +101,14 @@ pub fn (a Article) fields() []vgraph.Field {
 	]
 }
 
+// otel: articles record every span: their queries, writes, loads, hooks and
+// privacy rules.
+pub fn (a Article) otel() vgraph.Otel {
+	return vgraph.Otel{
+		level: .full
+	}
+}
+
 // policy keeps articles from banned viewers.
 pub fn (a Article) policy() vgraph.Policy {
 	return vgraph.Policy{
@@ -150,6 +158,13 @@ pub fn (u User) fields() []vgraph.Field {
 	]
 }
 
+// otel: users record their queries, writes and loads.
+pub fn (u User) otel() vgraph.Otel {
+	return vgraph.Otel{
+		level: .ops
+	}
+}
+
 pub fn (u User) edges() []vgraph.Edge {
 	return [
 		vgraph.Edge{
@@ -173,6 +188,13 @@ pub struct Tag {
 pub:
 	id   int @[primary; sql: serial]
 	name string
+}
+
+// otel: tags record what the app chooses when it runs.
+pub fn (t Tag) otel() vgraph.Otel {
+	return vgraph.Otel{
+		level: .default
+	}
 }
 
 pub fn (t Tag) edges() []vgraph.Edge {
@@ -247,6 +269,7 @@ import context
 import db.sqlite
 import orm
 import time
+import five07.otel.sdk.trace as sdk
 import five07.vgraph
 import five07.vgraph.graphql
 import graph
@@ -298,6 +321,10 @@ fn (mut c Counting) execute(query string) ![]orm.Row {
 }
 
 fn setup() !(graph.Graph, &Log) {
+	return setup_with()
+}
+
+fn setup_with(opts vgraph.ClientOptions) !(graph.Graph, &Log) {
 	mut db := sqlite.connect(\':memory:\')!
 	sql db {
 		create table models.User
@@ -362,7 +389,124 @@ fn setup() !(graph.Graph, &Log) {
 		inner: db
 		log:   log
 	}
-	return graph.Graph.new(conn)!, log
+	return graph.Graph.new(conn, opts)!, log
+}
+
+// recorder returns a provider that keeps its spans, and the exporter that
+// holds them.
+fn recorder() !(&sdk.TracerProvider, &sdk.InMemoryExporter) {
+	exporter := sdk.InMemoryExporter.new()
+	provider := sdk.TracerProvider.new(processors: [sdk.SimpleSpanProcessor.new(exporter)])!
+	return provider, exporter
+}
+
+fn span_named(spans []sdk.ReadOnlySpan, name string) !sdk.ReadOnlySpan {
+	for s in spans {
+		if s.name == name {
+			return s
+		}
+	}
+	return error(\'no span `\${name}` in \${spans.map(it.name)}\')
+}
+
+fn is_child(child sdk.ReadOnlySpan, parent sdk.ReadOnlySpan) bool {
+	return child.parent.span_id == parent.span_context.span_id
+}
+
+fn attr(span sdk.ReadOnlySpan, key string) string {
+	for kv in span.attributes {
+		if kv.key == key {
+			value := kv.value
+			return match value {
+				string { value }
+				i64 { value.str() }
+				else { value.str() }
+			}
+		}
+	}
+	return \'\'
+}
+
+// Each model records the spans of its level: articles everything, users their
+// operations, comments nothing, tags what the client chooses.
+fn test_spans_by_level() {
+	provider, exporter := recorder()!
+	g, _ := setup_with(tracer_provider: provider)!
+	tracer := provider.tracer(\'test\')
+	ctx, request := tracer.start(context.background(), \'request\')
+	gc := g.with_ctx(ctx)
+	articles := gc.articles().with_author().order_by_id().all()!
+	gc.comments().all()!
+	gc.users().count()!
+	gc.tags().all()!
+	request.end()
+	spans := exporter.spans()
+	root := span_named(spans, \'request\')!
+	query := span_named(spans, \'query articles\')!
+	assert is_child(query, root)
+	assert attr(query, \'db.collection.name\') == \'articles\'
+	assert attr(query, \'vgraph.operation\') == \'all\'
+	assert attr(query, \'vgraph.rows\') == articles.len.str()
+	// full: the policy\'s rules, under the query
+	assert is_child(span_named(spans, \'privacy articles\')!, query)
+	assert attr(span_named(spans, \'privacy articles\')!, \'vgraph.decision\') == \'skip\'
+	// the query\'s statement and its edge load, under it; the load\'s statement
+	// under the load
+	assert is_child(span_named(spans, \'SELECT articles\')!, query)
+	load := span_named(spans, \'load articles.author\')!
+	assert is_child(load, query)
+	assert attr(load, \'vgraph.batch_size\') == articles.len.str()
+	assert is_child(span_named(spans, \'SELECT users\')!, load)
+	// users are ops: their query, and no privacy span
+	assert is_child(span_named(spans, \'query users\')!, root)
+	// comments record nothing of their own; their statement is the request\'s
+	assert \'query comments\' !in spans.map(it.name)
+	assert is_child(span_named(spans, \'SELECT comments\')!, root)
+	// tags are default: ops, by default
+	assert is_child(span_named(spans, \'query tags\')!, root)
+}
+
+// A default model follows the client: `otel_level: .none` turns its spans off.
+fn test_a_default_model_follows_the_client() {
+	provider, exporter := recorder()!
+	g, _ := setup_with(tracer_provider: provider, otel_level: .none)!
+	g.tags().all()!
+	g.users().all()!
+	names := exporter.spans().map(it.name)
+	assert \'query tags\' !in names
+	assert \'query users\' in names
+}
+
+// A write is a span; a full model\'s hooks are spans inside it, and the write\'s
+// statements are the innermost hook\'s.
+fn test_write_and_hook_spans() {
+	provider, exporter := recorder()!
+	g, _ := setup_with(tracer_provider: provider)!
+	g.articles().create().set_user_id(1).exec()!
+	spans := exporter.spans()
+	create := span_named(spans, \'create articles\')!
+	assert attr(create, \'vgraph.operation\') == \'create\'
+	hook := span_named(spans, \'hook articles\')!
+	assert is_child(hook, create)
+	assert attr(hook, \'vgraph.operation\') == \'create\'
+	assert is_child(span_named(spans, \'INSERT articles\')!, hook)
+	// a user\'s write has no hooks, and so no hook span
+	exporter.reset()
+	g.users().update_one_id(1).set_name(\'ada\').exec()!
+	assert span_named(exporter.spans(), \'update users\')!.status.code == .unset
+	assert \'hook users\' !in exporter.spans().map(it.name)
+}
+
+// A failure is the span\'s error, without its message.
+fn test_a_failed_operation_is_an_error() {
+	provider, exporter := recorder()!
+	g, _ := setup_with(tracer_provider: provider)!
+	g.with_ctx(models.as_viewer(models.Viewer{ banned: true })).articles().count() or {}
+	query := span_named(exporter.spans(), \'query articles\')!
+	assert query.status.code == .error
+	assert query.status.description == \'\'
+	privacy := span_named(exporter.spans(), \'privacy articles\')!
+	assert privacy.status.code == .error
 }
 
 fn test_eager_loading_is_one_query_per_edge() {
