@@ -95,8 +95,8 @@ environment has them already.
 The layout of [`service`](../service#layout), and:
 
 ```
-telemetry.v                the tracer provider: one processor per exporter
-main.v                     startup: the provider, the app, ctrl-c
+main.v                     startup: the provider, from otel's autoconfig; the
+                           app; ctrl-c
 app.v                      the graph on the provider; each request's trace from
                            its headers
 main_test.v                the tests, over HTTP, with the spans kept in memory

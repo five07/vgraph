@@ -6,7 +6,7 @@ pub const default_db_path = ':memory:'
 pub const default_port = 8080
 
 // The settings `load_config` reads, from `.env` or the environment.
-const config_keys = ['DB_DRIVER', 'DB_PATH', 'PORT', 'SEED', 'OTEL_TRACES_EXPORTER']!
+const config_keys = ['DB_DRIVER', 'DB_PATH', 'PORT', 'SEED']!
 
 // Config holds the settings of the app.
 pub struct Config {
@@ -18,9 +18,6 @@ pub:
 	port    int    = default_port
 	// seed loads example data at startup when the database has no users.
 	seed bool = true
-	// traces_exporters are where spans go, from `OTEL_TRACES_EXPORTER`:
-	// `otlp` (a collector), `console` (stdout), or none at all
-	traces_exporters []string
 }
 
 // load_config reads the settings from the `.env` file at `path`, when there is
@@ -72,27 +69,11 @@ fn config_from(values map[string]string) !Config {
 			else { return error('SEED `${value}` must be `true` or `false`') }
 		}
 	}
-	mut exporters := []string{}
-	for entry in (values['OTEL_TRACES_EXPORTER'] or { '' }).split(',') {
-		name := entry.trim_space().to_lower()
-		match name {
-			'', 'none' {}
-			'otlp', 'console' {
-				if name !in exporters {
-					exporters << name
-				}
-			}
-			else {
-				return error('OTEL_TRACES_EXPORTER: `${name}` is not `otlp`, `console` or `none`')
-			}
-		}
-	}
 	return Config{
-		db_driver:        driver
-		db_path:          db_path
-		port:             port
-		seed:             seed
-		traces_exporters: exporters
+		db_driver: driver
+		db_path:   db_path
+		port:      port
+		seed:      seed
 	}
 }
 

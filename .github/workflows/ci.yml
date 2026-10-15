@@ -11,7 +11,7 @@ env:
   V_COMMIT: 04cb7fa314b95dfc5681768ed0598d53cb87e72e
   # The five07/otel commit vgraph is built against, on its develop branch until
   # otel 0.1.0. Bump it on purpose.
-  OTEL_COMMIT: 5342f596d966e5fd3e2c6146cc43bb38fc5a9d73
+  OTEL_COMMIT: 8d39b25fb9a919ab4ed67f19b92ca314e6dfcc60
 
 jobs:
   sqlite:

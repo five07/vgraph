@@ -3,6 +3,7 @@ module vgraph
 import context
 import load
 import five07.otel
+import five07.otel.semconv
 
 // Hooks, interceptors and privacy. A model declares them in `hooks()`,
 // `interceptors()` and `policy()`, beside `edges()`; an app registers more on
@@ -286,7 +287,7 @@ fn (c Client) prepare(table string, q load.Query, edge bool) !load.Query {
 			c.decide_query(c.ctx, table, policies, mut query)!
 		} else {
 			ctx, span := c.tracer.start(c.ctx, 'privacy ${table}',
-				attributes: [otel.string_attr(db_collection_name, table),
+				attributes: [otel.string_attr(semconv.db_collection_name, table),
 					otel.string_attr(vgraph_operation, 'query')]
 			)
 			decision := c.decide_query(ctx, table, policies, mut query) or {
@@ -309,7 +310,7 @@ fn (c Client) prepare(table string, q load.Query, edge bool) !load.Query {
 			i.run(c.ctx, table, mut query)!
 			continue
 		}
-		mut attrs := [otel.string_attr(db_collection_name, table)]
+		mut attrs := [otel.string_attr(semconv.db_collection_name, table)]
 		if i.name != '' {
 			attrs << otel.string_attr(vgraph_interceptor, i.name)
 		}

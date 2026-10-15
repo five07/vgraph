@@ -4,18 +4,13 @@ import context
 import orm
 import os
 import five07.otel
+import five07.otel.semconv
 
 // OpenTelemetry: vgraph records spans through `five07.otel`'s API, with the
 // provider the app gives `Client.new`. Without one, it records nothing.
 
 // version is vgraph's, which its tracer reports.
 pub const version = '0.1.0'
-
-// The semantic conventions' names of a database statement's attributes.
-const db_system_name = 'db.system.name'
-const db_collection_name = 'db.collection.name'
-const db_operation_name = 'db.operation.name'
-const db_query_text = 'db.query.text'
 
 // OtelLevel is how much a model's generated code records.
 pub enum OtelLevel {
@@ -107,16 +102,16 @@ fn statement_spans(tracer otel.Tracer, system string) Tracer {
 		operation, target := statement_names(e)
 		mut attrs := []otel.KeyValue{}
 		if system != '' {
-			attrs << otel.string_attr(db_system_name, system)
+			attrs << otel.string_attr(semconv.db_system_name, system)
 		}
 		if target != '' {
-			attrs << otel.string_attr(db_collection_name, target)
+			attrs << otel.string_attr(semconv.db_collection_name, target)
 		}
 		if operation != '' {
-			attrs << otel.string_attr(db_operation_name, operation)
+			attrs << otel.string_attr(semconv.db_operation_name, operation)
 		}
 		if e.statement != '' {
-			attrs << otel.string_attr(db_query_text, e.statement)
+			attrs << otel.string_attr(semconv.db_query_text, e.statement)
 		}
 		name := if operation != '' && target != '' {
 			'${operation} ${target}'
@@ -222,10 +217,10 @@ const vgraph_field = 'vgraph.field'
 // The generated code calls it; `end_span` ends the span.
 pub fn (c Client) start_span(level OtelLevel, name string, table string, op string) (Client, otel.Span) {
 	if !c.records(level, .ops) {
-		return c, otel.Span(otel.NoopSpan{})
+		return c, otel.noop_span()
 	}
 	ctx, span := c.tracer.start(c.ctx, name,
-		attributes: [otel.string_attr(db_collection_name, table),
+		attributes: [otel.string_attr(semconv.db_collection_name, table),
 			otel.string_attr(vgraph_operation, op)]
 	)
 	return c.with_span_ctx(ctx), span
@@ -235,10 +230,10 @@ pub fn (c Client) start_span(level OtelLevel, name string, table string, op stri
 // `parents` rows, as `start_span` does.
 pub fn (c Client) start_load_span(level OtelLevel, table string, edge string, parents int) (Client, otel.Span) {
 	if !c.records(level, .ops) {
-		return c, otel.Span(otel.NoopSpan{})
+		return c, otel.noop_span()
 	}
 	ctx, span := c.tracer.start(c.ctx, 'load ${table}.${edge}',
-		attributes: [otel.string_attr(db_collection_name, table),
+		attributes: [otel.string_attr(semconv.db_collection_name, table),
 			otel.string_attr(vgraph_operation, 'load'), otel.string_attr(vgraph_edge, edge),
 			otel.int_attr(vgraph_batch_size, parents)]
 	)
@@ -297,7 +292,7 @@ fn (c Client) traced_hook(table string, h Hook, chain Mutate) Mutate {
 	tracer := c.tracer
 	name := if h.name == 'privacy' { 'privacy ${table}' } else { 'hook ${table}' }
 	return fn [tracer, name, table, h, chain] (ctx context.Context, mut m Mutation) ! {
-		mut attrs := [otel.string_attr(db_collection_name, table),
+		mut attrs := [otel.string_attr(semconv.db_collection_name, table),
 			otel.string_attr(vgraph_operation, m.operation().str())]
 		if h.name != '' && h.name != 'privacy' {
 			attrs << otel.string_attr(vgraph_hook, h.name)

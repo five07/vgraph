@@ -2,6 +2,7 @@ module graphql
 
 import context
 import five07.otel
+import five07.otel.semconv
 
 // Source is an object being resolved: the root value, or whatever a resolver
 // returned for an object field. Any V value can be one; resolvers smartcast it
@@ -300,10 +301,10 @@ pub fn (s &Server) execute_document(doc &Document, operation_name string, inputs
 	mut attrs := []otel.KeyValue{}
 	if op := operation_of(doc, operation_name) {
 		kind := op.operation.str()
-		attrs << otel.string_attr('graphql.operation.type', kind)
+		attrs << otel.string_attr(semconv.graphql_operation_type, kind)
 		name = kind
 		if n := op.name {
-			attrs << otel.string_attr('graphql.operation.name', n.value)
+			attrs << otel.string_attr(semconv.graphql_operation_name, n.value)
 			name = '${kind} ${n.value}'
 		}
 	}

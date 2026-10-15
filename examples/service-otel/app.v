@@ -8,6 +8,7 @@ import five07.vgraph
 import five07.vgraph.graphql
 import five07.vgraph.sqlite as vsqlite
 import five07.otel.propagation
+import five07.otel.propagation.httpcarrier
 import graph
 import migrations
 // `app.Context` is written out in this module: importing `Context` by name
@@ -66,12 +67,7 @@ fn new_app_on(cfg app.Config, db sqlite.DB, opts vgraph.ClientOptions) !&App {
 // of the caller's, and every span of the request is in that trace.
 @['/graphql'; get; post]
 pub fn (a &App) serve_graphql(mut ctx app.Context) veb.Result {
-	header := ctx.req.header
-	parent := a.propagator.extract(context.background(), propagation.GetterCarrier{
-		get_fn: fn [header] (key string) ?string {
-			return header.get_custom(key) or { return none }
-		}
-	})
+	parent := a.propagator.extract(context.background(), httpcarrier.new(ctx.req.header))
 	res := a.gql.handle(graphql.HttpRequest{
 		method:       ctx.req.method.str()
 		content_type: ctx.req.header.get(.content_type) or { '' }

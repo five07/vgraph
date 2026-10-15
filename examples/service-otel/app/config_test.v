@@ -31,11 +31,10 @@ fn test_parse_env_rejects_a_line_without_equals() {
 fn test_config_defaults() {
 	cfg := config_from({})!
 	assert cfg == Config{
-		db_driver:        'sqlite'
-		db_path:          ':memory:'
-		port:             8080
-		seed:             true
-		traces_exporters: []
+		db_driver: 'sqlite'
+		db_path:   ':memory:'
+		port:      8080
+		seed:      true
 	}
 	assert !config_from({
 		'SEED': 'false'
@@ -95,23 +94,6 @@ fn test_load_config_reads_the_file_and_the_environment_overrides_it() {
 	}
 }
 
-fn test_traces_exporters() {
-	assert config_from({})!.traces_exporters == []
-	assert config_from({
-		'OTEL_TRACES_EXPORTER': 'none'
-	})!.traces_exporters == []
-	assert config_from({
-		'OTEL_TRACES_EXPORTER': ' OTLP, console,otlp'
-	})!.traces_exporters == ['otlp', 'console']
-	config_from({
-		'OTEL_TRACES_EXPORTER': 'zipkin'
-	}) or {
-		assert err.msg() == 'OTEL_TRACES_EXPORTER: `zipkin` is not `otlp`, `console` or `none`'
-		return
-	}
-	assert false, 'expected an error'
-}
-
 // The file's telemetry settings reach the environment, which otel and vgraph
 // read, without overriding what is set there.
 fn test_load_config_exports_the_telemetry_settings() {
@@ -130,8 +112,8 @@ fn test_load_config_exports_the_telemetry_settings() {
 		os.unsetenv('OTEL_TRACES_EXPORTER')
 		os.unsetenv('VGRAPH_OTEL_LEVEL')
 	}
-	cfg := load_config(path)!
-	assert cfg.traces_exporters == ['console']
+	load_config(path)!
+	assert os.getenv('OTEL_TRACES_EXPORTER') == 'console'
 	assert os.getenv('OTEL_SERVICE_NAME') == 'from_file'
 	assert os.getenv('VGRAPH_OTEL_LEVEL') == 'ops'
 }

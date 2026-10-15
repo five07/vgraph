@@ -102,11 +102,6 @@ fn span_named(spans []trace.ReadOnlySpan, name string) !trace.ReadOnlySpan {
 	return error('no span `${name}` in ${spans.map(it.name)}')
 }
 
-// is_child reports whether `child`'s parent is `parent`.
-fn is_child(child trace.ReadOnlySpan, parent trace.ReadOnlySpan) bool {
-	return child.parent.span_id == parent.span_context.span_id
-}
-
 const feed = 'query Feed { users(first: 1) { edges { node { name articles(first: 2) { edges { node { title } } } posts(first: 2) { edges { node { body } } } } } } }'
 
 // A request that carries a `traceparent` continues the caller's trace: its
@@ -135,22 +130,22 @@ fn test_each_model_records_its_level() {
 	op := span_named(spans, 'query Feed')!
 	assert op.kind == .server
 	users := span_named(spans, 'resolve Query.users')!
-	assert is_child(users, op)
+	assert users.is_child_of(op)
 	query := span_named(spans, 'query users')!
-	assert is_child(query, users)
-	assert is_child(span_named(spans, 'intercept users')!, query)
-	assert is_child(span_named(spans, 'SELECT users')!, query)
+	assert query.is_child_of(users)
+	assert span_named(spans, 'intercept users')!.is_child_of(query)
+	assert span_named(spans, 'SELECT users')!.is_child_of(query)
 	// articles are ops: a load, under the resolver of the user's field, which
 	// is the user's, and their statements under it
 	load := span_named(spans, 'load users.articles')!
-	assert is_child(load, span_named(spans, 'resolve User.articles')!)
-	assert is_child(span_named(spans, 'SELECT articles')!, load)
+	assert load.is_child_of(span_named(spans, 'resolve User.articles')!)
+	assert span_named(spans, 'SELECT articles')!.is_child_of(load)
 	assert 'resolve Article.title' !in spans.map(it.name)
 	// comments: their query has no span, its statement is the operation's
 	comments := r.request('{ comments(first: 1) { edges { node { body } } } }', {})!
 	assert 'query comments' !in comments.map(it.name)
 	assert 'resolve Query.comments' !in comments.map(it.name)
-	assert is_child(span_named(comments, 'SELECT comments')!, span_named(comments, 'query')!)
+	assert span_named(comments, 'SELECT comments')!.is_child_of(span_named(comments, 'query')!)
 }
 
 // Posts are `default`: the app chooses their level when it starts, here
@@ -162,7 +157,7 @@ fn test_posts_follow_the_apps_level() {
 	assert 'resolve Query.posts' !in at_ops.map(it.name)
 	full := start(.full)!
 	at_full := full.request('{ posts(first: 1) { edges { node { body } } } }', {})!
-	assert is_child(span_named(at_full, 'query posts')!, span_named(at_full, 'resolve Query.posts')!)
+	assert span_named(at_full, 'query posts')!.is_child_of(span_named(at_full, 'resolve Query.posts')!)
 	assert 'intercept posts' in at_full.map(it.name)
 	none_ := start(.none)!
 	at_none := none_.request('{ posts(first: 1) { edges { node { body } } } }', {})!
@@ -176,17 +171,17 @@ fn test_a_mutation_and_its_hooks() {
 	spans := r.request('mutation Join { createUser(input: {name: " Edsger ", email: "EDSGER@example.com"}) { name } }', {})!
 	op := span_named(spans, 'mutation Join')!
 	resolver := span_named(spans, 'resolve Mutation.createUser')!
-	assert is_child(resolver, op)
-	assert is_child(span_named(spans, 'BEGIN')!, op)
-	assert is_child(span_named(spans, 'COMMIT')!, op)
+	assert resolver.is_child_of(op)
+	assert span_named(spans, 'BEGIN')!.is_child_of(op)
+	assert span_named(spans, 'COMMIT')!.is_child_of(op)
 	create := span_named(spans, 'create users')!
-	assert is_child(create, resolver)
+	assert create.is_child_of(resolver)
 	// users have two hooks, but the soft delete runs on deletes alone: a
 	// create has one hook span, and the statement under it
 	hooks := spans.filter(it.name == 'hook users')
 	assert hooks.len == 1
-	assert is_child(hooks[0], create)
-	assert is_child(span_named(spans, 'INSERT users')!, hooks[0])
+	assert hooks[0].is_child_of(create)
+	assert span_named(spans, 'INSERT users')!.is_child_of(hooks[0])
 	// nothing in a span is a value of the request
 	for s in spans {
 		for kv in s.attributes {

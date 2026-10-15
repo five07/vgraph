@@ -409,22 +409,8 @@ fn span_named(spans []sdk.ReadOnlySpan, name string) !sdk.ReadOnlySpan {
 	return error(\'no span `\${name}` in \${spans.map(it.name)}\')
 }
 
-fn is_child(child sdk.ReadOnlySpan, parent sdk.ReadOnlySpan) bool {
-	return child.parent.span_id == parent.span_context.span_id
-}
-
 fn attr(span sdk.ReadOnlySpan, key string) string {
-	for kv in span.attributes {
-		if kv.key == key {
-			value := kv.value
-			return match value {
-				string { value }
-				i64 { value.str() }
-				else { value.str() }
-			}
-		}
-	}
-	return \'\'
+	return span.attribute(key) or { return \'\' }.str()
 }
 
 // Each model records the spans of its level: articles everything, users their
@@ -443,27 +429,27 @@ fn test_spans_by_level() {
 	spans := exporter.spans()
 	root := span_named(spans, \'request\')!
 	query := span_named(spans, \'query articles\')!
-	assert is_child(query, root)
+	assert query.is_child_of(root)
 	assert attr(query, \'db.collection.name\') == \'articles\'
 	assert attr(query, \'vgraph.operation\') == \'all\'
 	assert attr(query, \'vgraph.rows\') == articles.len.str()
 	// full: the policy\'s rules, under the query
-	assert is_child(span_named(spans, \'privacy articles\')!, query)
+	assert span_named(spans, \'privacy articles\')!.is_child_of(query)
 	assert attr(span_named(spans, \'privacy articles\')!, \'vgraph.decision\') == \'skip\'
 	// the query\'s statement and its edge load, under it; the load\'s statement
 	// under the load
-	assert is_child(span_named(spans, \'SELECT articles\')!, query)
+	assert span_named(spans, \'SELECT articles\')!.is_child_of(query)
 	load := span_named(spans, \'load articles.author\')!
-	assert is_child(load, query)
+	assert load.is_child_of(query)
 	assert attr(load, \'vgraph.batch_size\') == articles.len.str()
-	assert is_child(span_named(spans, \'SELECT users\')!, load)
+	assert span_named(spans, \'SELECT users\')!.is_child_of(load)
 	// users are ops: their query, and no privacy span
-	assert is_child(span_named(spans, \'query users\')!, root)
+	assert span_named(spans, \'query users\')!.is_child_of(root)
 	// comments record nothing of their own; their statement is the request\'s
 	assert \'query comments\' !in spans.map(it.name)
-	assert is_child(span_named(spans, \'SELECT comments\')!, root)
+	assert span_named(spans, \'SELECT comments\')!.is_child_of(root)
 	// tags are default: ops, by default
-	assert is_child(span_named(spans, \'query tags\')!, root)
+	assert span_named(spans, \'query tags\')!.is_child_of(root)
 }
 
 // A request is a span; a full model\'s resolvers are spans under it, and the
@@ -483,14 +469,14 @@ fn test_resolver_spans() {
 	assert attr(op, \'graphql.operation.type\') == \'query\'
 	assert attr(op, \'graphql.operation.name\') == \'Titles\'
 	articles := span_named(spans, \'resolve Query.articles\')!
-	assert is_child(articles, op)
+	assert articles.is_child_of(op)
 	assert attr(articles, \'vgraph.field\') == \'Query.articles\'
-	assert is_child(span_named(spans, \'query articles\')!, articles)
+	assert span_named(spans, \'query articles\')!.is_child_of(articles)
 	author := span_named(spans, \'resolve Article.author\')!
-	assert is_child(author, op)
+	assert author.is_child_of(op)
 	assert attr(author, \'vgraph.batch_size\') != \'\'
 	assert \'resolve Query.users\' !in names
-	assert is_child(span_named(spans, \'query users\')!, op)
+	assert span_named(spans, \'query users\')!.is_child_of(op)
 	assert \'resolve Article.title\' !in names
 }
 
@@ -515,9 +501,9 @@ fn test_write_and_hook_spans() {
 	create := span_named(spans, \'create articles\')!
 	assert attr(create, \'vgraph.operation\') == \'create\'
 	hook := span_named(spans, \'hook articles\')!
-	assert is_child(hook, create)
+	assert hook.is_child_of(create)
 	assert attr(hook, \'vgraph.operation\') == \'create\'
-	assert is_child(span_named(spans, \'INSERT articles\')!, hook)
+	assert span_named(spans, \'INSERT articles\')!.is_child_of(hook)
 	// a user\'s write has no hooks, and so no hook span
 	exporter.reset()
 	g.users().update_one_id(1).set_name(\'ada\').exec()!

@@ -7,6 +7,7 @@ import orm
 import os
 import sqlite
 import five07.otel
+import five07.otel.semconv
 import five07.otel.sdk.trace as sdk
 
 @[table: 'shelves']
@@ -68,13 +69,7 @@ fn recorder() !(&sdk.TracerProvider, &sdk.InMemoryExporter) {
 }
 
 fn attr(span sdk.ReadOnlySpan, key string) string {
-	for kv in span.attributes {
-		if kv.key == key {
-			value := kv.value
-			return if value is string { value } else { value.str() }
-		}
-	}
-	return ''
+	return span.attribute(key) or { return '' }.str()
 }
 
 fn add_book(c Client, title string) !string {
@@ -122,7 +117,7 @@ fn test_statements_are_spans_under_the_callers_span() {
 			assert s.scope.name == 'five07.vgraph'
 			assert s.scope.version == version
 			// only a driver knows its database
-			assert attr(s, db_system_name) == if driver { 'sqlite' } else { '' }
+			assert attr(s, semconv.db_system_name) == if driver { 'sqlite' } else { '' }
 			assert s.end_ns >= s.start_ns
 			for kv in s.attributes {
 				assert !attr(s, kv.key).contains('secret')
@@ -132,14 +127,14 @@ fn test_statements_are_spans_under_the_callers_span() {
 		if driver {
 			assert names == ['BEGIN', 'INSERT books', 'COMMIT', 'SELECT books']
 			insert := statements[1]
-			assert attr(insert, db_query_text).starts_with('INSERT INTO "books" (')
+			assert attr(insert, semconv.db_query_text).starts_with('INSERT INTO "books" (')
 		} else {
 			assert names == ['BEGIN', 'INSERT books', 'COMMIT', 'SELECT books']
-			assert attr(statements[1], db_query_text) == ''
+			assert attr(statements[1], semconv.db_query_text) == ''
 		}
-		assert attr(statements[1], db_collection_name) == 'books'
-		assert attr(statements[1], db_operation_name) == 'INSERT'
-		assert attr(statements[3], db_operation_name) == 'SELECT'
+		assert attr(statements[1], semconv.db_collection_name) == 'books'
+		assert attr(statements[1], semconv.db_operation_name) == 'INSERT'
+		assert attr(statements[3], semconv.db_operation_name) == 'SELECT'
 	}
 }
 

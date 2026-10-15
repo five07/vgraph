@@ -35,7 +35,8 @@ g := graph.Graph.new(vsqlite.new(db), tracer_provider: otel.TracerProvider(provi
 `OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_TRACES_SAMPLER` and
 otel's other variables configure the provider; see otel's
 [configuration](https://github.com/five07/otel/blob/main/docs/configuration.md).
-The [`service-otel`](../examples/service-otel) example picks its exporters from
+The [`service-otel`](../examples/service-otel) example builds its processors
+with otel's `autoconfig.processors_from_env()`, which reads
 `OTEL_TRACES_EXPORTER` (`otlp`, `console`, both, or `none`), and has a collector
 and Jaeger in a `docker-compose.yml`.
 
@@ -110,11 +111,7 @@ callers' traces reads the context from the request's headers:
 ```v
 // the caller's trace, from the request's W3C `traceparent` and `tracestate`
 parent := propagation.default_propagator().extract(context.background(),
-	propagation.GetterCarrier{
-		get_fn: fn [headers] (key string) ?string {
-			return headers[key] or { return none }
-		}
-	})
+	propagation.MapCarrier.new(headers))
 ```
 
 and hands it to `handle`; the operation's span is then a child of the caller's,
@@ -172,12 +169,12 @@ g := graph.Graph.new(vsqlite.new(db), vgraph.ClientOptions{
 	...opts
 	tracer_provider: otel.TracerProvider(provider)
 })!
-// … run the code, then read `exporter.spans()`
+// … run the code, then read `exporter.spans()`, or one by name: `exporter.span(name)`
 ```
 
 ## Building
 
-Two V master issues touch a program that links otel's SDK:
+Three V master issues touch a program that links otel's SDK:
 
 - `v run .`'s default build can miscompile calls between modules, which
   vgraph's calls into the SDK's provider are: wrong values, or a crash. Use
@@ -185,3 +182,7 @@ Two V master issues touch a program that links otel's SDK:
   `regressions/run_cross_module_interface` has the program.
 - A whole-folder `v test` built through V's module cache can hang in the SDK.
   Run `v -nocache test .`; a single file's `v test` is fine.
+- A `&trace.TracerProvider` doesn't compile into a struct's
+  `?otel.TracerProvider` field, so the examples convert it first:
+  `otel.TracerProvider(provider)`. otel's
+  `regressions/pointer_to_option_interface_field.vv` has the program.

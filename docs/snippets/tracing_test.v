@@ -63,7 +63,7 @@ fn recording(opts vgraph.ClientOptions) !(graph.Graph, &trace.TracerProvider, &t
 		...opts
 		tracer_provider: otel.TracerProvider(provider)
 	})!
-	// … run the code, then read `exporter.spans()`
+	// … run the code, then read `exporter.spans()`, or one by name: `exporter.span(name)`
 	// end snippet
 	return g, provider, exporter
 }
@@ -80,9 +80,8 @@ fn test_spans_nest_under_the_callers() {
 	assert comments.len == 0
 	spans := exporter.spans()
 	assert spans.map(it.name) == ['SELECT comments', 'query comments', 'GET /comments']
-	root := spans.last()
-	assert spans[1].parent.span_id == root.span_context.span_id
-	assert spans[0].parent.span_id == spans[1].span_context.span_id
+	assert spans[1].is_child_of(spans.last())
+	assert spans[0].is_child_of(spans[1])
 }
 
 // request_context returns the context of a request whose headers are
@@ -91,11 +90,7 @@ fn request_context(headers map[string]string) context.Context {
 	// snippet: propagation
 	// the caller's trace, from the request's W3C `traceparent` and `tracestate`
 	parent := propagation.default_propagator().extract(context.background(),
-		propagation.GetterCarrier{
-			get_fn: fn [headers] (key string) ?string {
-				return headers[key] or { return none }
-			}
-		})
+		propagation.MapCarrier.new(headers))
 	// end snippet
 	return parent
 }
