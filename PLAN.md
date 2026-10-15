@@ -245,6 +245,39 @@ is recorded and the generated code runs as it does today.
      structs wrongly (`initializing ... with an expression of incompatible
      type '__shared__...'`). The tests use `if x := ...` instead.
 5. **Example `service-otel`**, a copy of `service` with instrumentation.
+   **Done.**
+   - `examples/service-otel`: `service`'s app, models, migrations and seed,
+     with users `full`, articles `ops`, posts `default`, comments without
+     `otel()`; its own `graph/` and schema (the same API).
+   - `telemetry.v`: one processor per `OTEL_TRACES_EXPORTER` entry, `otlp`
+     (batch, `otlphttp`) and `console` (simple, `stdout`); none means no
+     provider, and the startup notice. `main.v` shuts the provider down on
+     ctrl-c, so queued spans go out.
+   - `app/config.v`: `OTEL_TRACES_EXPORTER` parsed and checked; the `.env`
+     file's `OTEL_*` and `VGRAPH_OTEL_LEVEL` go into the environment unless
+     already set, for otel and vgraph to read.
+   - `app.v`: each request's context from its headers (W3C `traceparent`,
+     `tracestate`, `baggage`), passed to `handle`, so the operation's span is
+     the caller's child.
+   - `main_test.v` (4 tests, over HTTP, in-memory exporter): the caller's
+     trace is continued, and a request without one starts its own; each
+     model's level (users' resolver, query, interceptor and statement spans;
+     articles' load; comments' statement only); posts at `ops`, `full` and
+     `none`; a mutation's transaction, write, hook and statement, and no value
+     of the request in any attribute. `service`'s tests cover the API, so the
+     copy has none of them.
+   - `docker-compose.yml` and `collector.yaml` from otel's `http_service`;
+     `.env.example` and a README with the span tree of a request.
+   - CI generates and checks `service-otel`'s client and schema; the root
+     README lists the example.
+   - Found here: with otel linked, a whole-folder `v test vgraph` builds
+     `otel_test` through V's module cache into a binary that deadlocks every
+     time in `SimpleSpanProcessor.on_end` (its lock held by nothing), while a
+     single-file `v test` builds one that never does. otel's README already
+     says its own whole-repository runs need `-nocache`. CI and the README now
+     run `v -nocache test vgraph` (and the PostgreSQL tests).
+   - `v -nocache test vgraph`: 31 passed, 3 skipped (PostgreSQL); `v fmt
+     -verify` and `v vet` clean.
 6. **Docs**: `docs/tracing.md` (otel and the raw `vgraph.trace` hook), the
    README, getting started, the compiler bug, and the context change in the
    upgrade notes.

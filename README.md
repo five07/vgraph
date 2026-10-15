@@ -137,6 +137,9 @@ The [examples](examples):
   option, on SQLite and PostgreSQL;
 - [`service`](examples/service): a GraphQL API on vgraph alone, with hooks, soft
   deletes, global ids and migrations;
+- [`service-otel`](examples/service-otel): the same API traced with
+  OpenTelemetry: a telemetry level per model, spans to a collector and stdout,
+  and each request in its caller's trace;
 - [`pagination`](examples/pagination): lists by `limit` and `offset` beside
   Relay connections by cursor, and when to use which;
 - [`auth`](examples/auth): JWT logins, privacy rules by viewer, and hooks that
@@ -165,10 +168,14 @@ It links the checkout into `~/.vmodules` (`$VMODULES`), and says so when another
 **Tests.**
 
 ```sh
-v test .     # everything on SQLite; the PostgreSQL tests are skipped
+v -nocache test .     # everything on SQLite; the PostgreSQL tests are skipped
 PGHOST=localhost PGUSER=... PGPASSWORD=... PGDATABASE=vgraph_test \
-  v -d vgraph_pg test pg_test.v examples/relations/pg_test.v examples/pagination/pg_test.v
+  v -nocache -d vgraph_pg test pg_test.v examples/relations/pg_test.v examples/pagination/pg_test.v
 ```
+
+`-nocache`: with otel linked in, V master's module cache builds a whole-folder
+`v test` that hangs in otel's SDK, as otel's own README says of its tests; a
+single file's `v test` is fine without it.
 
 The PostgreSQL tests drop and recreate their tables: give them a database of
 their own. The generated schemas are checked against graphql-js 16.11.0:
