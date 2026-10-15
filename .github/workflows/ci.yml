@@ -28,7 +28,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install --quiet -y libsqlite3-dev
       - name: Restore V
         id: v-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: vlang
           key: v-${{ runner.os }}-${{ env.V_COMMIT }}
@@ -72,9 +72,8 @@ jobs:
           git -C vgraph diff --exit-code -- examples/service/graph examples/service-otel/graph examples/relations/graph examples/pagination/graph examples/auth/graph docs/snippets/graph
           test -z "$(git -C vgraph status --porcelain -- examples/service/graph examples/service-otel/graph examples/relations/graph examples/pagination/graph examples/auth/graph docs/snippets/graph)"
 
-  # The tests on SQLite, in two shards on their own runners: each test
-  # compiles on its own, and the runner's memory lets V's test runner use only
-  # one job by default. `checks` fails on a test that is in neither shard.
+  # The tests on SQLite, in two shards on their own runners, since each test
+  # compiles on its own. `checks` fails on a test that is in neither shard.
   sqlite:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -82,10 +81,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # the guides' tests take up to ~17 GB each to compile (V expands the
+          # generated nodes' equality inline), so they compile one at a time
           - shard: guides
             paths: vgraph/docs vgraph/examples
+            jobs: 1
           - shard: library
             paths: vgraph/*_test.v vgraph/cmd vgraph/gen vgraph/graphql vgraph/load
+            jobs: 2
     name: sqlite (${{ matrix.shard }})
     steps:
       - uses: actions/checkout@v7
@@ -96,7 +99,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install --quiet -y libsqlite3-dev
       - name: Restore V
         id: v-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: vlang
           key: v-${{ runner.os }}-${{ env.V_COMMIT }}
@@ -118,8 +121,8 @@ jobs:
           git -C ~/.vmodules/five07/otel checkout "$OTEL_COMMIT"
       - name: Test
         env:
-          # two compiles at a time; V's default budget of 8 GB each allows one
-          VJOBS: 2
+          # V's test runner budgets 8 GB a compile, which allows the runner one
+          VJOBS: ${{ matrix.jobs }}
         run: v -nocache test ${{ matrix.paths }}
 
   # The schemas vgraph gen writes must read, and print, the same in graphql-js,
@@ -169,7 +172,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install --quiet -y libpq-dev libsqlite3-dev
       - name: Restore V
         id: v-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: vlang
           key: v-${{ runner.os }}-${{ env.V_COMMIT }}
