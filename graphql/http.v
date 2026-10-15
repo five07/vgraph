@@ -1,5 +1,6 @@
 module graphql
 
+import context
 import net.urllib
 
 // HttpRequest is the part of an HTTP request the handler needs, so any web
@@ -31,7 +32,7 @@ const plain_json = 'application/json; charset=utf-8'
 // (queries only). A client that accepts `application/graphql-response+json`
 // gets that media type, and status 400 for a request that couldn't run;
 // otherwise the response is `application/json` with status 200.
-pub fn (s &Server) handle(req HttpRequest, ctx Context) HttpResponse {
+pub fn (s &Server) handle(req HttpRequest, ctx context.Context) HttpResponse {
 	modern := req.accept.contains('application/graphql-response+json')
 	content_type := if modern { graphql_response_json } else { plain_json }
 	mut params := map[string]Value{}

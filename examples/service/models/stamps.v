@@ -1,9 +1,9 @@
 module models
 
+import context
 import orm
 import time
 import five07.vgraph
-import five07.vgraph.graphql
 
 // Stamps is a mixin: the times of every model that embeds it, set by its field
 // options when a row is created and updated.
@@ -49,7 +49,7 @@ pub fn normalize(f fn (mut m vgraph.Mutation)) vgraph.Hook {
 		name: 'normalize'
 		on:   [.create, .update_one, .update]
 		run:  fn [f] (next vgraph.Mutate) vgraph.Mutate {
-			return fn [f, next] (ctx graphql.Context, mut m vgraph.Mutation) ! {
+			return fn [f, next] (ctx context.Context, mut m vgraph.Mutation) ! {
 				f(mut m)
 				next(ctx, mut m)!
 			}

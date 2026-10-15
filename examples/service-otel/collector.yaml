@@ -1,0 +1,20 @@
+# The OpenTelemetry Collector's settings for `docker compose up`: take OTLP
+# over HTTP on 4318, print every span (`docker compose logs collector`), and
+# pass them on to Jaeger.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+exporters:
+  debug:
+    verbosity: detailed
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [debug, otlp/jaeger]

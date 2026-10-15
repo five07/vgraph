@@ -1,7 +1,7 @@
 module vgraph
 
+import context
 import db.sqlite as sq
-import graphql
 import load
 import orm
 import sqlite
@@ -579,35 +579,42 @@ fn test_transactions() {
 	}
 }
 
-// Requester is the context of a GraphQL request, in `test_graphql_transaction`.
+// Requester is the app's value in the context of a GraphQL request, in
+// `test_graphql_transaction`.
 struct Requester {
 	name string
 }
 
-// A GraphQL request's mutations (Q103): `GraphqlTransaction` begins a
-// transaction, and a client given the context it returns runs in it, with the
-// request's own context.
+const requester_key = 'requester'
+
+fn requester_ctx(name string) context.Context {
+	return context.with_value(context.background(), requester_key, Requester{name})
+}
+
+// A GraphQL request's mutations: `GraphqlTransaction` begins a transaction,
+// and a client given the context it returns runs in it, with the request's
+// own values.
 fn test_graphql_transaction() {
 	for c in clients()! {
 		assert c.can_begin()
 		t := GraphqlTransaction{
 			client: c
 		}
-		ctx := t.begin(Requester{'ada'})!
-		assert ctx is TxContext
+		ctx := t.begin(requester_ctx('ada'))!
+		assert tx_client(ctx) != none
 		inner := c.with_ctx(ctx)
 		assert inner.in_tx
-		if inner.ctx is Requester {
-			assert inner.ctx.name == 'ada'
+		if value := inner.ctx.value(requester_key) {
+			assert value is Requester && value.name == 'ada'
 		} else {
-			assert false, "the request's own context"
+			assert false, "the request's own values"
 		}
 		create(inner, 'writers', {
 			'name': orm.Primitive('ada')
 		})!
 		t.rollback(ctx)!
 		assert writers(c)!.len == 0
-		again := t.begin(Requester{'bob'})!
+		again := t.begin(requester_ctx('bob'))!
 		create(c.with_ctx(again), 'writers', {
 			'name': orm.Primitive('bob')
 		})!
@@ -820,7 +827,7 @@ fn test_writes_without_transactions() {
 	events := &WriteEvents{}
 	c.use_on('writers', Hook{
 		run: fn [events] (next Mutate) Mutate {
-			return fn [events, next] (ctx graphql.Context, mut m Mutation) ! {
+			return fn [events, next] (ctx context.Context, mut m Mutation) ! {
 				name := (m.field_value('name') or { orm.Primitive('') }) as string
 				m.on_commit(fn [events, name] () {
 					events.add('commit ${name}')

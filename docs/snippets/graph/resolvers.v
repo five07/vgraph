@@ -5,6 +5,7 @@
 // `graph.with_ctx(ctx)`: in a mutation, that is the request's transaction.
 module graph
 
+import context
 import five07.vgraph.graphql
 
 // snippet: resolvers
@@ -15,7 +16,7 @@ pub:
 }
 
 // query_search resolves `Query.search`: `search(text: String!): [Article!]!`.
-pub fn (r Resolvers) query_search(ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+pub fn (r Resolvers) query_search(ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 	found := r.g.with_ctx(ctx).articles().where_title_contains(info.arg('text').as_string()).order_by_id().all()!
 	result := graphql.list(found.map(graphql.obj(it)))
 	return parents.map(result)

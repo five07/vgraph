@@ -96,7 +96,7 @@ and serve it over GraphQL:
 server := g.graphql(graph.Resolvers{ g: g }, default_page: 20, max_page: 100)!
 res := server.execute(graphql.Request{
 	query: '{ articles(first: 2, orderBy: {field: VIEWS, direction: DESC}) { edges { node { title author { name } } } } }'
-}, Viewer{ id: 1 }) // the request's context, which hooks and privacy rules get
+}, as_viewer(Viewer{ id: 1 })) // the request's context: hooks and privacy rules get it
 println(res.json())
 ```
 
@@ -119,6 +119,10 @@ println(res.json())
   GraphQL module is its own, tested against graphql-js.
 - **Migrations** through V's `v.migrations`: tables, indexes, foreign keys,
   triggers and global ids, from the schema.
+- **Tracing** with OpenTelemetry, through `five07.otel`: a span per GraphQL
+  operation and per statement, and for each model as much as its level asks,
+  from its queries to its hooks and resolvers; never a value. Off, and free,
+  without a tracer provider.
 
 ## Docs
 
@@ -137,6 +141,9 @@ The [examples](examples):
   option, on SQLite and PostgreSQL;
 - [`service`](examples/service): a GraphQL API on vgraph alone, with hooks, soft
   deletes, global ids and migrations;
+- [`service-otel`](examples/service-otel): the same API traced with
+  OpenTelemetry: a telemetry level per model, spans to a collector and stdout,
+  and each request in its caller's trace;
 - [`pagination`](examples/pagination): lists by `limit` and `offset` beside
   Relay connections by cursor, and when to use which;
 - [`auth`](examples/auth): JWT logins, privacy rules by viewer, and hooks that
@@ -150,23 +157,29 @@ and the SQL `vgraph.trace` shows; for a feature, what it's for, and the Ent or
 entgql feature it matches, if any.
 
 **Setup.** vgraph needs V master at the commit in `.github/workflows/ci.yml`
-(`V_COMMIT`). The examples and the generator import it as `five07.vgraph`, so
-link your checkout there:
+(`V_COMMIT`), and `five07.otel` at the commit there (`OTEL_COMMIT`). The
+examples and the generator import vgraph as `five07.vgraph`, so link your
+checkout there:
 
 ```sh
 v run examples/setup.vsh
 ```
 
 It links the checkout into `~/.vmodules` (`$VMODULES`), and says so when another
-`five07.vgraph` is already there.
+`five07.vgraph` is already there. It links an `otel` checkout beside this one as
+`five07.otel` when that is missing, or says where to get it.
 
 **Tests.**
 
 ```sh
-v test .     # everything on SQLite; the PostgreSQL tests are skipped
+v -nocache test .     # everything on SQLite; the PostgreSQL tests are skipped
 PGHOST=localhost PGUSER=... PGPASSWORD=... PGDATABASE=vgraph_test \
-  v -d vgraph_pg test pg_test.v examples/relations/pg_test.v examples/pagination/pg_test.v
+  v -nocache -d vgraph_pg test pg_test.v examples/relations/pg_test.v examples/pagination/pg_test.v
 ```
+
+`-nocache`: with otel linked in, V master's module cache builds a whole-folder
+`v test` that hangs in otel's SDK, as otel's own README says of its tests; a
+single file's `v test` is fine without it.
 
 The PostgreSQL tests drop and recreate their tables: give them a database of
 their own. The generated schemas are checked against graphql-js 16.11.0:

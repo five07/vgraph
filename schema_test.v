@@ -389,6 +389,32 @@ fn test_page_sizes() {
 	}
 }
 
+@[table: 'traced_pages']
+struct TracedPage {
+	id int @[primary; sql: serial]
+}
+
+fn (p TracedPage) edges() []Edge {
+	return []
+}
+
+fn (p TracedPage) otel() Otel {
+	return Otel{
+		level: .default
+	}
+}
+
+// A model's `otel()` gives its level; one without the method records nothing.
+fn test_otel_level_is_reflected() {
+	mut s := Schema{}
+	s.add[TracedPage]()!
+	s.add[PageTable]()!
+	assert s.table('traced_pages')!.otel.level == .default
+	assert s.table('pages')!.otel.level == .none
+	// it implements `Instrumented`
+	_ := Instrumented(TracedPage{})
+}
+
 @[table: 'writers2']
 struct Writer2 {
 	id int @[primary; sql: serial]

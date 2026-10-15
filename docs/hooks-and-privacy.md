@@ -2,21 +2,34 @@
 
 As in Ent, a model declares hooks, interceptors and privacy rules beside
 `edges()`, and an app registers more on its graph at startup. All three get a
-context: the app's value of who is asking, which `g.with_ctx(ctx)` gives the
-graph, and the GraphQL server gives each request.
+`context.Context`, which `g.with_ctx(ctx)` gives the graph, and the GraphQL
+server gives each request. The app's own value of who is asking rides in it,
+added with `context.with_value` and read back with `ctx.value`.
 
 <!-- snippet: docs/snippets/setup.v#viewer -->
 ```v
-// Viewer is the app's own context: who is asking. `g.with_ctx(viewer)` passes
-// it to hooks, interceptors and privacy rules; the GraphQL server passes each
-// request's.
+// Viewer is the app's own value: who is asking. It rides in a context, which
+// `g.with_ctx(ctx)` passes to hooks, interceptors and privacy rules; the
+// GraphQL server passes each request's.
 struct Viewer {
 	id    i64
 	admin bool
 }
 
-fn viewer_of(ctx graphql.Context) Viewer {
-	return if ctx is Viewer { ctx } else { Viewer{} }
+// viewer_key_cell exists for its address, the context key of the viewer.
+const viewer_key_cell = u8(1)
+
+fn as_viewer(v Viewer) context.Context {
+	return context.with_value(context.background(), voidptr(&viewer_key_cell), v)
+}
+
+fn viewer_of(ctx context.Context) Viewer {
+	if value := ctx.value(voidptr(&viewer_key_cell)) {
+		if value is Viewer {
+			return value
+		}
+	}
+	return Viewer{}
 }
 ```
 
@@ -30,7 +43,7 @@ transaction. On the graph, hooks are typed:
 ```v
 // trim every title, on create and update
 g.articles().use(fn (next graph.ArticleMutate) graph.ArticleMutate {
-	return fn [next] (ctx graphql.Context, mut m graph.ArticleMutation) ! {
+	return fn [next] (ctx context.Context, mut m graph.ArticleMutation) ! {
 		if title := m.title() {
 			m.set_title(title.trim_space())
 		}
@@ -48,7 +61,7 @@ generated module. `vgraph.on`, `only_if` and `unless` limit one:
 g.use(vgraph.on(vgraph.Hook{
 	name: 'audit'
 	run:  fn (next vgraph.Mutate) vgraph.Mutate {
-		return fn [next] (ctx graphql.Context, mut m vgraph.Mutation) ! {
+		return fn [next] (ctx context.Context, mut m vgraph.Mutation) ! {
 			next(ctx, mut m)!
 			println('${viewer_of(ctx).id} deleted ${m.table_name()} ${m.key()}')
 		}
@@ -74,7 +87,7 @@ query or fails it:
 ```v
 // a viewer who isn't an admin reads published articles only, everywhere:
 // lists, counts, edges, traversals and GraphQL
-g.articles().intercept(fn (ctx graphql.Context, q graph.ArticleQuery) !graph.ArticleQuery {
+g.articles().intercept(fn (ctx context.Context, q graph.ArticleQuery) !graph.ArticleQuery {
 	if viewer_of(ctx).admin {
 		return q
 	}
@@ -97,7 +110,7 @@ and in GraphQL an error at its field.
 // only an admin deletes users; anyone else is a PrivacyError
 g.users().policy(vgraph.Policy{
 	mutation: [
-		fn (ctx graphql.Context, m vgraph.Mutation) !vgraph.Decision {
+		fn (ctx context.Context, m vgraph.Mutation) !vgraph.Decision {
 			if m.operation() !in [.delete, .delete_one] {
 				return .skip
 			}

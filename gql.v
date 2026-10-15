@@ -1,7 +1,9 @@
 module vgraph
 
+import context
 import graphql
 import orm
+import five07.otel
 
 // GraphQL options, as entgql's annotations, and the transaction of a GraphQL
 // request's mutations.
@@ -93,16 +95,6 @@ pub interface Graphql {
 	graphql() GraphqlTable
 }
 
-// TxContext is the context of a GraphQL request's mutations in a
-// transaction: the request's own context, and the client in the transaction.
-// A client's `with_ctx` takes it apart, so the generated resolvers run in the
-// transaction, and hooks and privacy rules see the request's context.
-pub struct TxContext {
-pub:
-	ctx    graphql.Context
-	client Client
-}
-
 // GraphqlTransaction runs a GraphQL request's mutations in one transaction of
 // `client`, as entgql's `Transactioner` does. The generated server sets it
 // when the client can begin a transaction.
@@ -111,26 +103,42 @@ pub:
 	client Client
 }
 
-// begin starts the transaction, and returns the context the mutations run
-// with: a `TxContext`.
-pub fn (t GraphqlTransaction) begin(ctx graphql.Context) !graphql.Context {
-	return TxContext{
-		ctx:    ctx
-		client: t.client.with_ctx(ctx).begin()!
+// tx_key_cell exists for its address, which is the context key of a GraphQL
+// request's transaction: no other module can make the same key.
+const tx_key_cell = u8(1)
+
+fn tx_key() context.Key {
+	return voidptr(&tx_key_cell)
+}
+
+// tx_client returns the client in the transaction that `ctx` carries, if any.
+fn tx_client(ctx context.Context) ?Client {
+	if value := ctx.value(tx_key()) {
+		if value is Client {
+			return value
+		}
 	}
+	return none
+}
+
+// begin starts the transaction, and returns the context the mutations run
+// with: the request's, carrying the client in the transaction, which a
+// client's `with_ctx` joins.
+pub fn (t GraphqlTransaction) begin(ctx context.Context) !context.Context {
+	return context.with_value(ctx, tx_key(), t.client.with_ctx(ctx).begin()!)
 }
 
 // commit commits the transaction `begin` started.
-pub fn (t GraphqlTransaction) commit(ctx graphql.Context) ! {
-	if ctx is TxContext {
-		ctx.client.commit()!
+pub fn (t GraphqlTransaction) commit(ctx context.Context) ! {
+	if c := tx_client(ctx) {
+		c.commit()!
 	}
 }
 
 // rollback rolls back the transaction `begin` started.
-pub fn (t GraphqlTransaction) rollback(ctx graphql.Context) ! {
-	if ctx is TxContext {
-		ctx.client.rollback()!
+pub fn (t GraphqlTransaction) rollback(ctx context.Context) ! {
+	if c := tx_client(ctx) {
+		c.rollback()!
 	}
 }
 
@@ -138,4 +146,48 @@ pub fn (t GraphqlTransaction) rollback(ctx graphql.Context) ! {
 // driver or an `orm.TransactionalConnection`, or runs in one already.
 pub fn (c Client) can_begin() bool {
 	return c.in_tx || c.conn is Driver || c.conn is orm.TransactionalConnection
+}
+
+// traced_resolver returns `r`, the resolver of `type_name.field`, with a span
+// around each call, `resolve Type.field`, when the client records the `full`
+// spans of a model of level `level`; `r` itself otherwise. The span covers the
+// field for every parent at its level, and its context goes to `r`, so its
+// queries are the span's children. The generated server wraps the resolvers of
+// the types of `full` and `default` models.
+pub fn (c Client) traced_resolver(level OtelLevel, type_name string, field string, r graphql.Resolver) graphql.Resolver {
+	if !c.records(level, .full) {
+		return r
+	}
+	tracer := c.tracer
+	name := 'resolve ${type_name}.${field}'
+	path := '${type_name}.${field}'
+	return fn [tracer, name, path, r] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		span_ctx, span := tracer.start(ctx, name,
+			attributes: [otel.string_attr(vgraph_field, path),
+				otel.int_attr(vgraph_batch_size, parents.len)]
+		)
+		defer {
+			span.end()
+		}
+		return r(span_ctx, info, parents) or {
+			span_failed(span, err)
+			return err
+		}
+	}
+}
+
+// graphql_tracer returns the tracer of the GraphQL server's operation spans:
+// the client's, when it has a provider.
+pub fn (c Client) graphql_tracer() ?otel.Tracer {
+	return if c.has_tracer_provider { c.tracer } else { none }
+}
+
+// tracing_notice returns the line a GraphQL server prints at its start when
+// its client has no tracer provider, or none when it has one. Passing
+// `otel.noop_tracer_provider()` silences it.
+pub fn (c Client) tracing_notice() ?string {
+	if c.has_tracer_provider {
+		return none
+	}
+	return 'vgraph: GraphQL server has no tracer provider; no spans will be recorded (pass tracer_provider to Client.new)'
 }

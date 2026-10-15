@@ -3,6 +3,7 @@ module main
 // A GraphQL server on an in-memory SQLite database of 40 authors and 300
 // books: `v run .`, then send the queries in README.md to
 // http://localhost:8080/graphql (or the port in `PORT`).
+import context
 import veb
 import db.sqlite
 import net.http
@@ -56,7 +57,7 @@ pub fn (a &App) serve_graphql(mut ctx Context) veb.Result {
 		accept:       ctx.req.header.get(.accept) or { '' }
 		query_string: if ctx.req.url.contains('?') { ctx.req.url.all_after('?') } else { '' }
 		body:         ctx.req.data
-	}, unsafe { nil })
+	}, context.background())
 	for key, value in res.headers {
 		ctx.set_custom_header(key, value) or {}
 	}

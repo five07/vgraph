@@ -1,9 +1,9 @@
 Module {
 	name: 'vgraph'
 	description: 'Ent-style graph layer for V: declared edges, loaded in batches.'
-	version: '0.1.0'
+	version: '0.2.0'
 	license: 'MIT'
 	repo_url: 'https://github.com/five07/vgraph'
 	min_v: '0.5.2'
-	dependencies: []
+	dependencies: ['five07.otel']
 }

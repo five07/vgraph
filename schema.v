@@ -72,6 +72,8 @@ pub:
 	rules        int
 	// graphql: the options its `graphql()` gives
 	graphql GraphqlTable
+	// otel: the telemetry options its `otel()` gives; level `none` without one
+	otel Otel
 }
 
 // column returns the column `name`, or `none` when the table has none.
@@ -122,6 +124,7 @@ pub fn (mut s Schema) add[T]() ! {
 	mut indexes := []Index{}
 	mut policy := Policy{}
 	mut gql := GraphqlTable{}
+	mut telemetry := Otel{}
 	record := T{}
 	$for field in T.fields {
 		$if field.typ is $array || field.typ is $map {
@@ -310,6 +313,8 @@ pub fn (mut s Schema) add[T]() ! {
 			policy = policy.merged(record.$method())
 		} $else $if method.name == 'graphql' {
 			gql = record.$method()
+		} $else $if method.name == 'otel' {
+			telemetry = record.$method()
 		}
 	}
 	for i, column in columns {
@@ -347,6 +352,7 @@ pub fn (mut s Schema) add[T]() ! {
 		interceptors: interceptors.len
 		rules:        policy.query.len + policy.mutation.len
 		graphql:      gql
+		otel:         telemetry
 	}
 }
 

@@ -7,15 +7,32 @@ import os
 
 const models = 'module models
 
+import context
 import time
 import five07.vgraph
-import five07.vgraph.graphql
 import five07.vgraph.load
 
-// Viewer is the context of a request.
+// Viewer is who a request runs as, in its context.
 pub struct Viewer {
 pub:
 	banned bool
+}
+
+const viewer_key = \'viewer\'
+
+// as_viewer returns a context that runs as `v`.
+pub fn as_viewer(v Viewer) context.Context {
+	return context.with_value(context.background(), viewer_key, v)
+}
+
+// viewer_of returns the viewer of `ctx`: no one banned when it has none.
+pub fn viewer_of(ctx context.Context) Viewer {
+	if value := ctx.value(viewer_key) {
+		if value is Viewer {
+			return value
+		}
+	}
+	return Viewer{}
 }
 
 @[table: \'users\']
@@ -59,7 +76,7 @@ pub fn (a Article) hooks() []vgraph.Hook {
 	return [
 		vgraph.on(vgraph.Hook{
 			run: fn (next vgraph.Mutate) vgraph.Mutate {
-				return fn [next] (ctx graphql.Context, mut m vgraph.Mutation) ! {
+				return fn [next] (ctx context.Context, mut m vgraph.Mutation) ! {
 					if _ := m.field_value(\'title\') {
 					} else {
 						m.set_field_value(\'title\', \'Untitled\')
@@ -84,17 +101,20 @@ pub fn (a Article) fields() []vgraph.Field {
 	]
 }
 
+// otel: articles record every span: their queries, writes, loads, hooks and
+// privacy rules.
+pub fn (a Article) otel() vgraph.Otel {
+	return vgraph.Otel{
+		level: .full
+	}
+}
+
 // policy keeps articles from banned viewers.
 pub fn (a Article) policy() vgraph.Policy {
 	return vgraph.Policy{
 		query: [
-			fn (ctx graphql.Context, _ string, mut _ load.Query) !vgraph.Decision {
-				if ctx is Viewer {
-					if ctx.banned {
-						return .deny
-					}
-				}
-				return .skip
+			fn (ctx context.Context, _ string, mut _ load.Query) !vgraph.Decision {
+				return if viewer_of(ctx).banned { .deny } else { .skip }
 			},
 		]
 	}
@@ -138,6 +158,13 @@ pub fn (u User) fields() []vgraph.Field {
 	]
 }
 
+// otel: users record their queries, writes and loads.
+pub fn (u User) otel() vgraph.Otel {
+	return vgraph.Otel{
+		level: .ops
+	}
+}
+
 pub fn (u User) edges() []vgraph.Edge {
 	return [
 		vgraph.Edge{
@@ -161,6 +188,13 @@ pub struct Tag {
 pub:
 	id   int @[primary; sql: serial]
 	name string
+}
+
+// otel: tags record what the app chooses when it runs.
+pub fn (t Tag) otel() vgraph.Otel {
+	return vgraph.Otel{
+		level: .default
+	}
 }
 
 pub fn (t Tag) edges() []vgraph.Edge {
@@ -231,9 +265,11 @@ pub fn (c Comment) edges() []vgraph.Edge {
 
 const project_test = 'module main
 
+import context
 import db.sqlite
 import orm
 import time
+import five07.otel.sdk.trace as sdk
 import five07.vgraph
 import five07.vgraph.graphql
 import graph
@@ -285,6 +321,10 @@ fn (mut c Counting) execute(query string) ![]orm.Row {
 }
 
 fn setup() !(graph.Graph, &Log) {
+	return setup_with()
+}
+
+fn setup_with(opts vgraph.ClientOptions) !(graph.Graph, &Log) {
 	mut db := sqlite.connect(\':memory:\')!
 	sql db {
 		create table models.User
@@ -349,7 +389,138 @@ fn setup() !(graph.Graph, &Log) {
 		inner: db
 		log:   log
 	}
-	return graph.Graph.new(conn)!, log
+	return graph.Graph.new(conn, opts)!, log
+}
+
+// recorder returns a provider that keeps its spans, and the exporter that
+// holds them.
+fn recorder() !(&sdk.TracerProvider, &sdk.InMemoryExporter) {
+	exporter := sdk.InMemoryExporter.new()
+	provider := sdk.TracerProvider.new(processors: [sdk.SimpleSpanProcessor.new(exporter)])!
+	return provider, exporter
+}
+
+fn span_named(spans []sdk.ReadOnlySpan, name string) !sdk.ReadOnlySpan {
+	for s in spans {
+		if s.name == name {
+			return s
+		}
+	}
+	return error(\'no span `\${name}` in \${spans.map(it.name)}\')
+}
+
+fn attr(span sdk.ReadOnlySpan, key string) string {
+	return span.attribute(key) or { return \'\' }.str()
+}
+
+// Each model records the spans of its level: articles everything, users their
+// operations, comments nothing, tags what the client chooses.
+fn test_spans_by_level() {
+	provider, exporter := recorder()!
+	g, _ := setup_with(tracer_provider: provider)!
+	tracer := provider.tracer(\'test\')
+	ctx, request := tracer.start(context.background(), \'request\')
+	gc := g.with_ctx(ctx)
+	articles := gc.articles().with_author().order_by_id().all()!
+	gc.comments().all()!
+	gc.users().count()!
+	gc.tags().all()!
+	request.end()
+	spans := exporter.spans()
+	root := span_named(spans, \'request\')!
+	query := span_named(spans, \'query articles\')!
+	assert query.is_child_of(root)
+	assert attr(query, \'db.collection.name\') == \'articles\'
+	assert attr(query, \'vgraph.operation\') == \'all\'
+	assert attr(query, \'vgraph.rows\') == articles.len.str()
+	// full: the policy\'s rules, under the query
+	assert span_named(spans, \'privacy articles\')!.is_child_of(query)
+	assert attr(span_named(spans, \'privacy articles\')!, \'vgraph.decision\') == \'skip\'
+	// the query\'s statement and its edge load, under it; the load\'s statement
+	// under the load
+	assert span_named(spans, \'SELECT articles\')!.is_child_of(query)
+	load := span_named(spans, \'load articles.author\')!
+	assert load.is_child_of(query)
+	assert attr(load, \'vgraph.batch_size\') == articles.len.str()
+	assert span_named(spans, \'SELECT users\')!.is_child_of(load)
+	// users are ops: their query, and no privacy span
+	assert span_named(spans, \'query users\')!.is_child_of(root)
+	// comments record nothing of their own; their statement is the request\'s
+	assert \'query comments\' !in spans.map(it.name)
+	assert span_named(spans, \'SELECT comments\')!.is_child_of(root)
+	// tags are default: ops, by default
+	assert span_named(spans, \'query tags\')!.is_child_of(root)
+}
+
+// A request is a span; a full model\'s resolvers are spans under it, and the
+// queries they run are theirs. An ops model\'s resolvers have none, nor do
+// columns.
+fn test_resolver_spans() {
+	provider, exporter := recorder()!
+	g, _ := setup_with(tracer_provider: provider)!
+	s := g.graphql(graph.Resolvers{})!
+	res := s.execute(graphql.Request{
+		query: \'query Titles { articles(orderBy: {field: ID}) { title author { name } } users { name } }\'
+	}, context.background())
+	assert res.errors.len == 0
+	spans := exporter.spans()
+	names := spans.map(it.name)
+	op := span_named(spans, \'query Titles\')!
+	assert attr(op, \'graphql.operation.type\') == \'query\'
+	assert attr(op, \'graphql.operation.name\') == \'Titles\'
+	articles := span_named(spans, \'resolve Query.articles\')!
+	assert articles.is_child_of(op)
+	assert attr(articles, \'vgraph.field\') == \'Query.articles\'
+	assert span_named(spans, \'query articles\')!.is_child_of(articles)
+	author := span_named(spans, \'resolve Article.author\')!
+	assert author.is_child_of(op)
+	assert attr(author, \'vgraph.batch_size\') != \'\'
+	assert \'resolve Query.users\' !in names
+	assert span_named(spans, \'query users\')!.is_child_of(op)
+	assert \'resolve Article.title\' !in names
+}
+
+// A default model follows the client: `otel_level: .none` turns its spans off.
+fn test_a_default_model_follows_the_client() {
+	provider, exporter := recorder()!
+	g, _ := setup_with(tracer_provider: provider, otel_level: .none)!
+	g.tags().all()!
+	g.users().all()!
+	names := exporter.spans().map(it.name)
+	assert \'query tags\' !in names
+	assert \'query users\' in names
+}
+
+// A write is a span; a full model\'s hooks are spans inside it, and the write\'s
+// statements are the innermost hook\'s.
+fn test_write_and_hook_spans() {
+	provider, exporter := recorder()!
+	g, _ := setup_with(tracer_provider: provider)!
+	g.articles().create().set_user_id(1).exec()!
+	spans := exporter.spans()
+	create := span_named(spans, \'create articles\')!
+	assert attr(create, \'vgraph.operation\') == \'create\'
+	hook := span_named(spans, \'hook articles\')!
+	assert hook.is_child_of(create)
+	assert attr(hook, \'vgraph.operation\') == \'create\'
+	assert span_named(spans, \'INSERT articles\')!.is_child_of(hook)
+	// a user\'s write has no hooks, and so no hook span
+	exporter.reset()
+	g.users().update_one_id(1).set_name(\'ada\').exec()!
+	assert span_named(exporter.spans(), \'update users\')!.status.code == .unset
+	assert \'hook users\' !in exporter.spans().map(it.name)
+}
+
+// A failure is the span\'s error, without its message.
+fn test_a_failed_operation_is_an_error() {
+	provider, exporter := recorder()!
+	g, _ := setup_with(tracer_provider: provider)!
+	g.with_ctx(models.as_viewer(models.Viewer{ banned: true })).articles().count() or {}
+	query := span_named(exporter.spans(), \'query articles\')!
+	assert query.status.code == .error
+	assert query.status.description == \'\'
+	privacy := span_named(exporter.spans(), \'privacy articles\')!
+	assert privacy.status.code == .error
 }
 
 fn test_eager_loading_is_one_query_per_edge() {
@@ -425,7 +596,7 @@ fn test_graphql() {
 	log.tables.clear()
 	res := s.execute(graphql.Request{
 		query: \'{ hello articles(where: {deletedAtIsNil: true}, orderBy: {field: ID}) { title url author { name } tags { name } comments(orderBy: {field: BODY, direction: DESC}) { body replies { body } } } }\'
-	}, unsafe { nil })
+	}, context.background())
 	assert res.json() == \'{"data":{"hello":"hello world","articles":[{"title":"V tips","url":"/articles/1","author":{"name":"ada"},"tags":[{"name":"v"},{"name":"db"}],"comments":[{"body":"b","replies":[]},{"body":"a","replies":[{"body":"b"}]}]},{"title":"SQL","url":"/articles/2","author":{"name":"bob"},"tags":[{"name":"db"}],"comments":[]}]}}\'
 	// one select per edge per level
 	assert log.tables == [\'articles\', \'users\', \'article_tags\', \'tags\', \'comments\', \'comments\']
@@ -434,7 +605,7 @@ fn test_graphql() {
 	assert !graph.schema_sdl.contains(\'Audit\')
 	failed := s.execute(graphql.Request{
 		query: \'mutation { touch(id: "1") { title } }\'
-	}, unsafe { nil })
+	}, context.background())
 	assert failed.errors.map(it.message) == [\'not now\']
 }
 
@@ -473,19 +644,19 @@ fn test_graphql_options() {
 	s := g.graphql(graph.Resolvers{})!
 	labels := s.execute(graphql.Request{
 		query: "{ labels(orderBy: {field: NAME}) { __typename name } }"
-	}, unsafe { nil })
+	}, context.background())
 	assert labels.json() == "{\\"data\\":{\\"labels\\":[{\\"__typename\\":\\"Label\\",\\"name\\":\\"db\\"},{\\"__typename\\":\\"Label\\",\\"name\\":\\"v\\"}]}}"
 	no_title := s.execute(graphql.Request{
 		query: "mutation { updateArticle(id: \\"1\\", input: {title: \\"x\\"}) { id } }"
-	}, unsafe { nil })
+	}, context.background())
 	assert no_title.errors.map(it.message) == ["Field \\"title\\" is not defined by type \\"UpdateArticleInput\\"."]
 	bad := s.execute(graphql.Request{
 		query: "mutation { createComment(input: {ownerType: \\"Nope\\", ownerID: \\"1\\", body: \\"x\\"}) { id } }"
-	}, unsafe { nil })
+	}, context.background())
 	assert bad.errors.map(it.message) == ["`ownerType` is one of Article"]
 	made := s.execute(graphql.Request{
 		query: "mutation { createComment(input: {ownerType: \\"Article\\", ownerID: \\"2\\", body: \\"x\\", parentID: \\"1\\"}) { body article { title } parent { body } } }"
-	}, unsafe { nil })
+	}, context.background())
 	assert made.json() == "{\\"data\\":{\\"createComment\\":{\\"body\\":\\"x\\",\\"article\\":{\\"title\\":\\"SQL\\"},\\"parent\\":{\\"body\\":\\"a\\"}}}}"
 	// the client\'s input, as the resolvers use it
 	art := g.articles().create().set_input(graph.CreateArticleInput{
@@ -503,7 +674,7 @@ fn test_hooks_and_privacy() {
 	mut old := []string{}
 	log := &old
 	g.articles().use(fn [log] (next graph.ArticleMutate) graph.ArticleMutate {
-		return fn [log, next] (ctx graphql.Context, mut m graph.ArticleMutation) ! {
+		return fn [log, next] (ctx context.Context, mut m graph.ArticleMutation) ! {
 			if title := m.title() {
 				m.set_title(title.to_upper())
 			}
@@ -522,7 +693,7 @@ fn test_hooks_and_privacy() {
 	assert old == [\'HI\']
 	assert g.articles().where_id(art.article.id).first()!.article.title == \'AGAIN\'
 	// a typed interceptor narrows every query of users, edge loads included
-	g.users().intercept(fn (_ graphql.Context, q graph.UserQuery) !graph.UserQuery {
+	g.users().intercept(fn (_ context.Context, q graph.UserQuery) !graph.UserQuery {
 		return q.where_name(\'bob\')
 	})
 	assert g.users().all()!.map(it.user.name) == [\'bob\']
@@ -534,13 +705,13 @@ fn test_hooks_and_privacy() {
 	s := g.graphql(graph.Resolvers{})!
 	res := s.execute(graphql.Request{
 		query: \'{ articles { title } users { name } }\'
-	}, models.Viewer{
+	}, models.as_viewer(models.Viewer{
 		banned: true
-	})
+	}))
 	assert res.errors.map(it.message) == [\'privacy: query of `articles` denied\']
 	assert res.json().contains(\'"path":["articles"]\')
-	assert g.with_ctx(models.Viewer{}).articles().count()! == 5
-	if _ := g.with_ctx(models.Viewer{ banned: true }).articles().count() {
+	assert g.with_ctx(models.as_viewer(models.Viewer{})).articles().count()! == 5
+	if _ := g.with_ctx(models.as_viewer(models.Viewer{ banned: true })).articles().count() {
 		assert false
 	} else {
 		assert err is vgraph.PrivacyError
@@ -597,7 +768,49 @@ fn test_gen_writes_a_working_client() {
 
 	res := os.exec([@VEXE, '-stats', 'test', root])
 	assert res.exit_code == 0, res.output
+
+	// a GraphQL server without a tracer provider says so when it starts; the
+	// no-op provider, passed on purpose, silences it
+	os.mkdir_all(os.join_path(root, 'notice'))!
+	os.write_file(os.join_path(root, 'notice', 'main.v'), notice_program)!
+	bin := os.join_path(root, 'notice_bin')
+	built := os.exec([@VEXE, '-o', bin, os.join_path(root, 'notice')])
+	assert built.exit_code == 0, built.output
+	without := os.exec([bin])
+	assert without.exit_code == 0, without.output
+	assert without.output.split_into_lines() == [
+		'vgraph: GraphQL server has no tracer provider; no spans will be recorded (pass tracer_provider to Client.new)',
+		'started',
+	]
+	with_noop := os.exec([bin, 'noop'])
+	assert with_noop.exit_code == 0, with_noop.output
+	assert with_noop.output.split_into_lines() == ['started']
 }
+
+// notice_program starts the project's GraphQL server, with the no-op tracer
+// provider when it is given `noop`, and without one otherwise.
+const notice_program = "module main
+
+import db.sqlite
+import os
+import five07.otel
+import five07.vgraph
+import graph
+
+fn main() {
+	db := sqlite.connect(':memory:') or { panic(err) }
+	opts := if 'noop' in os.args {
+		vgraph.ClientOptions{
+			tracer_provider: otel.noop_tracer_provider()
+		}
+	} else {
+		vgraph.ClientOptions{}
+	}
+	g := graph.Graph.new(db, opts) or { panic(err) }
+	g.graphql(graph.Resolvers{}) or { panic(err) }
+	println('started')
+}
+"
 
 const api_sdl = 'directive @tag(name: String!) on OBJECT | FIELD_DEFINITION
 
@@ -616,19 +829,20 @@ extend type Mutation {
 
 const resolvers = "module graph
 
+import context
 import five07.vgraph.graphql
 
 pub struct Resolvers {}
 
-pub fn (r Resolvers) query_hello(_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+pub fn (r Resolvers) query_hello(_ context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 	return parents.map(graphql.Resolved(graphql.Value('hello ' + info.arg('name').as_string())))
 }
 
-pub fn (r Resolvers) article_url(_ graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+pub fn (r Resolvers) article_url(_ context.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 	return parents.map(graphql.Resolved(graphql.Value('/articles/' + (it as ArticleNode).article.id.str())))
 }
 
-pub fn (r Resolvers) mutation_touch(_ graphql.Context, _ graphql.FieldInfo, _ []graphql.Source) ![]graphql.Resolved {
+pub fn (r Resolvers) mutation_touch(_ context.Context, _ graphql.FieldInfo, _ []graphql.Source) ![]graphql.Resolved {
 	return error('not now')
 }
 "
@@ -746,7 +960,8 @@ fn test_describe() {
 	pets := text.all_after('Pet (pets):').all_before('\n\n')
 	assert pets.contains('hooks: 1, interceptors: 1, policy rules: 0')
 	groups := text.all_after('Group (groups):').all_before('\n\n')
-	assert groups.contains('policy rules: 1')
+	assert groups.contains('policy rules: 1, otel: full')
+	assert pets.contains('otel: none')
 }
 
 // `--no-graphql` writes the client alone.

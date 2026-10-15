@@ -1,7 +1,7 @@
 module vgraph
 
+import context
 import db.sqlite as sq
-import graphql
 import load
 import orm
 import sqlite
@@ -75,7 +75,7 @@ fn (p Post) hooks() []Hook {
 		// a slug from the title, when the create has none
 		on(Hook{
 			run: fn (next Mutate) Mutate {
-				return fn [next] (ctx graphql.Context, mut m Mutation) ! {
+				return fn [next] (ctx context.Context, mut m Mutation) ! {
 					if _ := m.field_value('slug') {
 					} else {
 						title := m.field_value('title') or { orm.Primitive('') }
@@ -96,7 +96,7 @@ fn (p Post) interceptors() []Interceptor {
 fn (p Post) policy() Policy {
 	return Policy{
 		mutation: [
-			fn (_ graphql.Context, m Mutation) !Decision {
+			fn (_ context.Context, m Mutation) !Decision {
 				title := m.field_value('title') or { return .skip }
 				return if title == orm.Primitive('forbidden') { .deny } else { .skip }
 			},
@@ -109,7 +109,7 @@ fn trail_hook(name string) Hook {
 	return Hook{
 		name: name
 		run:  fn [name] (next Mutate) Mutate {
-			return fn [name, next] (ctx graphql.Context, mut m Mutation) ! {
+			return fn [name, next] (ctx context.Context, mut m Mutation) ! {
 				trail := m.field_value('trail') or { orm.Primitive('') }
 				m.set_field_value('trail', '${trail as string}/${name}')
 				next(ctx, mut m)!
@@ -189,10 +189,10 @@ fn test_hooks_run_in_order() {
 fn test_on_only_if_and_unless() {
 	for c in hook_clients()! {
 		c.use_on('posts', on(trail_hook('on update'), .update_one),
-			only_if(trail_hook('if long'), fn (_ graphql.Context, m Mutation) bool {
+			only_if(trail_hook('if long'), fn (_ context.Context, m Mutation) bool {
 				title := m.field_value('title') or { return false }
 				return (title as string).len > 5
-			}), unless(trail_hook('unless long'), fn (_ graphql.Context, m Mutation) bool {
+			}), unless(trail_hook('unless long'), fn (_ context.Context, m Mutation) bool {
 				title := m.field_value('title') or { return false }
 				return (title as string).len > 5
 			}))
@@ -216,7 +216,7 @@ fn test_a_hook_error_stops_the_write() {
 	for c in hook_clients()! {
 		c.use_on('posts', Hook{
 			run: fn (next Mutate) Mutate {
-				return fn [next] (ctx graphql.Context, mut m Mutation) ! {
+				return fn [next] (ctx context.Context, mut m Mutation) ! {
 					next(ctx, mut m)!
 					// after the insert: the transaction rolls it back
 					if m.key() == '2' {
@@ -247,7 +247,7 @@ fn test_what_a_hook_sees() {
 		}
 		c.use_on('posts', Hook{
 			run: fn [events] (next Mutate) Mutate {
-				return fn [events, next] (ctx graphql.Context, mut m Mutation) ! {
+				return fn [events, next] (ctx context.Context, mut m Mutation) ! {
 					match m.operation() {
 						.update {
 							events.add('keys ${m.keys()!}')
@@ -296,7 +296,7 @@ fn test_what_a_hook_sees() {
 		// a hook on authors adds every post to the author it creates
 		c.use_on('authors', Hook{
 			run: fn (next Mutate) Mutate {
-				return fn [next] (ctx graphql.Context, mut m Mutation) ! {
+				return fn [next] (ctx context.Context, mut m Mutation) ! {
 					m.add_ids('posts', '1', '2', '3')
 					next(ctx, mut m)!
 				}
@@ -318,7 +318,7 @@ fn test_transaction_hooks() {
 		events := &Events{}
 		c.use_on('posts', Hook{
 			run: fn [events] (next Mutate) Mutate {
-				return fn [events, next] (ctx graphql.Context, mut m Mutation) ! {
+				return fn [events, next] (ctx context.Context, mut m Mutation) ! {
 					title := m.field_value('title') or { orm.Primitive('') }
 					m.on_commit(fn [events, title] () {
 						events.add('committed ${title as string}')
@@ -358,12 +358,12 @@ fn test_interceptors_and_skip() {
 		}
 		c.intercept(Interceptor{
 			name: 'not a'
-			run:  fn (_ graphql.Context, _ string, mut q load.Query) ! {
+			run:  fn (_ context.Context, _ string, mut q load.Query) ! {
 				q.conds << load.ne('title', 'a')
 			}
 		})
 		c.intercept_on('posts', Interceptor{
-			run: fn (_ graphql.Context, table string, mut q load.Query) ! {
+			run: fn (_ context.Context, table string, mut q load.Query) ! {
 				assert table == 'posts'
 				q.conds << load.ne('title', 'c')
 			}
@@ -434,7 +434,7 @@ fn test_interceptors_left_out_of_edge_loads() {
 		c.intercept_on('authors', Interceptor{
 			name:  'hide_ada'
 			edges: false
-			run:   fn (_ graphql.Context, _ string, mut q load.Query) ! {
+			run:   fn (_ context.Context, _ string, mut q load.Query) ! {
 				q.conds << load.ne('name', 'ada')
 			}
 		})
@@ -459,12 +459,12 @@ fn test_privacy() {
 		// a graph rule before it can allow
 		c.policy(Policy{
 			mutation: [
-				fn (ctx graphql.Context, _ Mutation) !Decision {
-					return if ctx is Admin { .allow } else { .skip }
+				fn (ctx context.Context, _ Mutation) !Decision {
+					return if is_admin(ctx) { .allow } else { .skip }
 				},
 			]
 		})
-		admin := c.with_ctx(Admin{})
+		admin := c.with_ctx(admin_ctx())
 		new_post(admin, 'forbidden')!
 		assert posts(c)!.map(it.title) == ['forbidden']
 		// a table rule: when every rule skips, the write runs; `always_deny` ends that
@@ -473,25 +473,39 @@ fn test_privacy() {
 			mutation: [always_deny]
 			query:    [
 				// a filter: narrows, then lets the next rule decide
-				fn (_ graphql.Context, _ string, mut q load.Query) !Decision {
+				fn (_ context.Context, _ string, mut q load.Query) !Decision {
 					q.conds << load.ne('title', 'forbidden')
 					return .skip
 				},
-				fn (ctx graphql.Context, _ string, mut _ load.Query) !Decision {
-					return if ctx is NoContext { .deny } else { .allow }
+				fn (ctx context.Context, _ string, mut _ load.Query) !Decision {
+					return if is_admin(ctx) { .allow } else { .deny }
 				},
 			]
 		})
 		new_post(c, 'late') or { assert err is PrivacyError }
 		posts(c) or { assert err.msg() == 'privacy: query of `posts` denied' }
-		assert posts(c.with_ctx(Admin{}))!.map(it.title) == ['fine']
+		assert posts(c.with_ctx(admin_ctx()))!.map(it.title) == ['fine']
 		// privileged: no rules; interceptors still apply
 		new_post(c.privileged(), 'system')!
 		assert posts(c.privileged())!.map(it.title) == ['forbidden', 'fine', 'system']
 	}
 }
 
+// Admin is the app's value in the context of an admin's writes.
 struct Admin {}
+
+const admin_key = 'admin'
+
+fn admin_ctx() context.Context {
+	return context.with_value(context.background(), admin_key, Admin{})
+}
+
+fn is_admin(ctx context.Context) bool {
+	if value := ctx.value(admin_key) {
+		return value is Admin
+	}
+	return false
+}
 
 @[heap]
 struct TraceLog {
@@ -538,6 +552,33 @@ fn test_trace_reports_statements_without_values() {
 	}
 }
 
+// Each event carries the context of the client that ran it, in a transaction
+// too, so a tracer can tell the requests apart.
+fn test_trace_events_carry_the_context() {
+	for driver in [false, true] {
+		log := &TraceLog{}
+		db := hook_db()!
+		conn := if driver { orm.Connection(sqlite.new(db)) } else { orm.Connection(db) }
+		c := Client.new(trace(conn, fn [log] (e TraceEvent) {
+			mut l := unsafe { log }
+			l.events << e
+		}), hook_schema()!)!
+		posts(c)!
+		assert !is_admin(log.events.last().ctx)
+		admin := c.with_ctx(admin_ctx())
+		posts(admin)!
+		assert is_admin(log.events.last().ctx)
+		new_post(admin, 'traced')!
+		assert log.events.len > 2
+		for e in log.events[2..] {
+			assert is_admin(e.ctx), '${e.kind}'
+		}
+		// the plain client still reports the background context
+		posts(c)!
+		assert !is_admin(log.events.last().ctx)
+	}
+}
+
 // A hook sees what a write changes: its table, its columns, and the keys it
 // adds to, removes from or clears on each edge. `only_if` conditions stack.
 fn test_hooks_see_the_changes() {
@@ -545,14 +586,14 @@ fn test_hooks_see_the_changes() {
 		seen := &Events{}
 		c.use_on('authors', only_if(only_if(Hook{
 			run: fn [seen] (next Mutate) Mutate {
-				return fn [seen, next] (ctx graphql.Context, mut m Mutation) ! {
+				return fn [seen, next] (ctx context.Context, mut m Mutation) ! {
 					seen.add('${m.table_name()} ${m.changed_columns()} +${m.added_ids('posts')} -${m.removed_ids('posts')} ${m.edge_cleared('posts')}')
 					next(ctx, mut m)!
 				}
 			}
-		}, fn (_ graphql.Context, m Mutation) bool {
+		}, fn (_ context.Context, m Mutation) bool {
 			return m.operation() == .update_one
-		}), fn (_ graphql.Context, m Mutation) bool {
+		}), fn (_ context.Context, m Mutation) bool {
 			return 'name' in m.changed_columns()
 		}))
 		a := c.create(MutationData{

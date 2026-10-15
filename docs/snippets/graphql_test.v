@@ -10,7 +10,7 @@ fn test_graphql() {
 	server := g.graphql(graph.Resolvers{ g: g }, default_page: 20, max_page: 100)!
 	res := server.execute(graphql.Request{
 		query: '{ articles(first: 2, orderBy: {field: VIEWS, direction: DESC}) { edges { node { title author { name } } } } }'
-	}, Viewer{ id: 1 }) // the request's context, which hooks and privacy rules get
+	}, as_viewer(Viewer{ id: 1 })) // the request's context: hooks and privacy rules get it
 	println(res.json())
 	// end snippet
 	assert res.json() == '{"data":{"articles":{"edges":[{"node":{"title":"Hello, V","author":{"name":"Ada"}}},{"node":{"title":"Notes on SQL","author":{"name":"Bob"}}}]}}}'
@@ -20,7 +20,7 @@ fn test_graphql() {
 		method:       'POST'
 		content_type: 'application/json'
 		body:         '{"query": "{ search(text: \\"SQL\\") { title } }"}'
-	}, Viewer{})
+	}, as_viewer(Viewer{}))
 	println('${answer.status} ${answer.content_type}: ${answer.body}')
 	// end snippet
 	assert answer.status == 200
@@ -34,13 +34,13 @@ fn test_graphql() {
 				'userID': graphql.Value(b.ada.user.id.str())
 			})
 		}
-	}, Viewer{ id: b.ada.user.id })
+	}, as_viewer(Viewer{ id: b.ada.user.id }))
 	// end snippet
 	assert created.json() == '{"data":{"createArticle":{"title":"From GraphQL","status":"DRAFT"}}}'
 	// snippet: node
 	node := server.execute(graphql.Request{
 		query: '{ node(id: "${b.hello.article.id}") { __typename ... on Article { title } } }'
-	}, Viewer{})
+	}, as_viewer(Viewer{}))
 	// end snippet
 	assert node.json() == '{"data":{"node":{"__typename":"Article","title":"Hello, V"}}}'
 }
@@ -55,6 +55,6 @@ fn test_introspection_off() {
 	}
 	// end snippet
 	res := server.execute(graphql.Request{ query: '{ __schema { queryType { name } } }' },
-		Viewer{})
+		as_viewer(Viewer{}))
 	assert res.errors.len > 0
 }

@@ -1,7 +1,7 @@
 module main
 
+import context
 import five07.vgraph
-import five07.vgraph.graphql
 import graph
 
 fn test_hooks() {
@@ -10,7 +10,7 @@ fn test_hooks() {
 	// snippet: hook
 	// trim every title, on create and update
 	g.articles().use(fn (next graph.ArticleMutate) graph.ArticleMutate {
-		return fn [next] (ctx graphql.Context, mut m graph.ArticleMutation) ! {
+		return fn [next] (ctx context.Context, mut m graph.ArticleMutation) ! {
 			if title := m.title() {
 				m.set_title(title.trim_space())
 			}
@@ -25,14 +25,14 @@ fn test_hooks() {
 	g.use(vgraph.on(vgraph.Hook{
 		name: 'audit'
 		run:  fn (next vgraph.Mutate) vgraph.Mutate {
-			return fn [next] (ctx graphql.Context, mut m vgraph.Mutation) ! {
+			return fn [next] (ctx context.Context, mut m vgraph.Mutation) ! {
 				next(ctx, mut m)!
 				println('${viewer_of(ctx).id} deleted ${m.table_name()} ${m.key()}')
 			}
 		}
 	}, .delete_one))
 	// end snippet
-	g.with_ctx(Viewer{ id: 7 }).articles().delete_one(a).exec()!
+	g.with_ctx(as_viewer(Viewer{ id: 7 })).articles().delete_one(a).exec()!
 	assert g.skip('audit').articles().where_title('Spaced').count()! == 0
 }
 
@@ -42,20 +42,20 @@ fn test_interceptors_and_privacy() {
 	// snippet: interceptor
 	// a viewer who isn't an admin reads published articles only, everywhere:
 	// lists, counts, edges, traversals and GraphQL
-	g.articles().intercept(fn (ctx graphql.Context, q graph.ArticleQuery) !graph.ArticleQuery {
+	g.articles().intercept(fn (ctx context.Context, q graph.ArticleQuery) !graph.ArticleQuery {
 		if viewer_of(ctx).admin {
 			return q
 		}
 		return q.where_status(.published)
 	})
 	// end snippet
-	assert g.with_ctx(Viewer{ id: 1 }).articles().count()! == 2
-	assert g.with_ctx(Viewer{ admin: true }).articles().count()! == 3
+	assert g.with_ctx(as_viewer(Viewer{ id: 1 })).articles().count()! == 2
+	assert g.with_ctx(as_viewer(Viewer{ admin: true })).articles().count()! == 3
 	// snippet: policy
 	// only an admin deletes users; anyone else is a PrivacyError
 	g.users().policy(vgraph.Policy{
 		mutation: [
-			fn (ctx graphql.Context, m vgraph.Mutation) !vgraph.Decision {
+			fn (ctx context.Context, m vgraph.Mutation) !vgraph.Decision {
 				if m.operation() !in [.delete, .delete_one] {
 					return .skip
 				}
@@ -64,7 +64,7 @@ fn test_interceptors_and_privacy() {
 		]
 	})
 	// end snippet
-	if _ := g.with_ctx(Viewer{ id: 1 }).users().delete_one(b.bob).exec() {
+	if _ := g.with_ctx(as_viewer(Viewer{ id: 1 })).users().delete_one(b.bob).exec() {
 		assert false
 	} else {
 		assert err is vgraph.PrivacyError

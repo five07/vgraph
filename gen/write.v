@@ -69,10 +69,11 @@ pub fn generate(out_module string, entities []Entity, tables []Table) !map[strin
 	mut files := map[string]string{}
 	files['graph.v'] = graph_file(out_module, entities)
 	for table in tables {
-		files['${table.name}.v'] = table_file(out_module, infos[table.name], infos)!
+		info := infos[table.name]
+		files['${table.name}.v'] = instrument(table_file(out_module, info, infos)!, info)
 		if !table.view {
-			files['${table.name}_mutation.v'] = mutation_file(out_module, infos[table.name],
-				infos)!
+			files['${table.name}_mutation.v'] = instrument(mutation_file(out_module, info,
+				infos)!, info)
 		}
 	}
 	return files
@@ -97,9 +98,9 @@ fn graph_file(out_module string, entities []Entity) string {
 	mut b := strings.new_builder(2048)
 	b.writeln(header)
 	b.writeln('module ${out_module}\n')
+	b.writeln('import context')
 	b.writeln('import orm')
 	b.writeln('import five07.vgraph')
-	b.writeln('import five07.vgraph.graphql')
 	b.writeln('import five07.vgraph.load')
 	for path in imports_of(entities) {
 		b.writeln('import ${import_line(path)}')
@@ -113,10 +114,11 @@ pub:
 }
 
 // Graph.new registers every struct of the schema, checks its edges, and returns a
-// client that runs on `conn`.
-pub fn Graph.new(conn orm.Connection) !Graph {
+// client that runs on `conn`. `opts` give it a tracer provider, which records
+// its spans.
+pub fn Graph.new(conn orm.Connection, opts vgraph.ClientOptions) !Graph {
 	return Graph{
-		client: vgraph.Client.new(conn, schema()!)!
+		client: vgraph.Client.new(conn, schema()!, opts)!
 	}
 }
 
@@ -131,17 +133,17 @@ pub fn schema() !vgraph.Schema {
 	b.writeln('	return s
 }
 
-// with_ctx returns a graph whose queries and writes carry `ctx`, a value the
-// app defines, such as its user, to hooks and privacy rules. The GraphQL server
-// passes each request\'s context on.
-pub fn (g Graph) with_ctx(ctx graphql.Context) Graph {
+// with_ctx returns a graph whose queries and writes carry `ctx` to hooks and
+// privacy rules, with the app\'s own values in it, such as its user
+// (`context.with_value`). The GraphQL server passes each request\'s context on.
+pub fn (g Graph) with_ctx(ctx context.Context) Graph {
 	return Graph{
 		client: g.client.with_ctx(ctx)
 	}
 }
 
-// ctx returns the value `with_ctx` gave, or a `vgraph.NoContext`.
-pub fn (g Graph) ctx() graphql.Context {
+// ctx returns the context `with_ctx` gave, or `context.background()`.
+pub fn (g Graph) ctx() context.Context {
 	return g.client.ctx
 }
 
@@ -263,6 +265,10 @@ fn table_file(out_module string, info Info, infos map[string]Info) !string {
 	b.writeln(header)
 	b.writeln('module ${out_module}\n')
 	mut imports := ['five07.vgraph.load']
+	if level_of(info) != 'none' {
+		// the spans of its queries
+		imports.prepend('five07.vgraph')
+	}
 	if t.columns.any(it.typ.trim_left('?') == 'time.Time') {
 		imports << 'time'
 	}

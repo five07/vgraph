@@ -28,12 +28,12 @@ type Mutation {
 server := g.graphql(graph.Resolvers{ g: g }, default_page: 20, max_page: 100)!
 res := server.execute(graphql.Request{
 	query: '{ articles(first: 2, orderBy: {field: VIEWS, direction: DESC}) { edges { node { title author { name } } } } }'
-}, Viewer{ id: 1 }) // the request's context, which hooks and privacy rules get
+}, as_viewer(Viewer{ id: 1 })) // the request's context: hooks and privacy rules get it
 println(res.json())
 ```
 
-The second argument of `execute` and `handle` is the request's context, which
-hooks, interceptors and privacy rules get ([Hooks, interceptors and
+The second argument of `execute` and `handle` is the request's `context.Context`,
+which hooks, interceptors and privacy rules get ([Hooks, interceptors and
 privacy](hooks-and-privacy.md)). Resolvers read through the generated client:
 one query per edge per level of a request, however many rows.
 
@@ -47,7 +47,7 @@ answer := server.handle(graphql.HttpRequest{
 	method:       'POST'
 	content_type: 'application/json'
 	body:         '{"query": "{ search(text: \\"SQL\\") { title } }"}'
-}, Viewer{})
+}, as_viewer(Viewer{}))
 println('${answer.status} ${answer.content_type}: ${answer.body}')
 ```
 
@@ -97,7 +97,7 @@ created := server.execute(graphql.Request{
 			'userID': graphql.Value(b.ada.user.id.str())
 		})
 	}
-}, Viewer{ id: b.ada.user.id })
+}, as_viewer(Viewer{ id: b.ada.user.id }))
 ```
 
 ## Node
@@ -109,7 +109,7 @@ find its rows by global id ([Schema](schema.md#views-indexes-global-ids)):
 ```v
 node := server.execute(graphql.Request{
 	query: '{ node(id: "${b.hello.article.id}") { __typename ... on Article { title } } }'
-}, Viewer{})
+}, as_viewer(Viewer{}))
 ```
 
 ## Options
@@ -153,7 +153,7 @@ pub:
 }
 
 // query_search resolves `Query.search`: `search(text: String!): [Article!]!`.
-pub fn (r Resolvers) query_search(ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+pub fn (r Resolvers) query_search(ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 	found := r.g.with_ctx(ctx).articles().where_title_contains(info.arg('text').as_string()).order_by_id().all()!
 	result := graphql.list(found.map(graphql.obj(it)))
 	return parents.map(result)

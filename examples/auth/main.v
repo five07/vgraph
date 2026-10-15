@@ -4,6 +4,7 @@ module main
 // and each request runs as the viewer its token names, whose privacy rules
 // and hooks decide what it may read and write. `v run .`, then follow the
 // walkthrough in README.md.
+import context
 import veb
 import db.sqlite
 import net.http
@@ -91,7 +92,7 @@ fn new_app(cfg Config) !&App {
 // before the model's, so it leaves admins and the anonymous to those: the
 // model's `allow_admin` and `deny_anonymous` decide them.
 fn owner_only(g graph.Graph) vgraph.MutationRule {
-	return fn [g] (ctx graphql.Context, m vgraph.Mutation) !vgraph.Decision {
+	return fn [g] (ctx context.Context, m vgraph.Mutation) !vgraph.Decision {
 		viewer := auth.viewer_of(ctx)
 		if m.operation() == .create || viewer.admin || viewer.anonymous() {
 			return .skip
@@ -127,7 +128,7 @@ fn seed(g graph.Graph) ! {
 	if g.users().count()! > 0 {
 		return
 	}
-	g.with_ctx(auth.Viewer{ admin: true }).tx(fn (tx graph.Graph) ! {
+	g.with_ctx(auth.with_viewer(context.background(), auth.Viewer{ admin: true })).tx(fn (tx graph.Graph) ! {
 		tx.users().create().set_name('Ada').set_email('ada@example.com').set_password('ada-password').set_admin(true).exec()!
 		bob := tx.users().create().set_name('Bob').set_email('bob@example.com').set_password('bob-password').save()!
 		tx.posts().create().set_author(bob).set_title('Hello').set_body('My first post.').set_published_at(time.now()).exec()!
@@ -158,7 +159,7 @@ pub fn (a &App) serve_graphql(mut ctx Context) veb.Result {
 		accept:       ctx.req.header.get(.accept) or { '' }
 		query_string: if ctx.req.url.contains('?') { ctx.req.url.all_after('?') } else { '' }
 		body:         ctx.req.data
-	}, viewer)
+	}, auth.with_viewer(context.background(), viewer))
 	for key, value in res.headers {
 		ctx.set_custom_header(key, value) or {}
 	}

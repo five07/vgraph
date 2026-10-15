@@ -1,8 +1,9 @@
 module vgraph
 
-import graphql
+import context
 import load
 import orm
+import five07.otel
 
 // Client loads edges declared in a checked schema, and writes rows, over any
 // ORM connection.
@@ -10,9 +11,9 @@ pub struct Client {
 pub:
 	conn   orm.Connection
 	schema Schema
-	// ctx is the app's value for the queries and writes of this client, set
-	// with `with_ctx`.
-	ctx graphql.Context = NoContext{}
+	// ctx is the context of the queries and writes of this client, set with
+	// `with_ctx`: it carries the app's own values to hooks and privacy rules.
+	ctx context.Context = context.background()
 	// in_tx: the client runs inside a transaction (`begin`).
 	in_tx bool
 	// skipped: the names of the hooks and interceptors it leaves out (`skip`)
@@ -20,6 +21,13 @@ pub:
 	// privileged: it skips privacy rules; bypassed: interceptors too
 	privileged bool
 	bypassed   bool
+	// tracer records the client's spans: the provider's (`ClientOptions`), or
+	// one that records nothing
+	tracer otel.Tracer = otel.NoopTracer{}
+	// has_tracer_provider: `Client.new` was given a provider
+	has_tracer_provider bool
+	// otel_level is the level of the models whose level is `default`
+	otel_level OtelLevel = .ops
 mut:
 	owns_tx  bool
 	registry &Registry = &Registry{}
@@ -34,43 +42,58 @@ mut:
 	rollbacks []fn ()
 }
 
-// NoContext is the context of a client that `with_ctx` hasn't given one.
-pub struct NoContext {}
-
 // Client.new checks `schema`, and returns a client that loads its edges through
-// `conn`. When `conn` is a `Driver`, writes use it.
-pub fn Client.new(conn orm.Connection, schema Schema) !Client {
+// `conn`. When `conn` is a `Driver`, writes use it. With a tracer provider in
+// `opts`, the client records spans: one per statement unless
+// `trace_statements` is off, and those of the generated code.
+pub fn Client.new(conn orm.Connection, schema Schema, opts ClientOptions) !Client {
 	schema.validate()!
+	level := otel_level(opts)!
+	provider := opts.tracer_provider or {
+		return Client{
+			conn:       conn
+			schema:     schema
+			registry:   &Registry{}
+			otel_level: level
+		}
+	}
+	tracer := provider.tracer('five07.vgraph', version: version)
 	return Client{
-		conn:     conn
-		schema:   schema
-		registry: &Registry{}
+		conn:                if opts.trace_statements {
+			trace(conn, statement_spans(tracer, db_system(conn)))
+		} else {
+			conn
+		}
+		schema:              schema
+		registry:            &Registry{}
+		tracer:              tracer
+		has_tracer_provider: true
+		otel_level:          level
 	}
 }
 
-// with_ctx returns a client whose queries and writes carry `ctx`, a value the
-// app defines (its user, its request), to hooks and privacy rules. It is a
-// `graphql.Context`, so the GraphQL server passes each request's context on:
-// V can't convert one interface into another, so vgraph and its GraphQL module
-// share the one type.
+// with_ctx returns a client whose queries and writes carry `ctx`, to hooks
+// and privacy rules. The app's own values (its user, its request) ride in it,
+// added with `context.with_value`, and the GraphQL server passes each
+// request's context on.
 //
-// A `TxContext` (a GraphQL request's mutations) gives the client its
-// transaction too: the client then runs in it, and carries the request's own
-// context.
-pub fn (c Client) with_ctx(ctx graphql.Context) Client {
-	if ctx is TxContext {
+// The context of a GraphQL request's mutations carries their transaction
+// (`GraphqlTransaction`): the client then runs in it.
+pub fn (c Client) with_ctx(ctx context.Context) Client {
+	if tx := tx_client(ctx) {
 		return Client{
 			...c
-			conn:    ctx.client.conn
-			ctx:     ctx.ctx
+			conn:    with_trace_ctx(tx.conn, ctx)
+			ctx:     ctx
 			in_tx:   true
 			owns_tx: false
-			txstate: ctx.client.txstate
+			txstate: tx.txstate
 		}
 	}
 	return Client{
 		...c
-		ctx: ctx
+		conn: with_trace_ctx(c.conn, ctx)
+		ctx:  ctx
 	}
 }
 

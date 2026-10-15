@@ -4,6 +4,7 @@
 // what the formulas in `catalog` say the pages hold.
 module checks
 
+import context
 import five07.vgraph
 import five07.vgraph.graphql
 import catalog
@@ -60,7 +61,7 @@ fn (f Fixture) statements() []string {
 fn (f Fixture) run(query string) !graphql.Value {
 	r := f.server.execute(graphql.Request{
 		query: query
-	}, unsafe { nil })
+	}, context.background())
 	if r.errors.len > 0 {
 		return error(r.errors.map(it.message).join('\n'))
 	}

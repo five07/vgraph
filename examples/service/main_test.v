@@ -322,7 +322,7 @@ fn test_articles() {
 	assert failure(base, 'mutation { deleteArticle(id: "${article}") }')! == 'no `articles` row matches'
 }
 
-// An article by a deleted user still shows its author (Q112): deleted users
+// An article by a deleted user still shows its author: deleted users
 // are left out of queries, not of edges.
 fn test_a_deleted_author_still_shows() {
 	base := start()!

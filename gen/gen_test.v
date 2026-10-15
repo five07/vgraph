@@ -124,3 +124,61 @@ fn test_camel_follows_entgql() {
 	assert camel('api_url') == 'apiURL'
 	assert camel('group_users') == 'groupUsers'
 }
+
+fn test_parse_signature() {
+	sig := parse_signature('fn (q ArticleQuery) load_author(rows []models.Article, fns []fn (UserQuery) UserQuery) !map[string][]UserNode {') or {
+		panic('not read')
+	}
+	assert sig.vis == ''
+	assert sig.recv == 'q' && sig.typ == 'ArticleQuery' && sig.method == 'load_author'
+	assert sig.params == 'rows []models.Article, fns []fn (UserQuery) UserQuery'
+	assert sig.ret == '!map[string][]UserNode'
+	scan := parse_signature('pub fn (q ArticleQuery) scan[T]() ![]T {') or { panic('not read') }
+	assert scan.vis == 'pub ' && scan.generic == '[T]' && scan.params == '' && scan.ret == '![]T'
+	// a method with no result, and other lines, aren't operations
+	assert parse_signature('pub fn (q ArticleQuery) use(hooks ...ArticleHook) {') == none
+	assert parse_signature('pub fn (q ArticleQuery) limit(count int) ArticleQuery {') == none
+	assert parse_signature('	return q') == none
+}
+
+// A model of level `none` keeps its code as it was; any other level wraps its
+// operations in spans, by its level.
+fn test_instrument_by_level() {
+	text := '// all returns the rows.\npub fn (q ArticleQuery) all() ![]ArticleNode {\n\treturn q.nodes([])\n}\n'
+	mut info := Info{
+		table:  Table{
+			name: 'articles'
+			otel: Otel{
+				level: 'none'
+			}
+		}
+		entity: Entity{
+			struct_name: 'Article'
+		}
+	}
+	assert instrument(text, info) == text
+	info = Info{
+		...info
+		table: Table{
+			...info.table
+			otel: Otel{
+				level: 'default'
+			}
+		}
+	}
+	out := instrument(text, info)
+	assert out.contains("// all returns the rows.\npub fn (q ArticleQuery) all() ![]ArticleNode {\n\tclient, span := q.graph.client.start_span(.default, 'query articles', 'articles', 'all')")
+	assert out.contains('\n// all_untraced is `all`, without its span.\nfn (q ArticleQuery) all_untraced() ![]ArticleNode {\n\treturn q.nodes([])\n}\n')
+	assert out.contains('vgraph.span_rows(span, result.len)')
+}
+
+// A full or default model's resolvers each get a span; an ops model's don't,
+// nor do columns.
+fn test_trace_resolvers() {
+	text := "\ts.resolve('Query', 'articles', fn [g] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {\n\t\treturn fn () {\n\t\t}()\n\t})\n\tfor name in ['title'] {\n\t\ts.resolve('Article', name, resolve_article_field)\n\t}\n"
+	assert trace_resolvers(text, 'ops') == text
+	out := trace_resolvers(text, 'default')
+	assert out.starts_with("\ts.resolve('Query', 'articles', g.client.traced_resolver(.default, 'Query', 'articles', fn [g] (")
+	assert out.contains('\t\t}()\n\t}))\n')
+	assert out.contains("s.resolve('Article', name, resolve_article_field)")
+}

@@ -4,9 +4,10 @@ A GraphQL API whose requests carry a JSON Web Token. `login` checks a password
 and issues the token; each request then runs as the viewer its token names, and
 the models' privacy rules and hooks decide what that viewer may read and write.
 
-vgraph doesn't authenticate anyone. It passes a value of the app's, here
-`auth.Viewer`, as the request's context to every hook and privacy rule, and the
-app decides what it means.
+vgraph doesn't authenticate anyone. It passes the request's context to every
+hook and privacy rule; the app puts its own value in it, here an `auth.Viewer`
+(`auth.with_viewer`, read back with `auth.viewer_of`), and decides what it
+means.
 
 ```sh
 v run ../setup.vsh   # once per checkout: makes it importable as five07.vgraph
@@ -54,9 +55,9 @@ Where each lives:
 - **Sensitive fields:** `email` and `password` are `sensitive`, so they're in the
   inputs but never in the `User` type, filters or orders.
 
-The seed runs as an admin viewer of its own (`g.with_ctx(auth.Viewer{admin:
-true})`), so the same rules and hooks check it: making Ada an admin and posting
-as Bob are admin writes.
+The seed runs as an admin viewer of its own (`g.with_ctx(auth.with_viewer(ctx,
+auth.Viewer{admin: true}))`), so the same rules and hooks check it: making Ada
+an admin and posting as Bob are admin writes.
 
 ## Tokens
 

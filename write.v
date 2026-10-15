@@ -1,6 +1,6 @@
 module vgraph
 
-import graphql
+import context
 import load
 import orm
 import time
@@ -126,11 +126,25 @@ fn (c Client) run(t Table, hooks []Hook, m MutationData, op Op) !&MutationData {
 		client: c
 	}
 	apply_defaults(t, c.schema.options(t.name), mut data)
-	mut chain := Mutate(fn [c, t, mut data] (_ graphql.Context, mut _ Mutation) ! {
-		c.write(t, mut data)!
+	// a `full` model's hooks each have a span, whose context reaches the write
+	full := c.full_spans(t.name)
+	mut chain := Mutate(fn [c, t, mut data, full] (ctx context.Context, mut _ Mutation) ! {
+		if full {
+			c.with_span_ctx(ctx).write(t, mut data)!
+		} else {
+			c.write(t, mut data)!
+		}
 	})
 	for i := hooks.len - 1; i >= 0; i-- {
-		chain = hooks[i].wrap(chain)
+		h := hooks[i]
+		chain = if full {
+			Hook{
+				...h
+				run: c.traced_run(t.name, h)
+			}.wrap(chain)
+		} else {
+			h.wrap(chain)
+		}
 	}
 	mut iface := Mutation(data)
 	chain(c.ctx, mut iface)!

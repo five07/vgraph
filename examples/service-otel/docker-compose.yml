@@ -1,0 +1,16 @@
+# A collector on localhost:4318, where the service sends its spans when
+# OTEL_TRACES_EXPORTER includes `otlp`, and Jaeger on http://localhost:16686
+# to look at them.
+services:
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.120.0
+    volumes:
+      - ./collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "4318:4318"
+    depends_on:
+      - jaeger
+  jaeger:
+    image: jaegertracing/jaeger:2.4.0
+    ports:
+      - "16686:16686"

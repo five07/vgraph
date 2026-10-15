@@ -233,3 +233,21 @@ updates `append_<field>(items...)` for lists; it is a `JSON` scalar in GraphQL.
 
 `graphql()` returns a `vgraph.GraphqlTable` with the table's GraphQL options:
 see [GraphQL](graphql.md#options).
+
+`otel()` returns a `vgraph.Otel` with the table's telemetry level: how much its
+generated code records, when the app gives the client a tracer provider. `none`
+(the level without the method) records nothing; `ops` a span per query, write
+and edge load; `full` those and the spans of its hooks, interceptors, privacy
+rules and GraphQL resolvers; `default` leaves it to the app when it runs. See
+[Tracing](tracing.md).
+
+<!-- snippet: docs/snippets/models/models.v#otel -->
+```v
+// otel records a span per query, write and edge load of comments, when the app
+// gives the client a tracer provider.
+pub fn (c Comment) otel() vgraph.Otel {
+	return vgraph.Otel{
+		level: .ops
+	}
+}
+```

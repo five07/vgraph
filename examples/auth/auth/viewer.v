@@ -1,22 +1,41 @@
 module auth
 
+import context
 import crypto.bcrypt
 import os
-import five07.vgraph.graphql
 
 // Viewer is who a request runs as: a user, an admin, or no one (`id` 0). The
-// HTTP handler makes one from the request's token, and the GraphQL server
-// passes it to hooks and privacy rules as the request's context.
+// HTTP handler makes one from the request's token and puts it in the
+// request's context (`with_viewer`), which the GraphQL server passes to hooks
+// and privacy rules.
 pub struct Viewer {
 pub:
 	id    i64
 	admin bool
 }
 
+// viewer_key_cell exists for its address, which is the context key of the
+// viewer: no other module can make the same key.
+const viewer_key_cell = u8(1)
+
+fn viewer_key() context.Key {
+	return voidptr(&viewer_key_cell)
+}
+
+// with_viewer returns `ctx` running as `v`.
+pub fn with_viewer(ctx context.Context, v Viewer) context.Context {
+	return context.with_value(ctx, viewer_key(), v)
+}
+
 // viewer_of returns the viewer of the context `ctx`: the anonymous one when
-// it isn't a `Viewer`, such as a write the app makes itself.
-pub fn viewer_of(ctx graphql.Context) Viewer {
-	return if ctx is Viewer { ctx } else { Viewer{} }
+// it has none, such as a write the app makes itself.
+pub fn viewer_of(ctx context.Context) Viewer {
+	if value := ctx.value(viewer_key()) {
+		if value is Viewer {
+			return value
+		}
+	}
+	return Viewer{}
 }
 
 // anonymous reports whether no one is logged in.

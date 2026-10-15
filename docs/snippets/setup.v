@@ -3,11 +3,11 @@
 // comments; `docs_test.v` checks they stay the same.
 module main
 
+import context
 import db.sqlite
 import v.migrations
 import five07.vgraph
 import five07.vgraph.sqlite as vsqlite
-import five07.vgraph.graphql
 import graph
 
 // snippet: migration
@@ -81,16 +81,28 @@ fn blog() !Blog {
 }
 
 // snippet: viewer
-// Viewer is the app's own context: who is asking. `g.with_ctx(viewer)` passes
-// it to hooks, interceptors and privacy rules; the GraphQL server passes each
-// request's.
+// Viewer is the app's own value: who is asking. It rides in a context, which
+// `g.with_ctx(ctx)` passes to hooks, interceptors and privacy rules; the
+// GraphQL server passes each request's.
 struct Viewer {
 	id    i64
 	admin bool
 }
 
-fn viewer_of(ctx graphql.Context) Viewer {
-	return if ctx is Viewer { ctx } else { Viewer{} }
+// viewer_key_cell exists for its address, the context key of the viewer.
+const viewer_key_cell = u8(1)
+
+fn as_viewer(v Viewer) context.Context {
+	return context.with_value(context.background(), voidptr(&viewer_key_cell), v)
+}
+
+fn viewer_of(ctx context.Context) Viewer {
+	if value := ctx.value(voidptr(&viewer_key_cell)) {
+		if value is Viewer {
+			return value
+		}
+	}
+	return Viewer{}
 }
 
 // end snippet

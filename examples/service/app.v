@@ -1,5 +1,6 @@
 module main
 
+import context
 import veb
 import db.sqlite
 import net.http
@@ -65,7 +66,7 @@ pub fn (a &App) serve_graphql(mut ctx app.Context) veb.Result {
 		accept:       ctx.req.header.get(.accept) or { '' }
 		query_string: if ctx.req.url.contains('?') { ctx.req.url.all_after('?') } else { '' }
 		body:         ctx.req.data
-	}, unsafe { nil })
+	}, context.background())
 	for key, value in res.headers {
 		ctx.set_custom_header(key, value) or {}
 	}

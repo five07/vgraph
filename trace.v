@@ -1,5 +1,6 @@
 module vgraph
 
+import context
 import orm
 import time
 
@@ -19,11 +20,16 @@ pub enum TraceKind {
 // TraceEvent reports one statement. It carries no values: no parameters, and no
 // error message, which a database can fill with them. `statement` is set only for
 // the SQL vgraph writes itself (`Driver.exec_params`), with its placeholders.
+// `ctx` is the context of the client that ran it (`Client.with_ctx`), so a
+// tracer can tell which request a statement belongs to; `started` is when it
+// began.
 pub struct TraceEvent {
 pub:
+	ctx       context.Context = context.background()
 	kind      TraceKind
 	table     string
 	statement string
+	started   time.Time
 	duration  time.Duration
 	failed    bool
 }
@@ -58,19 +64,56 @@ pub fn trace(conn orm.Connection, f Tracer) orm.Connection {
 	}
 }
 
+// with_trace_ctx returns `conn` reporting its statements with `ctx`, when it
+// is traced, and any other connection as it is. A client's `with_ctx` gives
+// its connection the client's context this way.
+fn with_trace_ctx(conn orm.Connection, ctx context.Context) orm.Connection {
+	if conn is TracedDriver {
+		return &TracedDriver{
+			TracedTx: TracedTx{
+				Traced: conn.Traced.with_ctx(ctx)
+			}
+		}
+	}
+	if conn is TracedTx {
+		return &TracedTx{
+			Traced: conn.Traced.with_ctx(ctx)
+		}
+	}
+	if conn is Traced {
+		return &Traced{
+			...conn.with_ctx(ctx)
+		}
+	}
+	return conn
+}
+
 // Traced is a connection that reports its statements.
 @[heap]
 pub struct Traced {
 mut:
 	inner orm.Connection
 	f     Tracer @[required]
+	ctx   context.Context = context.background()
+}
+
+fn (t &Traced) with_ctx(ctx context.Context) Traced {
+	return Traced{
+		// a traced connection inside, such as the app's own under vgraph's
+		// spans, reports with `ctx` too
+		inner: with_trace_ctx(t.inner, ctx)
+		f:     t.f
+		ctx:   ctx
+	}
 }
 
 fn (t &Traced) emit(kind TraceKind, table string, statement string, start time.Time, failed bool) {
 	t.f(TraceEvent{
+		ctx:       t.ctx
 		kind:      kind
 		table:     table
 		statement: statement
+		started:   start
 		duration:  time.since(start)
 		failed:    failed
 	})
@@ -245,7 +288,7 @@ pub fn (mut t TracedDriver) begin_tx() !orm.Connection {
 		return err
 	}
 	t.emit(.begin, '', '', start, false)
-	return trace(inner, t.f)
+	return with_trace_ctx(trace(inner, t.f), t.ctx)
 }
 
 // commit_tx commits and reports the transaction `begin_tx` started.
