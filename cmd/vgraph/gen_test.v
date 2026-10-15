@@ -760,7 +760,8 @@ fn test_describe() {
 	pets := text.all_after('Pet (pets):').all_before('\n\n')
 	assert pets.contains('hooks: 1, interceptors: 1, policy rules: 0')
 	groups := text.all_after('Group (groups):').all_before('\n\n')
-	assert groups.contains('policy rules: 1')
+	assert groups.contains('policy rules: 1, otel: full')
+	assert pets.contains('otel: none')
 }
 
 // `--no-graphql` writes the client alone.

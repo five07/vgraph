@@ -193,6 +193,14 @@ pub:
 	interceptors int
 	rules        int
 	graphql      GraphqlTable
+	otel         Otel
+}
+
+// Otel mirrors `vgraph.Otel`, as the loader prints it: `level` is `none`,
+// `ops`, `full` or `default`.
+pub struct Otel {
+pub:
+	level string
 }
 
 fn (t Table) column(name string) !Column {

@@ -167,6 +167,18 @@ is recorded and the generated code runs as it does today.
      could move to otel.
 2. **Loader and schema**: read each model's `otel()` into `Table`;
    `vgraph describe` prints the level.
+   **Done.**
+   - `Schema.add` reads `otel()` by reflection, like `graphql()`, into
+     `Table.otel` (level `none` without it); `vgraph.Instrumented` is the
+     interface such a model implements, for the docs.
+   - The loader's JSON carries the level by name; `gen.Table.otel` mirrors it
+     (`gen.Otel.level`, a string).
+   - `vgraph describe` ends each table's summary line with `otel: <level>`.
+   - `relations`' `Group` is `full` and the docs' `Comment` is `ops`, so the
+     describe test and the schema guide (a new `otel()` paragraph, from a
+     snippet) show one. No generated code changes yet.
+   - `test_otel_level_is_reflected` in `schema_test.v`; the describe test
+     checks `full` and `none`. Full suite 28 passed, 3 skipped.
 3. **Generator**: `ops` and `full` spans in the generated client, `default`
    generated as `full` with its runtime check; no otel import when every model
    is `none`; gen tests for each level.

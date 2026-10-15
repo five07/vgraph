@@ -232,6 +232,17 @@ pub fn (c Comment) graphql() vgraph.GraphqlTable {
 	}
 }
 
+// snippet: otel
+// otel records a span per query, write and edge load of comments, when the app
+// gives the client a tracer provider.
+pub fn (c Comment) otel() vgraph.Otel {
+	return vgraph.Otel{
+		level: .ops
+	}
+}
+
+// end snippet
+
 // Tag labels articles.
 @[table: 'tags']
 pub struct Tag {

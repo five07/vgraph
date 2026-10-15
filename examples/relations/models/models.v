@@ -196,6 +196,14 @@ pub fn is_admin(ctx context.Context) bool {
 	return false
 }
 
+// otel records a span per query, write and edge load of groups, and of their
+// hooks, interceptors and privacy rules, when the app gives a tracer provider.
+pub fn (g Group) otel() vgraph.Otel {
+	return vgraph.Otel{
+		level: .full
+	}
+}
+
 // policy lets only an admin delete groups.
 pub fn (g Group) policy() vgraph.Policy {
 	return vgraph.Policy{

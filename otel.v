@@ -37,6 +37,12 @@ pub:
 	level OtelLevel
 }
 
+// Instrumented is implemented by structs that give telemetry options. vgraph
+// finds the method through reflection, so declaring it is enough.
+pub interface Instrumented {
+	otel() Otel
+}
+
 // ClientOptions set up a client's telemetry.
 @[params]
 pub struct ClientOptions {

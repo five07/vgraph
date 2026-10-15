@@ -3,8 +3,8 @@ module gen
 import strings
 
 // describe returns `tables` as text, as `ent describe` does: each table's
-// columns, edges and indexes, and how many hooks, interceptors and privacy
-// rules its model declares.
+// columns, edges and indexes, how many hooks, interceptors and privacy rules
+// its model declares, and its telemetry level.
 pub fn describe(entities []Entity, tables []Table) string {
 	mut b := strings.new_builder(4096)
 	for t in tables {
@@ -34,7 +34,7 @@ pub fn describe(entities []Entity, tables []Table) string {
 			}
 			write_rows(mut b, indexes)
 		}
-		b.writeln('\thooks: ${t.hooks}, interceptors: ${t.interceptors}, policy rules: ${t.rules}')
+		b.writeln('\thooks: ${t.hooks}, interceptors: ${t.interceptors}, policy rules: ${t.rules}, otel: ${t.otel.level}')
 		b.writeln('')
 	}
 	return b.str()
