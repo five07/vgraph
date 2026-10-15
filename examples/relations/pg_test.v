@@ -115,7 +115,7 @@ fn test_fixed_selects() {
 }
 
 // A GraphQL request's mutations on a pool: they run on the connection of the
-// request's transaction, so a failure rolls back every one of them (Q103).
+// request's transaction, so a failure rolls back every one of them.
 fn test_graphql_transaction_on_a_pool() {
 	fixture()!
 	mut db := pg.connect(pg.Config{

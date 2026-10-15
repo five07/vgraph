@@ -150,15 +150,17 @@ and the SQL `vgraph.trace` shows; for a feature, what it's for, and the Ent or
 entgql feature it matches, if any.
 
 **Setup.** vgraph needs V master at the commit in `.github/workflows/ci.yml`
-(`V_COMMIT`). The examples and the generator import it as `five07.vgraph`, so
-link your checkout there:
+(`V_COMMIT`), and `five07.otel` at the commit there (`OTEL_COMMIT`). The
+examples and the generator import vgraph as `five07.vgraph`, so link your
+checkout there:
 
 ```sh
 v run examples/setup.vsh
 ```
 
 It links the checkout into `~/.vmodules` (`$VMODULES`), and says so when another
-`five07.vgraph` is already there.
+`five07.vgraph` is already there. It links an `otel` checkout beside this one as
+`five07.otel` when that is missing, or says where to get it.
 
 **Tests.**
 

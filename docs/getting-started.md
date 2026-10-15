@@ -10,7 +10,11 @@ install it from GitHub:
 
 ```sh
 git clone https://github.com/five07/vgraph ~/.vmodules/five07/vgraph
+git clone https://github.com/five07/otel ~/.vmodules/five07/otel
 ```
+
+vgraph records OpenTelemetry spans through `five07.otel` when an app gives it a
+tracer provider ([Tracing](tracing.md)), so it imports it either way.
 
 It imports as `five07.vgraph`, with `five07.vgraph.sqlite` and
 `five07.vgraph.pg` (drivers), `five07.vgraph.graphql` (the GraphQL server) and

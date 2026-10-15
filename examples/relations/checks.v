@@ -1152,7 +1152,7 @@ fn check_relay(f Fixture) ! {
 	assert gql(f, '{ gadgets(after: 1) { totalCount } }')!.contains('Cursor must be a string')
 }
 
-// Connections on edges, and limits per parent (Q98): each row's own page, in
+// Connections on edges, and limits per parent: each row's own page, in
 // one select per edge with a driver; without one, every row of the edge, cut
 // in V.
 fn check_nested_connections(f Fixture) ! {

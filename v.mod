@@ -5,5 +5,5 @@ Module {
 	license: 'MIT'
 	repo_url: 'https://github.com/five07/vgraph'
 	min_v: '0.5.2'
-	dependencies: []
+	dependencies: ['five07.otel']
 }

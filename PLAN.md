@@ -134,6 +134,37 @@ is recorded and the generated code runs as it does today.
 1. **Core**: the dependency, `vgraph.Otel` and `OtelLevel`, the provider and
    `otel_level` on `Client`, statement spans, tests with
    `InMemoryExporter`.
+   **Done.**
+   - `otel.v`: `OtelLevel` (`none`, `ops`, `full`, `default`), `Otel`,
+     `ClientOptions` (`tracer_provider ?otel.TracerProvider`, `otel_level
+     ?OtelLevel`, `trace_statements = true`), `vgraph.version`, and
+     `Client.records(level, wanted)`, which the generated code will ask.
+   - `Client.new(conn, schema, opts)`; the generated `Graph.new(conn, opts)`
+     passes them on. The client keeps `tracer` (a no-op one without a
+     provider), `has_tracer_provider` and the resolved `otel_level`.
+     `otel_level: .default` is an error.
+   - Statement spans: with a provider, `Client.new` wraps the connection in
+     `vgraph.trace` with a tracer that makes each event a client span, started
+     and ended when the statement ran (`TraceEvent.started`, new), under the
+     span of the client's context. Names `SELECT books`, `INSERT books`,
+     `BEGIN`…; the table and operation of vgraph's own SQL are read from its
+     quoted names; an app's raw SQL is neither read nor recorded.
+     `db.query.text` only for vgraph's own SQL; failures are `error` with no
+     description.
+   - `db.system.name` only for vgraph's drivers, from their dialect: V gives an
+     ORM connection's type only as `DB`, and matching the types would link
+     every database's C library into vgraph.
+   - Re-wrapping with a context reaches a traced connection inside another, so
+     the app's own `vgraph.trace` under vgraph's spans gets the context too.
+   - The dependency: `five07.otel` in `v.mod`; CI clones it at `OTEL_COMMIT`
+     (develop, `5342f59`) in both jobs that build; `examples/setup.vsh` links a
+     sibling `otel` checkout or says where to get it; install notes in the
+     README and getting started.
+   - `otel_test.v`: 8 tests. Full suite 28 passed, 3 skipped; the PostgreSQL
+     tests pass on a local server. `v fmt -verify`, `v vet` (with `otel.v`) and
+     `v doc` clean.
+   - otel's `semconv` has no `db.*` names, so vgraph defines its own; they
+     could move to otel.
 2. **Loader and schema**: read each model's `otel()` into `Table`;
    `vgraph describe` prints the level.
 3. **Generator**: `ops` and `full` spans in the generated client, `default`

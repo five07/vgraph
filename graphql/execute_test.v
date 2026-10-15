@@ -469,7 +469,7 @@ input I { f: Int @tag(name: "f") }')!
 	assert print_schema_with(build_schema(with)!, applied_directives: true) == with
 }
 
-// The limits on depth and size (Q31): they count through inline fragments and
+// The limits on depth and size: they count through inline fragments and
 // named ones, each spread of a fragment again, and a validation error stops the
 // request before it runs.
 fn test_depth_and_size_limits() {

@@ -113,10 +113,11 @@ pub:
 }
 
 // Graph.new registers every struct of the schema, checks its edges, and returns a
-// client that runs on `conn`.
-pub fn Graph.new(conn orm.Connection) !Graph {
+// client that runs on `conn`. `opts` give it a tracer provider, which records
+// its spans.
+pub fn Graph.new(conn orm.Connection, opts vgraph.ClientOptions) !Graph {
 	return Graph{
-		client: vgraph.Client.new(conn, schema()!)!
+		client: vgraph.Client.new(conn, schema()!, opts)!
 	}
 }
 

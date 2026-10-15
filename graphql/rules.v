@@ -1397,7 +1397,7 @@ fn (mut r NoSchemaIntrospectionRule) enter(mut c ValidationContext, w &Walker, n
 
 fn (mut r NoSchemaIntrospectionRule) leave(mut _ ValidationContext, _ &Walker, _ Node) {}
 
-// --- MaxComplexityRule: vgraph's limits on depth and size (Q31)
+// --- MaxComplexityRule: vgraph's limits on depth and size
 
 struct MaxComplexityRule {
 	max_depth      int

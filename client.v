@@ -3,6 +3,7 @@ module vgraph
 import context
 import load
 import orm
+import five07.otel
 
 // Client loads edges declared in a checked schema, and writes rows, over any
 // ORM connection.
@@ -20,6 +21,13 @@ pub:
 	// privileged: it skips privacy rules; bypassed: interceptors too
 	privileged bool
 	bypassed   bool
+	// tracer records the client's spans: the provider's (`ClientOptions`), or
+	// one that records nothing
+	tracer otel.Tracer = otel.NoopTracer{}
+	// has_tracer_provider: `Client.new` was given a provider
+	has_tracer_provider bool
+	// otel_level is the level of the models whose level is `default`
+	otel_level OtelLevel = .ops
 mut:
 	owns_tx  bool
 	registry &Registry = &Registry{}
@@ -35,13 +43,32 @@ mut:
 }
 
 // Client.new checks `schema`, and returns a client that loads its edges through
-// `conn`. When `conn` is a `Driver`, writes use it.
-pub fn Client.new(conn orm.Connection, schema Schema) !Client {
+// `conn`. When `conn` is a `Driver`, writes use it. With a tracer provider in
+// `opts`, the client records spans: one per statement unless
+// `trace_statements` is off, and those of the generated code.
+pub fn Client.new(conn orm.Connection, schema Schema, opts ClientOptions) !Client {
 	schema.validate()!
+	level := otel_level(opts)!
+	provider := opts.tracer_provider or {
+		return Client{
+			conn:       conn
+			schema:     schema
+			registry:   &Registry{}
+			otel_level: level
+		}
+	}
+	tracer := provider.tracer('five07.vgraph', version: version)
 	return Client{
-		conn:     conn
-		schema:   schema
-		registry: &Registry{}
+		conn:                if opts.trace_statements {
+			trace(conn, statement_spans(tracer, db_system(conn)))
+		} else {
+			conn
+		}
+		schema:              schema
+		registry:            &Registry{}
+		tracer:              tracer
+		has_tracer_provider: true
+		otel_level:          level
 	}
 }
 

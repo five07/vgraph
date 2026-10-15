@@ -21,13 +21,15 @@ pub enum TraceKind {
 // error message, which a database can fill with them. `statement` is set only for
 // the SQL vgraph writes itself (`Driver.exec_params`), with its placeholders.
 // `ctx` is the context of the client that ran it (`Client.with_ctx`), so a
-// tracer can tell which request a statement belongs to.
+// tracer can tell which request a statement belongs to; `started` is when it
+// began.
 pub struct TraceEvent {
 pub:
 	ctx       context.Context = context.background()
 	kind      TraceKind
 	table     string
 	statement string
+	started   time.Time
 	duration  time.Duration
 	failed    bool
 }
@@ -97,7 +99,9 @@ mut:
 
 fn (t &Traced) with_ctx(ctx context.Context) Traced {
 	return Traced{
-		inner: t.inner
+		// a traced connection inside, such as the app's own under vgraph's
+		// spans, reports with `ctx` too
+		inner: with_trace_ctx(t.inner, ctx)
 		f:     t.f
 		ctx:   ctx
 	}
@@ -109,6 +113,7 @@ fn (t &Traced) emit(kind TraceKind, table string, statement string, start time.T
 		kind:      kind
 		table:     table
 		statement: statement
+		started:   start
 		duration:  time.since(start)
 		failed:    failed
 	})
