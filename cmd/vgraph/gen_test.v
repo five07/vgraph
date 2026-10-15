@@ -740,28 +740,26 @@ fn test_gen_writes_a_working_client() {
 	for method in ['query_hello', 'article_url', 'mutation_touch'] {
 		assert stubs.contains(') ${method}('), method
 	}
-	// the stubs are the project's: written once, never overwritten
+	// the stubs are the project's: written once, never overwritten; a stale
+	// generated file goes away, and a hand-written one stays
 	os.write_file(os.join_path(root, 'graph', 'resolvers.v'), resolvers)!
+	os.write_file(os.join_path(root, 'graph', 'old.v'), '${header()}\nmodule graph\n')!
+	os.write_file(os.join_path(root, 'graph', 'mine.v'), 'module graph\n')!
 	run(root, 'graph', true)!
 	assert os.read_file(os.join_path(root, 'graph', 'resolvers.v'))! == resolvers
+	assert !os.exists(os.join_path(root, 'graph', 'old.v'))
+	assert os.exists(os.join_path(root, 'graph', 'mine.v'))
 	// a new field gets a new stub, after what is there
 	os.write_file(os.join_path(root, 'api.graphql'), api_sdl + 'extend type Label { slug: String! }\n')!
 	run(root, 'graph', true)!
 	with_stub := os.read_file(os.join_path(root, 'graph', 'resolvers.v'))!
 	assert with_stub.starts_with(resolvers.trim_right('\n'))
 	assert with_stub.contains(') label_slug(')
+
+	// back to the project's resolvers, and an operations folder, which holds
+	// operations checked against the schema
 	os.write_file(os.join_path(root, 'api.graphql'), api_sdl)!
 	os.write_file(os.join_path(root, 'graph', 'resolvers.v'), resolvers)!
-	run(root, 'graph', true)!
-
-	// a stale generated file goes away; a hand-written one stays
-	os.write_file(os.join_path(root, 'graph', 'old.v'), '${header()}\nmodule graph\n')!
-	os.write_file(os.join_path(root, 'graph', 'mine.v'), 'module graph\n')!
-	run(root, 'graph', true)!
-	assert !os.exists(os.join_path(root, 'graph', 'old.v'))
-	assert os.exists(os.join_path(root, 'graph', 'mine.v'))
-
-	// an operations folder holds operations, checked against the schema
 	os.mkdir_all(os.join_path(root, 'web', 'operations'))!
 	os.write_file(os.join_path(root, 'web', 'operations', 'titles.graphql'), 'query Titles { articles(orderBy: {field: ID}) { title ...Who } }\nfragment Who on Article { author { name } }\n')!
 	run(root, 'graph', true)!

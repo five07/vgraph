@@ -14,7 +14,9 @@ env:
   OTEL_COMMIT: a9eef269d81ddf0009f766e26a39cc6ff54be7c6
 
 jobs:
-  sqlite:
+  # Formatting, docs, and the examples' generated clients; the tests are in
+  # `sqlite` and `postgres`.
+  checks:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -24,12 +26,20 @@ jobs:
           persist-credentials: false
       - name: Install SQLite headers
         run: sudo apt-get update && sudo apt-get install --quiet -y libsqlite3-dev
+      - name: Restore V
+        id: v-cache
+        uses: actions/cache@v4
+        with:
+          path: vlang
+          key: v-${{ runner.os }}-${{ env.V_COMMIT }}
       - name: Build V
+        if: steps.v-cache.outputs.cache-hit != 'true'
         run: |
           git clone --filter=blob:none https://github.com/vlang/v vlang
           git -C vlang checkout "$V_COMMIT"
           make -C vlang -j4
-          sudo ./vlang/v symlink
+      - name: Install V
+        run: sudo ./vlang/v symlink
       - name: Install vgraph as five07.vgraph, for the examples
         run: |
           mkdir -p ~/.vmodules/five07
@@ -38,6 +48,14 @@ jobs:
         run: |
           git clone --filter=blob:none https://github.com/five07/otel ~/.vmodules/five07/otel
           git -C ~/.vmodules/five07/otel checkout "$OTEL_COMMIT"
+      - name: Check that every test is in a shard of the sqlite job
+        run: |
+          missing=$(cd vgraph && find . -name '*_test.v' | grep -vE '^\./([^/]+_test\.v|(docs|examples|cmd|gen|graphql|load)/)' || true)
+          if [ -n "$missing" ]; then
+            echo "add these to a shard of the sqlite job:"
+            echo "$missing"
+            exit 1
+          fi
       - name: Check formatting
         run: v fmt -verify vgraph
       - name: Check doc comments
@@ -47,16 +65,62 @@ jobs:
         run: v doc -f html -m -o "$RUNNER_TEMP/api" -no-timestamp vgraph
       - name: Check that the examples' clients are generated from their current models
         run: |
-          v run vgraph/cmd/vgraph gen vgraph/examples/service
-          v run vgraph/cmd/vgraph gen vgraph/examples/service-otel
-          v run vgraph/cmd/vgraph gen vgraph/examples/relations
-          v run vgraph/cmd/vgraph gen vgraph/examples/pagination
-          v run vgraph/cmd/vgraph gen vgraph/examples/auth
-          v run vgraph/cmd/vgraph gen vgraph/docs/snippets
+          v -o "$RUNNER_TEMP/vgraph" vgraph/cmd/vgraph
+          for dir in examples/service examples/service-otel examples/relations examples/pagination examples/auth docs/snippets; do
+            "$RUNNER_TEMP/vgraph" gen "vgraph/$dir"
+          done
           git -C vgraph diff --exit-code -- examples/service/graph examples/service-otel/graph examples/relations/graph examples/pagination/graph examples/auth/graph docs/snippets/graph
           test -z "$(git -C vgraph status --porcelain -- examples/service/graph examples/service-otel/graph examples/relations/graph examples/pagination/graph examples/auth/graph docs/snippets/graph)"
+
+  # The tests on SQLite, in two shards on their own runners: each test
+  # compiles on its own, and the runner's memory lets V's test runner use only
+  # one job by default. `checks` fails on a test that is in neither shard.
+  sqlite:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: guides
+            paths: vgraph/docs vgraph/examples
+          - shard: library
+            paths: vgraph/*_test.v vgraph/cmd vgraph/gen vgraph/graphql vgraph/load
+    name: sqlite (${{ matrix.shard }})
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: vgraph
+          persist-credentials: false
+      - name: Install SQLite headers
+        run: sudo apt-get update && sudo apt-get install --quiet -y libsqlite3-dev
+      - name: Restore V
+        id: v-cache
+        uses: actions/cache@v4
+        with:
+          path: vlang
+          key: v-${{ runner.os }}-${{ env.V_COMMIT }}
+      - name: Build V
+        if: steps.v-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --filter=blob:none https://github.com/vlang/v vlang
+          git -C vlang checkout "$V_COMMIT"
+          make -C vlang -j4
+      - name: Install V
+        run: sudo ./vlang/v symlink
+      - name: Install vgraph as five07.vgraph, for the examples
+        run: |
+          mkdir -p ~/.vmodules/five07
+          ln -s "$GITHUB_WORKSPACE/vgraph" ~/.vmodules/five07/vgraph
+      - name: Install five07.otel
+        run: |
+          git clone --filter=blob:none https://github.com/five07/otel ~/.vmodules/five07/otel
+          git -C ~/.vmodules/five07/otel checkout "$OTEL_COMMIT"
       - name: Test
-        run: v -nocache test vgraph
+        env:
+          # two compiles at a time; V's default budget of 8 GB each allows one
+          VJOBS: 2
+        run: v -nocache test ${{ matrix.paths }}
 
   # The schemas vgraph gen writes must read, and print, the same in graphql-js,
   # which Apollo's tools build on.
@@ -103,12 +167,20 @@ jobs:
           persist-credentials: false
       - name: Install PostgreSQL and SQLite headers
         run: sudo apt-get update && sudo apt-get install --quiet -y libpq-dev libsqlite3-dev
+      - name: Restore V
+        id: v-cache
+        uses: actions/cache@v4
+        with:
+          path: vlang
+          key: v-${{ runner.os }}-${{ env.V_COMMIT }}
       - name: Build V
+        if: steps.v-cache.outputs.cache-hit != 'true'
         run: |
           git clone --filter=blob:none https://github.com/vlang/v vlang
           git -C vlang checkout "$V_COMMIT"
           make -C vlang -j4
-          sudo ./vlang/v symlink
+      - name: Install V
+        run: sudo ./vlang/v symlink
       - name: Install vgraph as five07.vgraph, for the examples
         run: |
           mkdir -p ~/.vmodules/five07

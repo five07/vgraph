@@ -9,4 +9,4 @@
 
 # the loader `vgraph gen` runs; removed after each run, unless it was interrupted
 .vgraph-gen/
-cmd/.DS_Store
+.DS_Store
