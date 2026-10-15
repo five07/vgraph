@@ -11,7 +11,7 @@ fn server_file(out_module string, infos map[string]Info, tables []Table, sdl str
 	mut b := strings.new_builder(65536)
 	b.writeln(header)
 	b.writeln('module ${out_module}\n')
-	mut imports := ['five07.vgraph', 'five07.vgraph.graphql', 'five07.vgraph.load']
+	mut imports := ['context', 'five07.vgraph', 'five07.vgraph.graphql', 'five07.vgraph.load']
 	has_time := visible.any(it.all_gql_fields().any(it.scalar == 'Time'))
 	has_relay := visible.any(it.relay())
 	if has_relay {
@@ -66,11 +66,11 @@ pub fn (g Graph) graphql(r Resolvers, opts vgraph.GraphqlOptions) !&graphql.Serv
 			return error(\'`\${table}` implements Node, but has no global ids: run `vgraph.global_ids` in a migration\')
 		}
 	}
-	s.resolve(\'Query\', \'node\', fn [g, types] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve(\'Query\', \'node\', fn [g, types] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		found := graphql_nodes(g.with_ctx(ctx), types, [info.arg(\'id\')])!
 		return parents.map(found[0])
 	})
-	s.resolve(\'Query\', \'nodes\', fn [g, types] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve(\'Query\', \'nodes\', fn [g, types] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		result := graphql.list(graphql_nodes(g.with_ctx(ctx), types, info.arg(\'ids\').as_list())!)
 		return parents.map(result)
 	})')
@@ -82,7 +82,7 @@ pub fn (g Graph) graphql(r Resolvers, opts vgraph.GraphqlOptions) !&graphql.Serv
 		b.writeln("\n	// the fields the project's .graphql files add")
 	}
 	for h in hand {
-		b.writeln("	s.resolve('${h.typ}', '${h.field}', fn [r] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {")
+		b.writeln("	s.resolve('${h.typ}', '${h.field}', fn [r] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {")
 		b.writeln('		return r.${h.method}(ctx, info, parents)')
 		b.writeln('	})')
 	}
@@ -139,18 +139,18 @@ fn write_resolvers(mut b strings.Builder, info Info, infos map[string]Info) ! {
 	b.writeln('\n	// ${t}')
 	if root != '' {
 		if info.relay() {
-			b.writeln('	s.resolve(\'Query\', \'${root}\', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+			b.writeln('	s.resolve(\'Query\', \'${root}\', fn [g, sizes] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		page := ${p}_connection(g.with_ctx(ctx).${info.table.name}().graphql_where(info.args)!, info, sizes[\'${info.table.name}\'])!
 		result := graphql.obj(page)
 		return parents.map(result)
 	})')
 		} else {
-			b.writeln('	s.resolve(\'Query\', \'${root}\', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+			b.writeln('	s.resolve(\'Query\', \'${root}\', fn [g, sizes] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		found := g.with_ctx(ctx).${info.table.name}().graphql_args(info.args, sizes[\'${info.table.name}\'])!.all()!
 		result := graphql.list(found.map(graphql.obj(it)))
 		return parents.map(result)
 	})
-	s.resolve(\'Query\', \'${root}Count\', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+	s.resolve(\'Query\', \'${root}Count\', fn [g] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		n := g.with_ctx(ctx).${info.table.name}().graphql_where(info.args)!.count()!
 		return parents.map(graphql.Resolved(graphql.Value(n)))
 	})')
@@ -170,7 +170,7 @@ fn write_resolvers(mut b strings.Builder, info Info, infos map[string]Info) ! {
 		rows := 'parents.map((it as ${info.node()}).${info.field()})'
 		tp := target.prefix()
 		if is_list_edge(e) && target.relay() {
-			b.writeln('	s.resolve(\'${t}\', \'${camel(e.name)}\', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+			b.writeln('	s.resolve(\'${t}\', \'${camel(e.name)}\', fn [g, sizes] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
 		p := graphql.page_args(info.args, sizes[\'${target.table.name}\'])!
 		orders := ${tp}_order(info.arg(\'orderBy\'), true)!
@@ -195,7 +195,7 @@ fn write_resolvers(mut b strings.Builder, info Info, infos map[string]Info) ! {
 		return out
 	})')
 		} else if is_list_edge(e) {
-			b.writeln('	s.resolve(\'${t}\', \'${camel(e.name)}\', fn [g, sizes] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+			b.writeln('	s.resolve(\'${t}\', \'${camel(e.name)}\', fn [g, sizes] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		cg := g.with_ctx(ctx)
 		sub := cg.${target.table.name}().graphql_args(info.args, sizes[\'${target.table.name}\'])!
 		loaded := cg.${info.table.name}().with_${e.name}(fn [sub] (_ ${target.query()}) ${target.query()} {
@@ -208,7 +208,7 @@ fn write_resolvers(mut b strings.Builder, info Info, infos map[string]Info) ! {
 		return out
 	})')
 		} else {
-			b.writeln('	s.resolve(\'${t}\', \'${camel(e.name)}\', fn [g] (ctx graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+			b.writeln('	s.resolve(\'${t}\', \'${camel(e.name)}\', fn [g] (ctx context.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		loaded := g.with_ctx(ctx).${info.table.name}().with_${e.name}().nodes(${rows})!
 		return loaded.map(fn (n ${info.node()}) graphql.Resolved {
 			if target := n.${e.name} {
@@ -225,7 +225,7 @@ fn write_resolvers(mut b strings.Builder, info Info, infos map[string]Info) ! {
 	}
 	one, _ := key_parser(info)!
 	if 'create' in ms {
-		b.writeln('	s.resolve(\'Mutation\', \'create${t}\', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		b.writeln('	s.resolve(\'Mutation\', \'create${t}\', fn [g] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		input := ${p}_create_input(info.arg(\'input\'))!
 		node := g.with_ctx(ctx).${info.table.name}().create().set_input(input).save()!
 		result := graphql.obj(node)
@@ -233,7 +233,7 @@ fn write_resolvers(mut b strings.Builder, info Info, infos map[string]Info) ! {
 	})')
 	}
 	if 'update' in ms {
-		b.writeln('	s.resolve(\'Mutation\', \'update${t}\', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		b.writeln('	s.resolve(\'Mutation\', \'update${t}\', fn [g] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		id := ${one}(info.arg(\'id\'))!
 		input := ${p}_update_input(info.arg(\'input\'))!
 		node := g.with_ctx(ctx).${info.table.name}().update_one_id(id).set_input(input).save()!
@@ -242,7 +242,7 @@ fn write_resolvers(mut b strings.Builder, info Info, infos map[string]Info) ! {
 	})')
 	}
 	if 'delete' in ms {
-		b.writeln('	s.resolve(\'Mutation\', \'delete${t}\', fn [g] (ctx graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+		b.writeln('	s.resolve(\'Mutation\', \'delete${t}\', fn [g] (ctx context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 		id := ${one}(info.arg(\'id\'))!
 		g.with_ctx(ctx).${info.table.name}().delete_one_id(id).exec()!
 		result := graphql.Resolved(graphql.Value(id.str()))
@@ -320,7 +320,7 @@ fn write_gql_fields(mut b strings.Builder, info Info) {
 	}
 	b.writeln('
 // resolve_${p}_field resolves the columns of `${t}`.
-fn resolve_${p}_field(_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+fn resolve_${p}_field(_ context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 	return parents.map(graphql.Resolved(${p}_value((it as ${info.node()}).${info.field()}, info.field_name)))
 }
 

@@ -18,3 +18,7 @@ g.articles().with_author().all()!
 Events carry no values: no parameters, and no error messages, which can quote
 them. The tests of the examples count statements this way, to check that a
 request runs the same ones however many rows it reads.
+
+Each event also carries `ctx`, the context of the client that ran the statement
+(`g.with_ctx(ctx)`, or the request's, through the GraphQL server), so a tracer
+can tell which request a statement belongs to, by the values the app put in it.

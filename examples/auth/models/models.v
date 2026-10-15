@@ -1,13 +1,13 @@
 // Package models holds the example's users and posts, with the rules of who
 // may read and write what: privacy policies decide whether an operation runs
 // at all, and hooks change a write by who makes it. Each gets the request's
-// viewer (`auth.Viewer`) as its context.
+// viewer (`auth.viewer_of`), from its context.
 module models
 
+import context
 import orm
 import time
 import five07.vgraph
-import five07.vgraph.graphql
 import five07.vgraph.load
 import auth
 
@@ -83,7 +83,7 @@ const hash_password = vgraph.Hook{
 	name: 'hash_password'
 	on:   [.create, .update_one, .update]
 	run:  fn (next vgraph.Mutate) vgraph.Mutate {
-		return fn [next] (ctx graphql.Context, mut m vgraph.Mutation) ! {
+		return fn [next] (ctx context.Context, mut m vgraph.Mutation) ! {
 			if value := m.field_value('password') {
 				password := if value is string { value } else { '' }
 				if password.len < 8 {
@@ -105,7 +105,7 @@ const hash_password = vgraph.Hook{
 const admin_only = vgraph.Hook{
 	name: 'admin_only'
 	run:  fn (next vgraph.Mutate) vgraph.Mutate {
-		return fn [next] (ctx graphql.Context, mut m vgraph.Mutation) ! {
+		return fn [next] (ctx context.Context, mut m vgraph.Mutation) ! {
 			if value := m.field_value('admin') {
 				granting := value is bool && value
 				if (granting || m.operation() != .create) && !auth.viewer_of(ctx).admin {
@@ -129,7 +129,7 @@ pub fn (u User) policy() vgraph.Policy {
 	}
 }
 
-fn user_writes(ctx graphql.Context, m vgraph.Mutation) !vgraph.Decision {
+fn user_writes(ctx context.Context, m vgraph.Mutation) !vgraph.Decision {
 	viewer := auth.viewer_of(ctx)
 	return match m.operation() {
 		.create { .allow }
@@ -201,7 +201,7 @@ const set_author = vgraph.Hook{
 	name: 'set_author'
 	on:   [.create]
 	run:  fn (next vgraph.Mutate) vgraph.Mutate {
-		return fn [next] (ctx graphql.Context, mut m vgraph.Mutation) ! {
+		return fn [next] (ctx context.Context, mut m vgraph.Mutation) ! {
 			viewer := auth.viewer_of(ctx)
 			value := m.field_value('author_id') or { orm.Primitive(i64(0)) }
 			author := if value is i64 { value } else { i64(0) }
@@ -229,7 +229,7 @@ pub fn (p Post) policy() vgraph.Policy {
 	}
 }
 
-fn visible_posts(ctx graphql.Context, _ string, mut q load.Query) !vgraph.Decision {
+fn visible_posts(ctx context.Context, _ string, mut q load.Query) !vgraph.Decision {
 	viewer := auth.viewer_of(ctx)
 	if viewer.admin {
 		return .allow
@@ -243,11 +243,11 @@ fn visible_posts(ctx graphql.Context, _ string, mut q load.Query) !vgraph.Decisi
 }
 
 // allow_admin lets an admin make any write.
-fn allow_admin(ctx graphql.Context, _ vgraph.Mutation) !vgraph.Decision {
+fn allow_admin(ctx context.Context, _ vgraph.Mutation) !vgraph.Decision {
 	return if auth.viewer_of(ctx).admin { .allow } else { .skip }
 }
 
-fn deny_anonymous(ctx graphql.Context, _ vgraph.Mutation) !vgraph.Decision {
+fn deny_anonymous(ctx context.Context, _ vgraph.Mutation) !vgraph.Decision {
 	return if auth.viewer_of(ctx).anonymous() { .deny } else { .skip }
 }
 

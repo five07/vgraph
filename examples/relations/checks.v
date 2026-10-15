@@ -3,6 +3,7 @@ module main
 // The checks for each Ent relationship kind, run on SQLite by `main_test.v` and
 // on PostgreSQL by `pg_test.v`, through the client `vgraph gen` wrote into
 // `graph/`.
+import context
 import orm
 import v.migrations
 import five07.vgraph
@@ -467,14 +468,14 @@ fn check_uuid_keys(f Fixture) ! {
 fn gql(f Fixture, query string) !string {
 	return f.server.execute(graphql.Request{
 		query: query
-	}, unsafe { nil }).json()
+	}, context.background()).json()
 }
 
 // gqlt runs a GraphQL query on the server of the traced driver.
 fn gqlt(f Fixture, query string) !string {
 	return f.tserver.execute(graphql.Request{
 		query: query
-	}, unsafe { nil }).json()
+	}, context.background()).json()
 }
 
 // GraphQL: every relationship kind, one select per edge per level, and the
@@ -582,7 +583,7 @@ fn check_writes(f Fixture) ! {
 	} else {
 		assert err is vgraph.PrivacyError
 	}
-	w.with_ctx(models.Admin{}).groups().delete_one_id(1).exec()!
+	w.with_ctx(models.as_admin()).groups().delete_one_id(1).exec()!
 	assert w.users().where_id_in([1, 3]).with_groups().order_by_id().all()!.map(it.groups.map(it.group.name)) == [
 		[]string{},
 		['devs'],
@@ -1003,7 +1004,7 @@ fn check_schema(f Fixture) ! {
 fn run(s &graphql.Server, query string) !graphql.Value {
 	r := s.execute(graphql.Request{
 		query: query
-	}, unsafe { nil })
+	}, context.background())
 	if r.errors.len > 0 {
 		return error(r.errors.map(it.message).join('\n'))
 	}
@@ -1272,18 +1273,18 @@ fn check_mutations(f Fixture) ! {
 		// context, inside the transaction too
 		denied := s.execute(graphql.Request{
 			query: 'mutation { a: createGroup(input: {name: "ops-${i}"}) { id } b: deleteGroup(id: "2") }'
-		}, unsafe { nil })
+		}, context.background())
 		assert denied.errors.len == 1 && denied.errors[0].path == [graphql.PathItem('b')]
 		// so the request rolled back, the group it created with it
 		assert at(run(s, '{ groupsCount(where: {name: "ops-${i}"}) }')!, 'groupsCount') == graphql.Value(0)
 		allowed := s.execute(graphql.Request{
 			query: 'mutation { a: createGroup(input: {name: "ops-${i}"}) { id } }'
-		}, models.Admin{})
+		}, models.as_admin())
 		assert allowed.errors.len == 0
 		gr := at(allowed.data or { graphql.null }, 'a', 'id').as_string()
 		admin := s.execute(graphql.Request{
 			query: 'mutation { deleteGroup(id: "${gr}") }'
-		}, models.Admin{})
+		}, models.as_admin())
 		assert admin.errors.len == 0
 		// a soft delete: the pet's row stays, hidden
 		pet := at(run(s, 'mutation { createPet(input: {name: "kit-${i}"}) { id } }')!, 'createPet',

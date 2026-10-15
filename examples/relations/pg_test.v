@@ -4,6 +4,7 @@ module main
 // Every Ent relationship kind on PostgreSQL. The checks are in `checks.v`. It
 // runs only with `-d vgraph_pg`, and reads `PGHOST`, `PGPORT`, `PGUSER`,
 // `PGPASSWORD` and `PGDATABASE`. It drops and recreates the tables it uses.
+import context
 import db.pg
 import five07.vgraph.pg as vpg
 import os
@@ -133,7 +134,7 @@ fn test_graphql_transaction_on_a_pool() {
 	// one's group is gone with it
 	denied := s.execute(graphql.Request{
 		query: 'mutation { a: createGroup(input: {name: "ops"}) { id } b: createUser(input: {name: "gil", groupIDs: ["1"]}) { id } c: deleteGroup(id: "2") }'
-	}, unsafe { nil })
+	}, context.background())
 	assert denied.errors.map(it.message) == ['privacy: delete_one of `groups` denied']
 	assert g.groups().where_name('ops').count()! == 0
 	assert g.users().where_name('gil').count()! == 0
@@ -141,7 +142,7 @@ fn test_graphql_transaction_on_a_pool() {
 	// as an admin, all three, committed together
 	allowed := s.execute(graphql.Request{
 		query: 'mutation { a: createGroup(input: {name: "ops"}) { id } b: createUser(input: {name: "gil", groupIDs: ["1"]}) { groups { name } } c: deleteGroup(id: "2") }'
-	}, models.Admin{})
+	}, models.as_admin())
 	assert allowed.errors.len == 0
 	assert g.groups().order_by_id().all()!.map(it.group.name) == ['admins', 'ops']
 	assert g.users().where_name('gil').with_groups().only()!.groups.map(it.group.name) == ['admins']

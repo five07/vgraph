@@ -97,9 +97,9 @@ fn graph_file(out_module string, entities []Entity) string {
 	mut b := strings.new_builder(2048)
 	b.writeln(header)
 	b.writeln('module ${out_module}\n')
+	b.writeln('import context')
 	b.writeln('import orm')
 	b.writeln('import five07.vgraph')
-	b.writeln('import five07.vgraph.graphql')
 	b.writeln('import five07.vgraph.load')
 	for path in imports_of(entities) {
 		b.writeln('import ${import_line(path)}')
@@ -131,17 +131,17 @@ pub fn schema() !vgraph.Schema {
 	b.writeln('	return s
 }
 
-// with_ctx returns a graph whose queries and writes carry `ctx`, a value the
-// app defines, such as its user, to hooks and privacy rules. The GraphQL server
-// passes each request\'s context on.
-pub fn (g Graph) with_ctx(ctx graphql.Context) Graph {
+// with_ctx returns a graph whose queries and writes carry `ctx` to hooks and
+// privacy rules, with the app\'s own values in it, such as its user
+// (`context.with_value`). The GraphQL server passes each request\'s context on.
+pub fn (g Graph) with_ctx(ctx context.Context) Graph {
 	return Graph{
 		client: g.client.with_ctx(ctx)
 	}
 }
 
-// ctx returns the value `with_ctx` gave, or a `vgraph.NoContext`.
-pub fn (g Graph) ctx() graphql.Context {
+// ctx returns the context `with_ctx` gave, or `context.background()`.
+pub fn (g Graph) ctx() context.Context {
 	return g.client.ctx
 }
 

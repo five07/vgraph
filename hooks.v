@@ -1,6 +1,6 @@
 module vgraph
 
-import graphql
+import context
 import load
 
 // Hooks, interceptors and privacy. A model declares them in `hooks()`,
@@ -9,7 +9,7 @@ import load
 // that `with_ctx` gave.
 
 // Mutate runs a write, or the rest of the hooks before it.
-pub type Mutate = fn (ctx graphql.Context, mut m Mutation) !
+pub type Mutate = fn (ctx context.Context, mut m Mutation) !
 
 // Hook wraps the writes of a table: it can change the mutation before `next`,
 // check it after, or return an error, which stops the write and rolls back its
@@ -21,7 +21,7 @@ pub:
 	// on: the operations the hook runs for; all of them when empty.
 	on []Op
 	// cond: the hook runs only when it returns true.
-	cond ?fn (ctx graphql.Context, m Mutation) bool
+	cond ?fn (ctx context.Context, m Mutation) bool
 	run  fn (next Mutate) Mutate @[required]
 }
 
@@ -35,11 +35,11 @@ pub fn on(h Hook, ops ...Op) Hook {
 
 // only_if returns `h`, run only when `cond` returns true, and its own condition
 // holds.
-pub fn only_if(h Hook, cond fn (ctx graphql.Context, m Mutation) bool) Hook {
+pub fn only_if(h Hook, cond fn (ctx context.Context, m Mutation) bool) Hook {
 	inner := h.cond
 	return Hook{
 		...h
-		cond: fn [inner, cond] (ctx graphql.Context, m Mutation) bool {
+		cond: fn [inner, cond] (ctx context.Context, m Mutation) bool {
 			if c := inner {
 				if !c(ctx, m) {
 					return false
@@ -52,8 +52,8 @@ pub fn only_if(h Hook, cond fn (ctx graphql.Context, m Mutation) bool) Hook {
 
 // unless returns `h`, run only when `cond` returns false, and its own condition
 // holds.
-pub fn unless(h Hook, cond fn (ctx graphql.Context, m Mutation) bool) Hook {
-	return only_if(h, fn [cond] (ctx graphql.Context, m Mutation) bool {
+pub fn unless(h Hook, cond fn (ctx context.Context, m Mutation) bool) Hook {
+	return only_if(h, fn [cond] (ctx context.Context, m Mutation) bool {
 		return !cond(ctx, m)
 	})
 }
@@ -61,7 +61,7 @@ pub fn unless(h Hook, cond fn (ctx graphql.Context, m Mutation) bool) Hook {
 // wrap returns `next` behind `h`, which decides on each write whether it runs.
 fn (h Hook) wrap(next Mutate) Mutate {
 	run := h.run(next)
-	return fn [h, run, next] (ctx graphql.Context, mut m Mutation) ! {
+	return fn [h, run, next] (ctx context.Context, mut m Mutation) ! {
 		mut applies := h.on.len == 0 || m.operation() in h.on
 		if applies {
 			if c := h.cond {
@@ -78,7 +78,7 @@ fn (h Hook) wrap(next Mutate) Mutate {
 
 // Intercept changes a query of `table` before it runs, or returns an error,
 // which fails it.
-pub type Intercept = fn (ctx graphql.Context, table string, mut q load.Query) !
+pub type Intercept = fn (ctx context.Context, table string, mut q load.Query) !
 
 // Interceptor runs before every select of its table: root queries, counts, edge
 // loads and traversals.
@@ -101,10 +101,10 @@ pub enum Decision {
 
 // QueryRule decides on a query of `table`. It may narrow `q` and skip, as a
 // filter.
-pub type QueryRule = fn (ctx graphql.Context, table string, mut q load.Query) !Decision
+pub type QueryRule = fn (ctx context.Context, table string, mut q load.Query) !Decision
 
 // MutationRule decides on a write.
-pub type MutationRule = fn (ctx graphql.Context, m Mutation) !Decision
+pub type MutationRule = fn (ctx context.Context, m Mutation) !Decision
 
 // Policy is the privacy rules of queries and writes. Rules run in order, and the
 // first that allows or denies decides; when they all skip, the operation runs,
@@ -128,22 +128,22 @@ pub fn (p Policy) merged(other Policy) Policy {
 }
 
 // always_allow allows any write.
-pub fn always_allow(_ graphql.Context, _ Mutation) !Decision {
+pub fn always_allow(_ context.Context, _ Mutation) !Decision {
 	return .allow
 }
 
 // always_deny denies any write.
-pub fn always_deny(_ graphql.Context, _ Mutation) !Decision {
+pub fn always_deny(_ context.Context, _ Mutation) !Decision {
 	return .deny
 }
 
 // always_allow_query allows any query.
-pub fn always_allow_query(_ graphql.Context, _ string, mut _ load.Query) !Decision {
+pub fn always_allow_query(_ context.Context, _ string, mut _ load.Query) !Decision {
 	return .allow
 }
 
 // always_deny_query denies any query.
-pub fn always_deny_query(_ graphql.Context, _ string, mut _ load.Query) !Decision {
+pub fn always_deny_query(_ context.Context, _ string, mut _ load.Query) !Decision {
 	return .deny
 }
 
@@ -371,7 +371,7 @@ fn privacy_hook(table string, rules []MutationRule) Hook {
 	return Hook{
 		name: 'privacy'
 		run:  fn [table, rules] (next Mutate) Mutate {
-			return fn [table, rules, next] (ctx graphql.Context, mut m Mutation) ! {
+			return fn [table, rules, next] (ctx context.Context, mut m Mutation) ! {
 				decide: for rule in rules {
 					match rule(ctx, m)! {
 						.allow { break decide }
@@ -397,7 +397,7 @@ fn privacy_hook(table string, rules []MutationRule) Hook {
 pub fn soft_delete_query(column string) Interceptor {
 	return Interceptor{
 		name: 'soft_delete'
-		run:  fn [column] (_ graphql.Context, _ string, mut q load.Query) ! {
+		run:  fn [column] (_ context.Context, _ string, mut q load.Query) ! {
 			q.conds << load.is_null(column)
 		}
 	}
@@ -411,7 +411,7 @@ pub fn soft_delete_hook(column string) Hook {
 		name: 'soft_delete'
 		on:   [.update_one, .update, .delete_one, .delete]
 		run:  fn [column] (next Mutate) Mutate {
-			return fn [column, next] (ctx graphql.Context, mut m Mutation) ! {
+			return fn [column, next] (ctx context.Context, mut m Mutation) ! {
 				m.where(load.is_null(column))
 				match m.operation() {
 					.delete_one {

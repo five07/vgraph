@@ -3,7 +3,7 @@ module main
 // The hooks that read other tables through the generated graph, which the
 // models can't import: they are registered on the graph at startup.
 
-import five07.vgraph.graphql
+import context
 import graph
 
 // register_comment_checks adds to `g` the hook that checks a new reply: its
@@ -11,7 +11,7 @@ import graph
 // exists, isn't deleted, and is of the type `owner_type` names.
 fn register_comment_checks(g graph.Graph) {
 	g.comments().use(fn [g] (next graph.CommentMutate) graph.CommentMutate {
-		return fn [g, next] (ctx graphql.Context, mut m graph.CommentMutation) ! {
+		return fn [g, next] (ctx context.Context, mut m graph.CommentMutation) ! {
 			if m.operation() == .create {
 				check_parent(g.with_ctx(ctx), m)!
 			}

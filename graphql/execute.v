@@ -1,14 +1,12 @@
 module graphql
 
+import context
+
 // Source is an object being resolved: the root value, or whatever a resolver
 // returned for an object field. Any V value can be one; resolvers smartcast it
 // back (`if p is ArticleNode { ... }`). A `map[string]Value` resolves its
 // fields by key when no resolver is registered.
 pub interface Source {}
-
-// Context is passed unchanged to every resolver of a request: the app's own
-// per-request data, such as the signed-in user, usually as a reference.
-pub interface Context {}
 
 // Resolved is a resolver's result for one parent: a `Value` for a leaf (or a
 // `map[string]Value` object), an `Object` for an object, a list of results, or
@@ -54,7 +52,9 @@ pub fn list(items []Resolved) Resolved {
 
 // Resolver resolves one field for every parent at a level at once: it returns
 // one result per parent, in order. An error fails the field for all of them.
-pub type Resolver = fn (ctx Context, info FieldInfo, parents []Source) ![]Resolved
+// `ctx` is the request's context: the app's own values, such as the signed-in
+// user, ride in it (`context.with_value`), as does its trace.
+pub type Resolver = fn (ctx context.Context, info FieldInfo, parents []Source) ![]Resolved
 
 // TypeResolver names the object type of an interface or union value, for
 // results that are not an `Object` with a `typename`.
@@ -121,12 +121,13 @@ fn selection_has(set SelectionSet, name string, i &FieldInfo) bool {
 // Transaction runs a request's mutations together: `begin` before the first,
 // then `commit`, or `rollback` when any of them failed. `begin` returns the
 // context the mutations' resolvers get, which can carry the transaction, such
-// as its connection; `commit` and `rollback` get it back. A connection that
-// implements `orm.TransactionalConnection` fits through a small adapter.
+// as its connection, as a value (`context.with_value`); `commit` and
+// `rollback` get it back. A connection that implements
+// `orm.TransactionalConnection` fits through a small adapter.
 pub interface Transaction {
-	begin(ctx Context) !Context
-	commit(ctx Context) !
-	rollback(ctx Context) !
+	begin(ctx context.Context) !context.Context
+	commit(ctx context.Context) !
+	rollback(ctx context.Context) !
 }
 
 // Request is a GraphQL request.
@@ -198,8 +199,8 @@ pub fn (mut s Server) resolve(type_name string, field string, resolver Resolver)
 
 // resolve_each registers a resolver of `type_name.field` that resolves one
 // parent at a time.
-pub fn (mut s Server) resolve_each(type_name string, field string, f fn (ctx Context, info FieldInfo, parent Source) !Resolved) {
-	s.resolvers['${type_name}.${field}'] = fn [f] (ctx Context, info FieldInfo, parents []Source) ![]Resolved {
+pub fn (mut s Server) resolve_each(type_name string, field string, f fn (ctx context.Context, info FieldInfo, parent Source) !Resolved) {
+	s.resolvers['${type_name}.${field}'] = fn [f] (ctx context.Context, info FieldInfo, parents []Source) ![]Resolved {
 		mut out := []Resolved{cap: parents.len}
 		for p in parents {
 			out << f(ctx, info, p) or {
@@ -217,8 +218,9 @@ pub fn (mut s Server) scalar(name string, scalar Scalar) {
 	s.schema.scalars[name] = scalar
 }
 
-// execute runs a request: parse, validate, coerce variables, execute.
-pub fn (s &Server) execute(req Request, ctx Context) Response {
+// execute runs a request: parse, validate, coerce variables, execute. Every
+// resolver gets `ctx`, or for a mutation in a transaction, what `begin` made of it.
+pub fn (s &Server) execute(req Request, ctx context.Context) Response {
 	doc := parse(req.query, s.parse_options) or {
 		return request_failed(err)
 	}
@@ -274,7 +276,7 @@ pub fn operation_of(doc &Document, name string) !OperationDefinition {
 }
 
 // execute_document runs an operation of a validated document.
-pub fn (s &Server) execute_document(doc &Document, operation_name string, inputs map[string]Value, ctx Context) Response {
+pub fn (s &Server) execute_document(doc &Document, operation_name string, inputs map[string]Value, ctx context.Context) Response {
 	op := operation_of(doc, operation_name) or { return request_failed(err) }
 	variables := s.schema.coerce_variable_values(doc, op.variable_definitions, inputs) or {
 		return Response{
@@ -570,7 +572,7 @@ struct Execution {
 	variables map[string]Value
 	fragments map[string]FragmentDefinition
 mut:
-	ctx    Context // the transaction's, for a mutation in one
+	ctx    context.Context // the transaction's, for a mutation in one
 	slots  []Slot
 	errors []GraphQLError
 }

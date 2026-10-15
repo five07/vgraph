@@ -1,6 +1,6 @@
 module vgraph
 
-import graphql
+import context
 import load
 import orm
 
@@ -10,9 +10,9 @@ pub struct Client {
 pub:
 	conn   orm.Connection
 	schema Schema
-	// ctx is the app's value for the queries and writes of this client, set
-	// with `with_ctx`.
-	ctx graphql.Context = NoContext{}
+	// ctx is the context of the queries and writes of this client, set with
+	// `with_ctx`: it carries the app's own values to hooks and privacy rules.
+	ctx context.Context = context.background()
 	// in_tx: the client runs inside a transaction (`begin`).
 	in_tx bool
 	// skipped: the names of the hooks and interceptors it leaves out (`skip`)
@@ -34,9 +34,6 @@ mut:
 	rollbacks []fn ()
 }
 
-// NoContext is the context of a client that `with_ctx` hasn't given one.
-pub struct NoContext {}
-
 // Client.new checks `schema`, and returns a client that loads its edges through
 // `conn`. When `conn` is a `Driver`, writes use it.
 pub fn Client.new(conn orm.Connection, schema Schema) !Client {
@@ -48,29 +45,28 @@ pub fn Client.new(conn orm.Connection, schema Schema) !Client {
 	}
 }
 
-// with_ctx returns a client whose queries and writes carry `ctx`, a value the
-// app defines (its user, its request), to hooks and privacy rules. It is a
-// `graphql.Context`, so the GraphQL server passes each request's context on:
-// V can't convert one interface into another, so vgraph and its GraphQL module
-// share the one type.
+// with_ctx returns a client whose queries and writes carry `ctx`, to hooks
+// and privacy rules. The app's own values (its user, its request) ride in it,
+// added with `context.with_value`, and the GraphQL server passes each
+// request's context on.
 //
-// A `TxContext` (a GraphQL request's mutations) gives the client its
-// transaction too: the client then runs in it, and carries the request's own
-// context.
-pub fn (c Client) with_ctx(ctx graphql.Context) Client {
-	if ctx is TxContext {
+// The context of a GraphQL request's mutations carries their transaction
+// (`GraphqlTransaction`): the client then runs in it.
+pub fn (c Client) with_ctx(ctx context.Context) Client {
+	if tx := tx_client(ctx) {
 		return Client{
 			...c
-			conn:    ctx.client.conn
-			ctx:     ctx.ctx
+			conn:    with_trace_ctx(tx.conn, ctx)
+			ctx:     ctx
 			in_tx:   true
 			owns_tx: false
-			txstate: ctx.client.txstate
+			txstate: tx.txstate
 		}
 	}
 	return Client{
 		...c
-		ctx: ctx
+		conn: with_trace_ctx(c.conn, ctx)
+		ctx:  ctx
 	}
 }
 

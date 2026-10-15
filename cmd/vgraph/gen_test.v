@@ -7,15 +7,32 @@ import os
 
 const models = 'module models
 
+import context
 import time
 import five07.vgraph
-import five07.vgraph.graphql
 import five07.vgraph.load
 
-// Viewer is the context of a request.
+// Viewer is who a request runs as, in its context.
 pub struct Viewer {
 pub:
 	banned bool
+}
+
+const viewer_key = \'viewer\'
+
+// as_viewer returns a context that runs as `v`.
+pub fn as_viewer(v Viewer) context.Context {
+	return context.with_value(context.background(), viewer_key, v)
+}
+
+// viewer_of returns the viewer of `ctx`: no one banned when it has none.
+pub fn viewer_of(ctx context.Context) Viewer {
+	if value := ctx.value(viewer_key) {
+		if value is Viewer {
+			return value
+		}
+	}
+	return Viewer{}
 }
 
 @[table: \'users\']
@@ -59,7 +76,7 @@ pub fn (a Article) hooks() []vgraph.Hook {
 	return [
 		vgraph.on(vgraph.Hook{
 			run: fn (next vgraph.Mutate) vgraph.Mutate {
-				return fn [next] (ctx graphql.Context, mut m vgraph.Mutation) ! {
+				return fn [next] (ctx context.Context, mut m vgraph.Mutation) ! {
 					if _ := m.field_value(\'title\') {
 					} else {
 						m.set_field_value(\'title\', \'Untitled\')
@@ -88,13 +105,8 @@ pub fn (a Article) fields() []vgraph.Field {
 pub fn (a Article) policy() vgraph.Policy {
 	return vgraph.Policy{
 		query: [
-			fn (ctx graphql.Context, _ string, mut _ load.Query) !vgraph.Decision {
-				if ctx is Viewer {
-					if ctx.banned {
-						return .deny
-					}
-				}
-				return .skip
+			fn (ctx context.Context, _ string, mut _ load.Query) !vgraph.Decision {
+				return if viewer_of(ctx).banned { .deny } else { .skip }
 			},
 		]
 	}
@@ -231,6 +243,7 @@ pub fn (c Comment) edges() []vgraph.Edge {
 
 const project_test = 'module main
 
+import context
 import db.sqlite
 import orm
 import time
@@ -425,7 +438,7 @@ fn test_graphql() {
 	log.tables.clear()
 	res := s.execute(graphql.Request{
 		query: \'{ hello articles(where: {deletedAtIsNil: true}, orderBy: {field: ID}) { title url author { name } tags { name } comments(orderBy: {field: BODY, direction: DESC}) { body replies { body } } } }\'
-	}, unsafe { nil })
+	}, context.background())
 	assert res.json() == \'{"data":{"hello":"hello world","articles":[{"title":"V tips","url":"/articles/1","author":{"name":"ada"},"tags":[{"name":"v"},{"name":"db"}],"comments":[{"body":"b","replies":[]},{"body":"a","replies":[{"body":"b"}]}]},{"title":"SQL","url":"/articles/2","author":{"name":"bob"},"tags":[{"name":"db"}],"comments":[]}]}}\'
 	// one select per edge per level
 	assert log.tables == [\'articles\', \'users\', \'article_tags\', \'tags\', \'comments\', \'comments\']
@@ -434,7 +447,7 @@ fn test_graphql() {
 	assert !graph.schema_sdl.contains(\'Audit\')
 	failed := s.execute(graphql.Request{
 		query: \'mutation { touch(id: "1") { title } }\'
-	}, unsafe { nil })
+	}, context.background())
 	assert failed.errors.map(it.message) == [\'not now\']
 }
 
@@ -473,19 +486,19 @@ fn test_graphql_options() {
 	s := g.graphql(graph.Resolvers{})!
 	labels := s.execute(graphql.Request{
 		query: "{ labels(orderBy: {field: NAME}) { __typename name } }"
-	}, unsafe { nil })
+	}, context.background())
 	assert labels.json() == "{\\"data\\":{\\"labels\\":[{\\"__typename\\":\\"Label\\",\\"name\\":\\"db\\"},{\\"__typename\\":\\"Label\\",\\"name\\":\\"v\\"}]}}"
 	no_title := s.execute(graphql.Request{
 		query: "mutation { updateArticle(id: \\"1\\", input: {title: \\"x\\"}) { id } }"
-	}, unsafe { nil })
+	}, context.background())
 	assert no_title.errors.map(it.message) == ["Field \\"title\\" is not defined by type \\"UpdateArticleInput\\"."]
 	bad := s.execute(graphql.Request{
 		query: "mutation { createComment(input: {ownerType: \\"Nope\\", ownerID: \\"1\\", body: \\"x\\"}) { id } }"
-	}, unsafe { nil })
+	}, context.background())
 	assert bad.errors.map(it.message) == ["`ownerType` is one of Article"]
 	made := s.execute(graphql.Request{
 		query: "mutation { createComment(input: {ownerType: \\"Article\\", ownerID: \\"2\\", body: \\"x\\", parentID: \\"1\\"}) { body article { title } parent { body } } }"
-	}, unsafe { nil })
+	}, context.background())
 	assert made.json() == "{\\"data\\":{\\"createComment\\":{\\"body\\":\\"x\\",\\"article\\":{\\"title\\":\\"SQL\\"},\\"parent\\":{\\"body\\":\\"a\\"}}}}"
 	// the client\'s input, as the resolvers use it
 	art := g.articles().create().set_input(graph.CreateArticleInput{
@@ -503,7 +516,7 @@ fn test_hooks_and_privacy() {
 	mut old := []string{}
 	log := &old
 	g.articles().use(fn [log] (next graph.ArticleMutate) graph.ArticleMutate {
-		return fn [log, next] (ctx graphql.Context, mut m graph.ArticleMutation) ! {
+		return fn [log, next] (ctx context.Context, mut m graph.ArticleMutation) ! {
 			if title := m.title() {
 				m.set_title(title.to_upper())
 			}
@@ -522,7 +535,7 @@ fn test_hooks_and_privacy() {
 	assert old == [\'HI\']
 	assert g.articles().where_id(art.article.id).first()!.article.title == \'AGAIN\'
 	// a typed interceptor narrows every query of users, edge loads included
-	g.users().intercept(fn (_ graphql.Context, q graph.UserQuery) !graph.UserQuery {
+	g.users().intercept(fn (_ context.Context, q graph.UserQuery) !graph.UserQuery {
 		return q.where_name(\'bob\')
 	})
 	assert g.users().all()!.map(it.user.name) == [\'bob\']
@@ -534,13 +547,13 @@ fn test_hooks_and_privacy() {
 	s := g.graphql(graph.Resolvers{})!
 	res := s.execute(graphql.Request{
 		query: \'{ articles { title } users { name } }\'
-	}, models.Viewer{
+	}, models.as_viewer(models.Viewer{
 		banned: true
-	})
+	}))
 	assert res.errors.map(it.message) == [\'privacy: query of `articles` denied\']
 	assert res.json().contains(\'"path":["articles"]\')
-	assert g.with_ctx(models.Viewer{}).articles().count()! == 5
-	if _ := g.with_ctx(models.Viewer{ banned: true }).articles().count() {
+	assert g.with_ctx(models.as_viewer(models.Viewer{})).articles().count()! == 5
+	if _ := g.with_ctx(models.as_viewer(models.Viewer{ banned: true })).articles().count() {
 		assert false
 	} else {
 		assert err is vgraph.PrivacyError
@@ -616,19 +629,20 @@ extend type Mutation {
 
 const resolvers = "module graph
 
+import context
 import five07.vgraph.graphql
 
 pub struct Resolvers {}
 
-pub fn (r Resolvers) query_hello(_ graphql.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+pub fn (r Resolvers) query_hello(_ context.Context, info graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 	return parents.map(graphql.Resolved(graphql.Value('hello ' + info.arg('name').as_string())))
 }
 
-pub fn (r Resolvers) article_url(_ graphql.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
+pub fn (r Resolvers) article_url(_ context.Context, _ graphql.FieldInfo, parents []graphql.Source) ![]graphql.Resolved {
 	return parents.map(graphql.Resolved(graphql.Value('/articles/' + (it as ArticleNode).article.id.str())))
 }
 
-pub fn (r Resolvers) mutation_touch(_ graphql.Context, _ graphql.FieldInfo, _ []graphql.Source) ![]graphql.Resolved {
+pub fn (r Resolvers) mutation_touch(_ context.Context, _ graphql.FieldInfo, _ []graphql.Source) ![]graphql.Resolved {
 	return error('not now')
 }
 "

@@ -4,6 +4,7 @@ module main
 // seed, then on many more rows of every table, and runs the same selects in
 // the same order. An edge whose keys come back empty skips the select of its
 // rows, so each case reaches rows on every edge it loads, on the seed too.
+import context
 import orm
 import rand
 import time
@@ -34,13 +35,13 @@ fn guarded(conn orm.Connection, f Fixture, name string, driver bool) !Setup {
 	g := graph.Graph.new(vgraph.trace(conn, log_to(f.log)))!
 	g.client.intercept_on('pets', vgraph.Interceptor{
 		name: 'carded_owner'
-		run:  fn (_ graphql.Context, _ string, mut q load.Query) ! {
+		run:  fn (_ context.Context, _ string, mut q load.Query) ! {
 			q.conds << graph.pet_has_owner_with(graph.user_has_card())
 		}
 	})
 	g.client.policy_on('users', vgraph.Policy{
 		query: [
-			fn (_ graphql.Context, _ string, mut q load.Query) !vgraph.Decision {
+			fn (_ context.Context, _ string, mut q load.Query) !vgraph.Decision {
 				q.conds << graph.user_has_groups()
 				return .skip
 			},

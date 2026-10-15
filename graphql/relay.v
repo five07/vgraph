@@ -1,5 +1,7 @@
 module graphql
 
+import context
+
 // Relay connections: https://relay.dev/graphql/connections.htm. A resolver
 // returns a `Connection`, and `Server.connection` resolves its fields.
 
@@ -174,19 +176,19 @@ fn string_arg(args map[string]Value, name string) ?string {
 // and its edge type `edge_type`, whose resolvers return `Connection` values,
 // and of `PageInfo`.
 pub fn (mut s Server) connection(connection_type string, edge_type string) {
-	s.resolve(connection_type, 'edges', fn (_ Context, _ FieldInfo, parents []Source) ![]Resolved {
+	s.resolve(connection_type, 'edges', fn (_ context.Context, _ FieldInfo, parents []Source) ![]Resolved {
 		return parents.map(list((it as Connection).edges.map(obj(it))))
 	})
-	s.resolve(connection_type, 'pageInfo', fn (_ Context, _ FieldInfo, parents []Source) ![]Resolved {
+	s.resolve(connection_type, 'pageInfo', fn (_ context.Context, _ FieldInfo, parents []Source) ![]Resolved {
 		return parents.map(Resolved(page_info_value((it as Connection).page_info)))
 	})
-	s.resolve(connection_type, 'totalCount', fn (_ Context, _ FieldInfo, parents []Source) ![]Resolved {
+	s.resolve(connection_type, 'totalCount', fn (_ context.Context, _ FieldInfo, parents []Source) ![]Resolved {
 		return parents.map(Resolved(Value((it as Connection).total_count)))
 	})
-	s.resolve(edge_type, 'node', fn (_ Context, _ FieldInfo, parents []Source) ![]Resolved {
+	s.resolve(edge_type, 'node', fn (_ context.Context, _ FieldInfo, parents []Source) ![]Resolved {
 		return parents.map(obj((it as ConnectionEdge).node))
 	})
-	s.resolve(edge_type, 'cursor', fn (_ Context, _ FieldInfo, parents []Source) ![]Resolved {
+	s.resolve(edge_type, 'cursor', fn (_ context.Context, _ FieldInfo, parents []Source) ![]Resolved {
 		return parents.map(Resolved(Value((it as ConnectionEdge).cursor)))
 	})
 }

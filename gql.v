@@ -1,5 +1,6 @@
 module vgraph
 
+import context
 import graphql
 import orm
 
@@ -93,16 +94,6 @@ pub interface Graphql {
 	graphql() GraphqlTable
 }
 
-// TxContext is the context of a GraphQL request's mutations in a
-// transaction: the request's own context, and the client in the transaction.
-// A client's `with_ctx` takes it apart, so the generated resolvers run in the
-// transaction, and hooks and privacy rules see the request's context.
-pub struct TxContext {
-pub:
-	ctx    graphql.Context
-	client Client
-}
-
 // GraphqlTransaction runs a GraphQL request's mutations in one transaction of
 // `client`, as entgql's `Transactioner` does. The generated server sets it
 // when the client can begin a transaction.
@@ -111,26 +102,42 @@ pub:
 	client Client
 }
 
-// begin starts the transaction, and returns the context the mutations run
-// with: a `TxContext`.
-pub fn (t GraphqlTransaction) begin(ctx graphql.Context) !graphql.Context {
-	return TxContext{
-		ctx:    ctx
-		client: t.client.with_ctx(ctx).begin()!
+// tx_key_cell exists for its address, which is the context key of a GraphQL
+// request's transaction: no other module can make the same key.
+const tx_key_cell = u8(1)
+
+fn tx_key() context.Key {
+	return voidptr(&tx_key_cell)
+}
+
+// tx_client returns the client in the transaction that `ctx` carries, if any.
+fn tx_client(ctx context.Context) ?Client {
+	if value := ctx.value(tx_key()) {
+		if value is Client {
+			return value
+		}
 	}
+	return none
+}
+
+// begin starts the transaction, and returns the context the mutations run
+// with: the request's, carrying the client in the transaction, which a
+// client's `with_ctx` joins.
+pub fn (t GraphqlTransaction) begin(ctx context.Context) !context.Context {
+	return context.with_value(ctx, tx_key(), t.client.with_ctx(ctx).begin()!)
 }
 
 // commit commits the transaction `begin` started.
-pub fn (t GraphqlTransaction) commit(ctx graphql.Context) ! {
-	if ctx is TxContext {
-		ctx.client.commit()!
+pub fn (t GraphqlTransaction) commit(ctx context.Context) ! {
+	if c := tx_client(ctx) {
+		c.commit()!
 	}
 }
 
 // rollback rolls back the transaction `begin` started.
-pub fn (t GraphqlTransaction) rollback(ctx graphql.Context) ! {
-	if ctx is TxContext {
-		ctx.client.rollback()!
+pub fn (t GraphqlTransaction) rollback(ctx context.Context) ! {
+	if c := tx_client(ctx) {
+		c.rollback()!
 	}
 }
 

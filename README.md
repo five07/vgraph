@@ -96,7 +96,7 @@ and serve it over GraphQL:
 server := g.graphql(graph.Resolvers{ g: g }, default_page: 20, max_page: 100)!
 res := server.execute(graphql.Request{
 	query: '{ articles(first: 2, orderBy: {field: VIEWS, direction: DESC}) { edges { node { title author { name } } } } }'
-}, Viewer{ id: 1 }) // the request's context, which hooks and privacy rules get
+}, as_viewer(Viewer{ id: 1 })) // the request's context: hooks and privacy rules get it
 println(res.json())
 ```
 

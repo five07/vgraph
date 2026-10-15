@@ -304,7 +304,7 @@ fn mutation_file(out_module string, info Info, infos map[string]Info) !string {
 	mut b := strings.new_builder(16384)
 	b.writeln(header)
 	b.writeln('module ${out_module}\n')
-	mut imports := ['orm', 'five07.vgraph', 'five07.vgraph.graphql', 'five07.vgraph.load']
+	mut imports := ['context', 'orm', 'five07.vgraph', 'five07.vgraph.load']
 	if t.columns.any(it.json_type != '') {
 		imports << 'json2'
 	}
@@ -329,7 +329,7 @@ pub mut:
 }
 
 // ${info.entity.struct_name}Mutate runs a write to `${t.name}`, or the rest of its hooks.
-pub type ${info.entity.struct_name}Mutate = fn (ctx graphql.Context, mut m ${mt}) !
+pub type ${info.entity.struct_name}Mutate = fn (ctx context.Context, mut m ${mt}) !
 
 // ${info.entity.struct_name}Hook wraps the writes to `${t.name}`, as a `vgraph.Hook` does.
 pub type ${info.entity.struct_name}Hook = fn (next ${info.entity.struct_name}Mutate) ${info.entity.struct_name}Mutate
@@ -339,10 +339,10 @@ pub fn (q ${q}) use(hooks ...${info.entity.struct_name}Hook) {
 	for h in hooks {
 		q.graph.client.use_on(\'${t.name}\', vgraph.Hook{
 			run: fn [h] (next vgraph.Mutate) vgraph.Mutate {
-				typed := h(fn [next] (ctx graphql.Context, mut m ${mt}) ! {
+				typed := h(fn [next] (ctx context.Context, mut m ${mt}) ! {
 					next(ctx, mut m.inner)!
 				})
-				return fn [typed] (ctx graphql.Context, mut m vgraph.Mutation) ! {
+				return fn [typed] (ctx context.Context, mut m vgraph.Mutation) ! {
 					mut tm := ${mt}{
 						inner: m
 					}
@@ -361,11 +361,11 @@ pub fn (q ${q}) use_hook(hooks ...vgraph.Hook) {
 
 // intercept registers typed interceptors for the queries of `${t.name}`: each
 // gets a query, and returns it, narrowed, or an error.
-pub fn (q ${q}) intercept(interceptors ...fn (ctx graphql.Context, q ${q}) !${q}) {
+pub fn (q ${q}) intercept(interceptors ...fn (ctx context.Context, q ${q}) !${q}) {
 	g := q.graph
 	for f in interceptors {
 		q.graph.client.intercept_on(\'${t.name}\', vgraph.Interceptor{
-			run: fn [f, g] (ctx graphql.Context, _ string, mut query load.Query) ! {
+			run: fn [f, g] (ctx context.Context, _ string, mut query load.Query) ! {
 				next := f(ctx, ${q}{
 					graph: g
 					query: query

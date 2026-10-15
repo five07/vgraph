@@ -1,6 +1,6 @@
 module vgraph
 
-import graphql
+import context
 import load
 import orm
 import time
@@ -126,7 +126,7 @@ fn (c Client) run(t Table, hooks []Hook, m MutationData, op Op) !&MutationData {
 		client: c
 	}
 	apply_defaults(t, c.schema.options(t.name), mut data)
-	mut chain := Mutate(fn [c, t, mut data] (_ graphql.Context, mut _ Mutation) ! {
+	mut chain := Mutate(fn [c, t, mut data] (_ context.Context, mut _ Mutation) ! {
 		c.write(t, mut data)!
 	})
 	for i := hooks.len - 1; i >= 0; i-- {

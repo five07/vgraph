@@ -2,8 +2,8 @@
 // Each edge is one of the Ent relationship kinds; see the README.
 module models
 
+import context
 import five07.vgraph
-import five07.vgraph.graphql
 import time
 
 // User is in nearly every kind of relationship.
@@ -178,18 +178,33 @@ pub:
 	name string
 }
 
-// Admin is the context of a request by an administrator.
+// Admin marks a request by an administrator, as a value in its context.
 pub struct Admin {}
+
+const admin_key = 'admin'
+
+// as_admin returns a context for a request by an administrator.
+pub fn as_admin() context.Context {
+	return context.with_value(context.background(), admin_key, Admin{})
+}
+
+// is_admin reports whether `ctx` is an administrator's.
+pub fn is_admin(ctx context.Context) bool {
+	if value := ctx.value(admin_key) {
+		return value is Admin
+	}
+	return false
+}
 
 // policy lets only an admin delete groups.
 pub fn (g Group) policy() vgraph.Policy {
 	return vgraph.Policy{
 		mutation: [
-			fn (ctx graphql.Context, m vgraph.Mutation) !vgraph.Decision {
+			fn (ctx context.Context, m vgraph.Mutation) !vgraph.Decision {
 				if m.operation() !in [.delete, .delete_one] {
 					return .skip
 				}
-				return if ctx is Admin { .allow } else { .deny }
+				return if is_admin(ctx) { .allow } else { .deny }
 			},
 		]
 	}

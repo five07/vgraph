@@ -1,5 +1,6 @@
 module graphql
 
+import context
 import os
 
 const library_sdl = '
@@ -40,28 +41,28 @@ fn library() !&Server {
 	mut s := Server.new(library_sdl)!
 	books := [Book{1, 'Dune', 'SCIFI', 'Herbert'}, Book{2, 'Hobbit', 'FANTASY', 'Tolkien'},
 		Book{3, 'Children of Dune', 'SCIFI', 'Herbert'}]
-	s.resolve('Query', 'books', fn [books] (_ Context, info FieldInfo, parents []Source) ![]Resolved {
+	s.resolve('Query', 'books', fn [books] (_ context.Context, info FieldInfo, parents []Source) ![]Resolved {
 		genre := info.arg('genre')
 		found := books.filter(genre is Null || Value(it.genre) == genre).map(obj(it))
 		return parents.map(list(found))
 	})
-	s.resolve('Query', 'hello', fn (_ Context, info FieldInfo, parents []Source) ![]Resolved {
+	s.resolve('Query', 'hello', fn (_ context.Context, info FieldInfo, parents []Source) ![]Resolved {
 		return parents.map(Resolved(Value('hello ${info.arg('name')}')))
 	})
-	s.resolve('Query', 'broken', fn (_ Context, _ FieldInfo, parents []Source) ![]Resolved {
+	s.resolve('Query', 'broken', fn (_ context.Context, _ FieldInfo, parents []Source) ![]Resolved {
 		return error('it broke')
 	})
-	s.resolve_each('Book', 'id', fn (_ Context, _ FieldInfo, parent Source) !Resolved {
+	s.resolve_each('Book', 'id', fn (_ context.Context, _ FieldInfo, parent Source) !Resolved {
 		return Value((parent as Book).id)
 	})
-	s.resolve_each('Book', 'title', fn (_ Context, _ FieldInfo, parent Source) !Resolved {
+	s.resolve_each('Book', 'title', fn (_ context.Context, _ FieldInfo, parent Source) !Resolved {
 		return Value((parent as Book).title)
 	})
-	s.resolve_each('Book', 'genre', fn (_ Context, _ FieldInfo, parent Source) !Resolved {
+	s.resolve_each('Book', 'genre', fn (_ context.Context, _ FieldInfo, parent Source) !Resolved {
 		return Value((parent as Book).genre)
 	})
 	// one call for every book at a level: the batching the executor promises
-	s.resolve('Book', 'author', fn (_ Context, _ FieldInfo, parents []Source) ![]Resolved {
+	s.resolve('Book', 'author', fn (_ context.Context, _ FieldInfo, parents []Source) ![]Resolved {
 		return parents.map(Resolved(Value({
 			'name': Value((it as Book).author)
 		})))
@@ -84,7 +85,7 @@ fn test_query_with_arguments_aliases_and_fragments() {
 		variables: {
 			'g': Value('SCIFI')
 		}
-	}, unsafe { nil })
+	}, context.background())
 	assert r.errors.len == 0, r.json()
 	assert r.json() == '{"data":{"scifi":[{"id":"1","title":"Dune","genre":"SCIFI"},{"id":"3","title":"Children of Dune","genre":"SCIFI"}],"all":[{"title":"Dune","author":{"name":"Herbert"}},{"title":"Hobbit","author":{"name":"Tolkien"}},{"title":"Children of Dune","author":{"name":"Herbert"}}],"hello":"hello world","other":"hello you","__typename":"Query"}}'
 }
@@ -93,7 +94,7 @@ fn test_errors_null_the_nearest_nullable_field() {
 	mut s := library()!
 	r := s.execute(Request{
 		query: '{ hello broken }'
-	}, unsafe { nil })
+	}, context.background())
 	assert r.json() == '{"errors":[{"message":"it broke","locations":[{"line":1,"column":9}],"path":["broken"]}],"data":null}'
 }
 
@@ -101,16 +102,16 @@ fn test_request_errors() {
 	mut s := library()!
 	assert s.execute(Request{
 		query: '{ nope }'
-	}, unsafe { nil }).json() == '{"errors":[{"message":"Cannot query field \\"nope\\" on type \\"Query\\".","locations":[{"line":1,"column":3}]}]}'
+	}, context.background()).json() == '{"errors":[{"message":"Cannot query field \\"nope\\" on type \\"Query\\".","locations":[{"line":1,"column":3}]}]}'
 	assert s.execute(Request{
 		query: '{'
-	}, unsafe { nil }).json() == '{"errors":[{"message":"Syntax Error: Expected Name, found <EOF>.","locations":[{"line":1,"column":2}]}]}'
+	}, context.background()).json() == '{"errors":[{"message":"Syntax Error: Expected Name, found <EOF>.","locations":[{"line":1,"column":2}]}]}'
 	r := s.execute(Request{
 		query:     'query ($g: Genre) { books(genre: $g) { id } }'
 		variables: {
 			'g': Value('HORROR')
 		}
-	}, unsafe { nil })
+	}, context.background())
 	assert r.request_error
 	assert r.errors[0].message == 'Variable "\$g" got invalid value "HORROR"; Value "HORROR" does not exist in "Genre" enum.'
 }
@@ -119,7 +120,7 @@ fn test_introspection() {
 	mut s := library()!
 	r := s.execute(Request{
 		query: '{ __type(name: "Book") { name kind fields { name type { kind name ofType { name } } } } }'
-	}, unsafe { nil })
+	}, context.background())
 	assert r.errors.len == 0, r.json()
 	assert r.json() == '{"data":{"__type":{"name":"Book","kind":"OBJECT","fields":[{"name":"id","type":{"kind":"NON_NULL","name":null,"ofType":{"name":"ID"}}},{"name":"title","type":{"kind":"NON_NULL","name":null,"ofType":{"name":"String"}}},{"name":"genre","type":{"kind":"ENUM","name":"Genre","ofType":null}},{"name":"author","type":{"kind":"OBJECT","name":"Author","ofType":null}}]}}}'
 }
@@ -133,7 +134,7 @@ fn test_introspection_matches_graphql_js() {
 		mut s := Server.new(m['sdl'] or { null }.as_string())!
 		got := s.execute(Request{
 			query: m['query'] or { null }.as_string()
-		}, unsafe { nil })
+		}, context.background())
 		want := m['result'] or { null }
 		assert got.json() == want.json()
 	}
@@ -172,27 +173,38 @@ mut:
 	calls &Calls
 }
 
-// InTx is the context of a request's mutations in a `MemoryTx`.
+// InTx is the value a `MemoryTx` adds to the context of a request's mutations.
 struct InTx {
 	n int
 }
 
-fn (t MemoryTx) begin(_ Context) !Context {
+const in_tx_key = 'in_tx'
+
+fn in_tx(ctx context.Context) ?InTx {
+	if v := ctx.value(in_tx_key) {
+		if v is InTx {
+			return v
+		}
+	}
+	return none
+}
+
+fn (t MemoryTx) begin(ctx context.Context) !context.Context {
 	mut calls := t.calls
 	calls.log << 'begin'
-	return InTx{
+	return context.with_value(ctx, in_tx_key, InTx{
 		n: calls.log.len
-	}
+	})
 }
 
-fn (t MemoryTx) commit(ctx Context) ! {
+fn (t MemoryTx) commit(ctx context.Context) ! {
 	mut calls := t.calls
-	calls.log << if ctx is InTx { 'commit ${ctx.n}' } else { 'commit' }
+	calls.log << if tx := in_tx(ctx) { 'commit ${tx.n}' } else { 'commit' }
 }
 
-fn (t MemoryTx) rollback(ctx Context) ! {
+fn (t MemoryTx) rollback(ctx context.Context) ! {
 	mut calls := t.calls
-	calls.log << if ctx is InTx { 'rollback ${ctx.n}' } else { 'rollback' }
+	calls.log << if tx := in_tx(ctx) { 'rollback ${tx.n}' } else { 'rollback' }
 }
 
 fn zoo(mut calls Calls) !&Server {
@@ -209,41 +221,41 @@ fn zoo(mut calls Calls) !&Server {
 			'lives':      9
 		}),
 	]
-	s.resolve('Query', 'animals', fn [animals] (_ Context, _ FieldInfo, parents []Source) ![]Resolved {
+	s.resolve('Query', 'animals', fn [animals] (_ context.Context, _ FieldInfo, parents []Source) ![]Resolved {
 		return parents.map(Resolved(Value(animals)))
 	})
-	s.resolve('Query', 'pets', fn [animals] (_ Context, _ FieldInfo, parents []Source) ![]Resolved {
+	s.resolve('Query', 'pets', fn [animals] (_ context.Context, _ FieldInfo, parents []Source) ![]Resolved {
 		// a null item in a nullable list, and an object of no type at all
 		return parents.map(list([Resolved(animals[0]), null, obj(map[string]Value{})]))
 	})
-	s.resolve('Query', 'count', fn (_ Context, _ FieldInfo, parents []Source) ![]Resolved {
+	s.resolve('Query', 'count', fn (_ context.Context, _ FieldInfo, parents []Source) ![]Resolved {
 		return parents.map(Resolved(null))
 	})
-	s.resolve('Query', 'numbers', fn (_ Context, _ FieldInfo, parents []Source) ![]Resolved {
+	s.resolve('Query', 'numbers', fn (_ context.Context, _ FieldInfo, parents []Source) ![]Resolved {
 		return parents.map(Resolved(Value([Value(1), null, Value(3)])))
 	})
-	s.resolve('Query', 'big', fn (_ Context, _ FieldInfo, parents []Source) ![]Resolved {
+	s.resolve('Query', 'big', fn (_ context.Context, _ FieldInfo, parents []Source) ![]Resolved {
 		return parents.map(Resolved(Value(f64(1e10))))
 	})
-	s.resolve('Animal', 'name', fn (_ Context, _ FieldInfo, parents []Source) ![]Resolved {
+	s.resolve('Animal', 'name', fn (_ context.Context, _ FieldInfo, parents []Source) ![]Resolved {
 		return error('never called: fields resolve on object types')
 	})
 	// count the calls per field: each must be called once per level
 	for t in ['Dog', 'Cat'] {
-		s.resolve(t, 'name', fn [mut calls, t] (_ Context, _ FieldInfo, parents []Source) ![]Resolved {
+		s.resolve(t, 'name', fn [mut calls, t] (_ context.Context, _ FieldInfo, parents []Source) ![]Resolved {
 			calls.counts['${t}.name']++
 			return parents.map(Resolved((it as map[string]Value)['name'] or { null }))
 		})
 	}
-	s.resolve('Mutation', 'add', fn [mut calls] (ctx Context, info FieldInfo, parents []Source) ![]Resolved {
+	s.resolve('Mutation', 'add', fn [mut calls] (ctx context.Context, info FieldInfo, parents []Source) ![]Resolved {
 		// the resolvers of a mutation get the transaction's context
-		if ctx !is InTx {
+		if in_tx(ctx) == none {
 			return error('not in the transaction')
 		}
 		calls.names << info.arg('name').as_string()
 		return parents.map(Resolved(Value(calls.names.len)))
 	})
-	s.resolve('Mutation', 'fail', fn (_ Context, _ FieldInfo, parents []Source) ![]Resolved {
+	s.resolve('Mutation', 'fail', fn (_ context.Context, _ FieldInfo, parents []Source) ![]Resolved {
 		return error('no')
 	})
 	s.transaction = MemoryTx{
@@ -257,7 +269,7 @@ fn test_abstract_types_and_batching() {
 	mut s := zoo(mut calls)!
 	r := s.execute(Request{
 		query: '{ animals { __typename name ... on Dog { barks } ... on Cat { lives } } }'
-	}, unsafe { nil })
+	}, context.background())
 	assert r.json() == '{"data":{"animals":[{"__typename":"Dog","name":"rex","barks":true},{"__typename":"Cat","name":"tom","lives":9}]}}'
 	assert calls.counts == {
 		'Dog.name': 1
@@ -270,15 +282,15 @@ fn test_null_propagation_and_paths() {
 	mut s := zoo(mut calls)!
 	r := s.execute(Request{
 		query: '{ numbers pets { ... on Dog { name } } }'
-	}, unsafe { nil })
+	}, context.background())
 	assert r.json() == '{"errors":[{"message":"Cannot return null for non-nullable field Query.numbers.","locations":[{"line":1,"column":3}],"path":["numbers",1]},{"message":"Abstract type \\"Pet\\" must resolve to an Object type at runtime for field \\"Query.pets\\". Either the \\"Pet\\" type should provide a \\"resolveType\\" function or each possible type should provide an \\"isTypeOf\\" function.","locations":[{"line":1,"column":11}],"path":["pets",2]}],"data":{"numbers":null,"pets":[{"name":"rex"},null,null]}}'
 	whole := s.execute(Request{
 		query: '{ count }'
-	}, unsafe { nil })
+	}, context.background())
 	assert whole.json() == '{"errors":[{"message":"Cannot return null for non-nullable field Query.count.","locations":[{"line":1,"column":3}],"path":["count"]}],"data":null}'
 	assert s.execute(Request{
 		query: '{ big }'
-	}, unsafe { nil }).errors[0].message == 'Int cannot represent non 32-bit signed integer value: 10000000000'
+	}, context.background()).errors[0].message == 'Int cannot represent non 32-bit signed integer value: 10000000000'
 }
 
 fn test_skip_include_and_operation_names() {
@@ -293,15 +305,15 @@ fn test_skip_include_and_operation_names() {
 		variables:      {
 			'on': Value(false)
 		}
-	}, unsafe { nil })
+	}, context.background())
 	assert r.json() == '{"data":{"animals":[{"barks":true},{}]}}'
 	assert s.execute(Request{
 		query: query
-	}, unsafe { nil }).errors[0].message == 'Must provide operation name if query contains multiple operations.'
+	}, context.background()).errors[0].message == 'Must provide operation name if query contains multiple operations.'
 	assert s.execute(Request{
 		query:          query
 		operation_name: 'C'
-	}, unsafe { nil }).errors[0].message == 'Unknown operation named "C".'
+	}, context.background()).errors[0].message == 'Unknown operation named "C".'
 }
 
 fn test_mutations_run_in_order_in_a_transaction() {
@@ -309,13 +321,13 @@ fn test_mutations_run_in_order_in_a_transaction() {
 	mut s := zoo(mut calls)!
 	r := s.execute(Request{
 		query: 'mutation { a: add(name: "x") b: add(name: "y") }'
-	}, unsafe { nil })
+	}, context.background())
 	assert r.json() == '{"data":{"a":1,"b":2}}'
 	assert calls.names == ['x', 'y']
 	assert calls.log == ['begin', 'commit 1']
 	failed := s.execute(Request{
 		query: 'mutation { a: add(name: "z") fail }'
-	}, unsafe { nil })
+	}, context.background())
 	assert failed.errors.map(it.message) == ['no']
 	assert calls.log == ['begin', 'commit 1', 'begin', 'rollback 3']
 }
@@ -327,7 +339,7 @@ fn test_http() {
 		method:       'POST'
 		content_type: 'application/json'
 		body:         '{"query": "query (\$n: Boolean!) { __typename @include(if: \$n) }", "variables": {"n": true}}'
-	}, unsafe { nil })
+	}, context.background())
 	assert ok.status == 200
 	assert ok.content_type == 'application/json; charset=utf-8'
 	assert ok.body == '{"data":{"__typename":"Query"}}'
@@ -336,30 +348,30 @@ fn test_http() {
 		content_type: 'application/json'
 		accept:       'application/graphql-response+json'
 		body:         '{"query": "{ nope }"}'
-	}, unsafe { nil })
+	}, context.background())
 	assert invalid.status == 400
 	assert invalid.content_type == 'application/graphql-response+json; charset=utf-8'
 	get := s.handle(HttpRequest{
 		method:       'GET'
 		query_string: 'query=%7B%20__typename%20%7D'
-	}, unsafe { nil })
+	}, context.background())
 	assert get.body == '{"data":{"__typename":"Query"}}'
 	mutation := s.handle(HttpRequest{
 		method:       'GET'
 		query_string: 'query=mutation%20%7B%20fail%20%7D'
-	}, unsafe { nil })
+	}, context.background())
 	assert mutation.status == 405
 	assert mutation.headers['Allow'] == 'POST'
 	assert s.handle(HttpRequest{
 		method:       'POST'
 		content_type: 'text/plain'
 		body:         '{}'
-	}, unsafe { nil }).status == 415
+	}, context.background()).status == 415
 	assert s.handle(HttpRequest{
 		method:       'POST'
 		content_type: 'application/json'
 		body:         '{"query": 1}'
-	}, unsafe { nil }).body == '{"errors":[{"message":"The request must have a \\"query\\" string."}]}'
+	}, context.background()).body == '{"errors":[{"message":"The request must have a \\"query\\" string."}]}'
 	// each malformed request, with its status and message
 	for req, want in {
 		'POST {':            '400 The body is not valid JSON'
@@ -382,19 +394,19 @@ fn test_http() {
 			content_type: 'application/json; charset=utf-8'
 			query_string: if method == 'GET' { 'query=%7B__typename%7D&' + rest } else { '' }
 			body:         body
-		}, unsafe { nil })
+		}, context.background())
 		assert '${res.status} ${res.body}'.starts_with(want.all_before(' ') + ' '), req
 		assert res.body.contains(want.all_after_first(' ')), req
 	}
 	put := s.handle(HttpRequest{
 		method: 'PUT'
-	}, unsafe { nil })
+	}, context.background())
 	assert put.headers['Allow'] == 'GET, POST'
 	// a named operation by GET, with variables
 	named := s.handle(HttpRequest{
 		method:       'GET'
 		query_string: 'query=query%20A(%24n%3A%20Boolean!)%20%7B%20__typename%20%40include(if%3A%20%24n)%20%7D&operationName=A&variables=%7B%22n%22%3Afalse%7D'
-	}, unsafe { nil })
+	}, context.background())
 	assert named.body == '{"data":{}}'
 }
 
@@ -408,7 +420,7 @@ type ItemEdge { node: Item cursor: String! }
 type PageInfo { hasNextPage: Boolean! hasPreviousPage: Boolean! startCursor: String endCursor: String }')!
 	mut asked := []bool{}
 	log := &asked
-	s.resolve('Query', 'items', fn [log] (_ Context, info FieldInfo, parents []Source) ![]Resolved {
+	s.resolve('Query', 'items', fn [log] (_ context.Context, info FieldInfo, parents []Source) ![]Resolved {
 		mut l := unsafe { log }
 		l << info.selected('totalCount')
 		page := page_args(info.args)!
@@ -423,20 +435,20 @@ type PageInfo { hasNextPage: Boolean! hasPreviousPage: Boolean! startCursor: Str
 	s.connection('ItemConnection', 'ItemEdge')
 	r := s.execute(Request{
 		query: '{ items(first: 2) { ...Page edges { cursor node { name } } } } fragment Page on ItemConnection { totalCount pageInfo { hasNextPage hasPreviousPage startCursor endCursor } }'
-	}, unsafe { nil })
+	}, context.background())
 	assert r.json() == '{"data":{"items":{"totalCount":3,"pageInfo":{"hasNextPage":true,"hasPreviousPage":false,"startCursor":"c-a","endCursor":"c-b"},"edges":[{"cursor":"c-a","node":{"name":"a"}},{"cursor":"c-b","node":{"name":"b"}}]}}}'
 	empty := s.execute(Request{
 		query: '{ items(first: 0) { edges { cursor } pageInfo { startCursor endCursor } } }'
-	}, unsafe { nil })
+	}, context.background())
 	assert empty.json() == '{"data":{"items":{"edges":[],"pageInfo":{"startCursor":null,"endCursor":null}}}}'
 	assert asked == [true, false]
 	both := s.execute(Request{
 		query: '{ items(first: 1, last: 1) { totalCount } }'
-	}, unsafe { nil })
+	}, context.background())
 	assert both.errors.map(it.message) == ['Passing both `first` and `last` to paginate a connection is not supported.']
 	below := s.execute(Request{
 		query: '{ items(last: -2) { totalCount } }'
-	}, unsafe { nil })
+	}, context.background())
 	assert below.errors.map(it.message) == ['`last` on a connection cannot be less than zero.']
 }
 
@@ -468,11 +480,11 @@ fn test_depth_and_size_limits() {
 	}
 	ok := s.execute(Request{
 		query: '{ books { author { name } } }'
-	}, unsafe { nil })
+	}, context.background())
 	assert ok.errors.len == 0
 	deep := s.execute(Request{
 		query: 'query Deep { books { author { books { title } } } }'
-	}, unsafe { nil })
+	}, context.background())
 	assert deep.request_error
 	assert deep.errors.map(it.message) == [
 		'Operation "Deep" is nested 4 levels deep, more than the limit of 3.',
@@ -480,21 +492,21 @@ fn test_depth_and_size_limits() {
 	// an inline fragment and a named one add no level of their own
 	via := s.execute(Request{
 		query: '{ books { ... on Book { author { ...A } } } } fragment A on Author { books { id } }'
-	}, unsafe { nil })
+	}, context.background())
 	assert via.errors.map(it.message) == [
 		'Operation is nested 4 levels deep, more than the limit of 3.',
 	]
 	// each spread counts the fragment's fields again
 	wide := s.execute(Request{
 		query: '{ a: books { ...F } b: books { ...F } } fragment F on Book { id title genre }'
-	}, unsafe { nil })
+	}, context.background())
 	assert wide.errors.map(it.message) == [
 		'Operation selects 8 fields, more than the limit of 6.',
 	]
 	// a fragment cycle is counted once, and reported by its own rule
 	cycle := s.execute(Request{
 		query: '{ books { author { ...X } } } fragment X on Author { books { author { ...X } } }'
-	}, unsafe { nil })
+	}, context.background())
 	assert cycle.errors.any(it.message.contains('Cannot spread fragment "X" within itself'))
 }
 
@@ -512,7 +524,7 @@ type Query {
 fn inputs() !&Server {
 	mut s := Server.new(inputs_sdl)!
 	for field in ['find', 'one', 'many'] {
-		s.resolve_each('Query', field, fn (_ Context, info FieldInfo, _ Source) !Resolved {
+		s.resolve_each('Query', field, fn (_ context.Context, info FieldInfo, _ Source) !Resolved {
 			return Value(Value(info.args.clone()).json())
 		})
 	}
@@ -525,7 +537,7 @@ fn run_vars(s &Server, query string, variables map[string]Value) string {
 	r := s.execute(Request{
 		query:     query
 		variables: variables
-	}, unsafe { nil })
+	}, context.background())
 	if r.errors.len > 0 {
 		return r.errors.map(it.message).join('\n')
 	}

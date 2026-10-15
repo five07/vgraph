@@ -1047,6 +1047,7 @@ fn resolvers_file(out_module string, current string, defined string, hand []Hand
 	if current != '' && missing.len == 0 {
 		return ''
 	}
+	stub_imports := ['context', 'five07.vgraph.graphql']
 	mut b := strings.new_builder(4096)
 	if current == '' {
 		b.writeln("// Resolvers resolves the fields that this project's .graphql files add to the")
@@ -1057,7 +1058,9 @@ fn resolvers_file(out_module string, current string, defined string, hand []Hand
 		b.writeln('module ${out_module}')
 		if missing.len > 0 {
 			b.writeln('')
-			b.writeln('import five07.vgraph.graphql')
+			for line in stub_imports {
+				b.writeln('import ${line}')
+			}
 		}
 		if !defined.contains('struct Resolvers') {
 			b.writeln('')
@@ -1066,15 +1069,19 @@ fn resolvers_file(out_module string, current string, defined string, hand []Hand
 	} else {
 		b.write_string(current.trim_right('\n'))
 		b.writeln('')
-		if missing.len > 0 && !current.contains('import five07.vgraph.graphql') {
-			// the stubs need graphql: put the import after the module line
+		absent := stub_imports.filter(!current.contains('import ${it}\n'))
+		if missing.len > 0 && absent.len > 0 {
+			// the stubs need these: put the imports after the module line
 			text := b.str()
 			b = strings.new_builder(4096)
 			module_line := text.index('\nmodule ') or { -1 }
 			if module_line >= 0 {
 				end := text.index_after('\n', module_line + 1) or { text.len }
 				b.write_string(text[..end + 1])
-				b.writeln('\nimport five07.vgraph.graphql')
+				b.writeln('')
+				for line in absent {
+					b.writeln('import ${line}')
+				}
 				b.write_string(text[end + 1..])
 			} else {
 				b.write_string(text)
@@ -1084,7 +1091,7 @@ fn resolvers_file(out_module string, current string, defined string, hand []Hand
 	for h in missing {
 		b.writeln('')
 		b.writeln('// ${h.method} resolves `${h.typ}.${h.field}`: `${h.sdl}`.')
-		b.writeln('pub fn (r Resolvers) ${h.method}(_ graphql.Context, _ graphql.FieldInfo, _ []graphql.Source) ![]graphql.Resolved {')
+		b.writeln('pub fn (r Resolvers) ${h.method}(_ context.Context, _ graphql.FieldInfo, _ []graphql.Source) ![]graphql.Resolved {')
 		b.writeln("\treturn error('${h.typ}.${h.field} is not implemented')")
 		b.writeln('}')
 	}
