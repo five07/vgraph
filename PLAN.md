@@ -182,6 +182,40 @@ is recorded and the generated code runs as it does today.
 3. **Generator**: `ops` and `full` spans in the generated client, `default`
    generated as `full` with its runtime check; no otel import when every model
    is `none`; gen tests for each level.
+   **Done.**
+   - `gen/otel.v`: after a table's files are generated, a model whose level
+     isn't `none` has each operation's method split into `<name>_untraced`
+     (the body as it was) and a wrapper of the same name and doc comment,
+     which starts the span (`Client.start_span`, `start_load_span`), runs the
+     body with a client whose context holds it, records a failure
+     (`vgraph.span_failed`: the error's type, no message) or the rows
+     (`vgraph.span_rows`), and ends it. A `none` model's code is unchanged.
+   - Operations: `all`, `count`, `ids`, `scan`, the aggregates and the
+     group-by's `all` (`query <table>`); each `load_<edge>`
+     (`load <table>.<edge>`, with `vgraph.batch_size`); the `save` and `exec`
+     of create, create bulk, update one, update, delete one and delete
+     (`create`/`update`/`delete <table>`). `first`, `only`, `exist` and the
+     rest go through these, and a `save` runs its `exec` inside its own span.
+     Attributes: `db.collection.name`, `vgraph.operation`, `vgraph.rows`.
+   - The generated code calls vgraph's helpers, so it never imports otel; a
+     traced table file imports `five07.vgraph`. The level is a literal in each
+     wrapper (`.ops`, `.full`, `.default`), and `Client.records` decides.
+   - Hooks, interceptors and privacy rules run in the core, so their `full`
+     spans are there, gated by the table's level (`Client.full_spans`):
+     `hook <table>` per hook that applies, `privacy <table>` for a write's
+     rules (the privacy hook) and for a query's (with `vgraph.decision`), and
+     `intercept <table>` per interceptor (`vgraph.interceptor`, its name).
+     Hook spans nest, as hooks do: each covers the hooks inside it and the
+     write, whose statements are the innermost span's. Rules, interceptors
+     and hooks get the span's context, so their own queries nest under it.
+   - `full` and `ops` generate the same code but for the level; `full`'s
+     generated extra is the GraphQL resolver spans of Phase 4.
+   - Tests: the `vgraph gen` end-to-end project has one model per level
+     (`full` articles, `ops` users, `default` tags, comments without) and
+     checks the span tree, `otel_level: .none` on a `default` model, write and
+     hook spans, and a failure; `gen_test.v` tests the signature parser and
+     `instrument` by level; `otel_test.v` tests privacy and interceptor spans.
+     Full suite 28 passed, 3 skipped; PostgreSQL tests pass locally.
 4. **GraphQL server**: the operation span, resolver spans of `full` and
    `default` types, the startup notice and its test.
 5. **Example `service-otel`**, a copy of `service` with instrumentation.

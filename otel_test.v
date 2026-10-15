@@ -14,6 +14,12 @@ struct Shelf {
 	name string
 }
 
+fn (s Shelf) otel() Otel {
+	return Otel{
+		level: .full
+	}
+}
+
 fn (s Shelf) edges() []Edge {
 	return [
 		Edge{
@@ -229,4 +235,31 @@ fn test_statement_names_of_vgraphs_own_sql() {
 	// an app's raw SQL isn't read
 	assert names_of(.raw, '') == ' '
 	assert names_of(.commit, '') == 'COMMIT '
+}
+
+// A full model's query privacy rules are one span, with what decided, and each
+// of its interceptors one, named; a model of another level has neither.
+fn test_privacy_and_interceptor_spans_of_a_full_model() {
+	provider, exporter := recorder()!
+	c := Client.new(otel_db()!, otel_schema()!, tracer_provider: provider)!
+	for table in ['shelves', 'books'] {
+		c.policy_on(table, Policy{
+			query: [always_allow_query]
+		})
+		c.intercept_on(table, Interceptor{
+			name: 'visible'
+			run:  fn (_ context.Context, _ string, mut q load.Query) ! {
+				q.conds << load.ne('name', 'hidden')
+			}
+		})
+	}
+	c.prepare_query('shelves', load.Query{})!
+	spans := exporter.spans()
+	assert spans.map(it.name) == ['privacy shelves', 'intercept shelves']
+	assert attr(spans[0], vgraph_decision) == 'allow'
+	assert attr(spans[0], vgraph_operation) == 'query'
+	assert attr(spans[1], vgraph_interceptor) == 'visible'
+	exporter.reset()
+	c.prepare_query('books', load.Query{})!
+	assert exporter.spans().len == 0
 }
