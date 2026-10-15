@@ -10,7 +10,7 @@ import five07.otel.semconv
 // provider the app gives `Client.new`. Without one, it records nothing.
 
 // version is vgraph's, which its tracer reports.
-pub const version = '0.1.0'
+pub const version = '0.2.0'
 
 // OtelLevel is how much a model's generated code records.
 pub enum OtelLevel {
