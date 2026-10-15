@@ -156,4 +156,4 @@ for a in articles {
 
 Each edge loads in one query for all the rows at a level, never one per row.
 Next: [Queries](queries.md) and [Writes](writes.md), or serve it all over
-[GraphQL](graphql.md).
+[GraphQL](graphql.md), and see what it runs with [Tracing](tracing.md).

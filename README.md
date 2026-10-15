@@ -119,6 +119,10 @@ println(res.json())
   GraphQL module is its own, tested against graphql-js.
 - **Migrations** through V's `v.migrations`: tables, indexes, foreign keys,
   triggers and global ids, from the schema.
+- **Tracing** with OpenTelemetry, through `five07.otel`: a span per GraphQL
+  operation and per statement, and for each model as much as its level asks,
+  from its queries to its hooks and resolvers; never a value. Off, and free,
+  without a tracer provider.
 
 ## Docs
 
